@@ -1,0 +1,30 @@
+# Rust / Cargo 构建产物
+target/
+Cargo.lock
+
+# 打包输出
+deliverable/
+dist/
+tmp/
+*.zip
+*.tar.gz
+
+# 编译产物
+*.exe
+*.dll
+*.so
+*.dylib
+
+# IDE 和编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 操作系统文件
+Thumbs.db
+.DS_Store
+
+# 调试日志
+*.log

@@ -1,0 +1,3 @@
+[target.x86_64-unknown-linux-musl]
+linker = ".cargo/zig-cc-x86_64-linux-musl.cmd"
+rustflags = ["-C", "link-self-contained=no"]
