@@ -134,7 +134,6 @@ jobs:
             - `rustracker-linux.tar.gz` - Linux 完整包（含二进制和安装脚本）
             - `rustracker-linux` - Linux 64位二进制
             - `rustracker.exe` - Windows 64位二进制
-            - `install-linux.sh` - Linux 安装脚本
 
             ### Linux 安装
             ```bash
@@ -145,7 +144,6 @@ jobs:
           files: |
             release/rustracker-linux
             release/rustracker.exe
-            release/install-linux.sh
             rustracker-linux.tar.gz
           draft: false
           prerelease: false
