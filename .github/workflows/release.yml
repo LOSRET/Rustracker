@@ -105,14 +105,18 @@ jobs:
       - name: Get changelog
         id: changelog
         run: |
-          # 获取上一个版本 tag
-          prev_tag=$(git tag --sort=-creatordate | head -2 | tail -1)
-          if [ -z "$prev_tag" ]; then
-            # 没有 tag，获取所有 commit
+          # 找到上一次修改 Cargo.toml 中 version 的 commit
+          prev_commit=$(git log --all --oneline -- Cargo.toml | sed -n '2p' | cut -d' ' -f1)
+          if [ -z "$prev_commit" ]; then
+            # 没有找到之前的版本 commit，获取所有 commit
             changelog=$(git log --pretty=format:"- %s" --no-merges)
           else
-            # 获取两个版本之间的 commit
-            changelog=$(git log ${prev_tag}..HEAD --pretty=format:"- %s" --no-merges)
+            # 获取两个版本 commit 之间的所有修改（排除版本更新 commit）
+            changelog=$(git log ${prev_commit}..HEAD~1 --pretty=format:"- %s" --no-merges)
+          fi
+          # 如果没有内容，显示通用说明
+          if [ -z "$changelog" ]; then
+            changelog="- 代码优化和修复"
           fi
           # 多行内容写入环境变量
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
