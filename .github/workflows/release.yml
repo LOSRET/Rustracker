@@ -102,6 +102,23 @@ jobs:
           cp release/install-linux.sh rustracker-linux/
           tar -czf rustracker-linux.tar.gz rustracker-linux
 
+      - name: Get changelog
+        id: changelog
+        run: |
+          # 获取上一个版本 tag
+          prev_tag=$(git tag --sort=-creatordate | head -2 | tail -1)
+          if [ -z "$prev_tag" ]; then
+            # 没有 tag，获取所有 commit
+            changelog=$(git log --pretty=format:"- %s" --no-merges)
+          else
+            # 获取两个版本之间的 commit
+            changelog=$(git log ${prev_tag}..HEAD --pretty=format:"- %s" --no-merges)
+          fi
+          # 多行内容写入环境变量
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$changelog" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
@@ -109,6 +126,9 @@ jobs:
           name: v${{ needs.check-version.outputs.version }}
           body: |
             ## rustracker v${{ needs.check-version.outputs.version }}
+
+            ### 更新内容
+            ${{ steps.changelog.outputs.changelog }}
 
             ### 下载
             - `rustracker-linux.tar.gz` - Linux 完整包（含二进制和安装脚本）
