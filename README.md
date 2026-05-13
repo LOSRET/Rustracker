@@ -1,3 +1,5 @@
+[中文](./README-zh.md) | English
+
 # rustracker
 
 A small HTTP BitTorrent tracker written in Rust.
