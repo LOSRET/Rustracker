@@ -89,6 +89,13 @@ jobs:
       - name: Copy install script
         run: cp install-linux.sh release/
 
+      - name: Create Linux package
+        run: |
+          mkdir -p rustracker-linux
+          cp release/rustracker-linux rustracker-linux/
+          cp release/install-linux.sh rustracker-linux/
+          tar -czf rustracker-linux.tar.gz rustracker-linux
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
@@ -98,17 +105,21 @@ jobs:
             ## rustracker v${{ needs.check-version.outputs.version }}
 
             ### 下载
-            - `rustracker-linux` - Linux 64位
-            - `rustracker.exe` - Windows 64位
+            - `rustracker-linux.tar.gz` - Linux 完整包（含二进制和安装脚本）
+            - `rustracker-linux` - Linux 64位二进制
+            - `rustracker.exe` - Windows 64位二进制
             - `install-linux.sh` - Linux 安装脚本
 
             ### Linux 安装
             ```bash
+            tar -xzf rustracker-linux.tar.gz
+            cd rustracker-linux
             sudo sh install-linux.sh
             ```
           files: |
             release/rustracker-linux
             release/rustracker.exe
             release/install-linux.sh
+            rustracker-linux.tar.gz
           draft: false
           prerelease: false
