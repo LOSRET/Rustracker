@@ -1,0 +1,114 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Cargo.toml'
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+      changed: ${{ steps.check.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - id: get_version
+        name: Get current version
+        run: echo "version=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')" >> $GITHUB_OUTPUT
+
+      - id: check
+        name: Check if version changed
+        run: |
+          git show HEAD~1:Cargo.toml > old_Cargo.toml 2>/dev/null || true
+          old_version=$(grep '^version' old_Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/' || echo "")
+          new_version=${{ steps.get_version.outputs.version }}
+          rm -f old_Cargo.toml
+          if [ "$old_version" != "$new_version" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "Version changed: $old_version -> $new_version"
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "Version unchanged: $new_version"
+          fi
+
+  build:
+    needs: check-version
+    if: needs.check-version.outputs.changed == 'true'
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact: rustracker-linux
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: rustracker.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: target/${{ matrix.target }}/release/${{ matrix.artifact }}
+
+  release:
+    needs: [check-version, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Linux binary
+        uses: actions/download-artifact@v4
+        with:
+          name: rustracker-linux
+          path: release/
+
+      - name: Download Windows binary
+        uses: actions/download-artifact@v4
+        with:
+          name: rustracker.exe
+          path: release/
+
+      - name: Copy install script
+        run: cp install-linux.sh release/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.check-version.outputs.version }}
+          name: v${{ needs.check-version.outputs.version }}
+          body: |
+            ## rustracker v${{ needs.check-version.outputs.version }}
+
+            ### 下载
+            - `rustracker-linux` - Linux 64位
+            - `rustracker.exe` - Windows 64位
+            - `install-linux.sh` - Linux 安装脚本
+
+            ### Linux 安装
+            ```bash
+            sudo sh install-linux.sh
+            ```
+          files: |
+            release/rustracker-linux
+            release/rustracker.exe
+            release/install-linux.sh
+          draft: false
+          prerelease: false
