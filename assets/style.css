@@ -481,7 +481,7 @@
             .main { padding: 60px 18px 18px; }
             .topbar, .chart-head { flex-direction: column; align-items: stretch; }
             .metrics { grid-template-columns: repeat(2, minmax(130px, 1fr)); }
-            #trendChart, #clientChart { height: 240px; }
+            #trendChart, #clientChart { height: 330px; }
             .hamburger { display: block; }
             .side {
                 position: fixed;
@@ -502,5 +502,5 @@
         @media (max-width: 560px) {
             .metrics { grid-template-columns: 1fr; }
             h1 { font-size: 24px; }
-            #trendChart, #clientChart { height: 200px; }
+            #trendChart, #clientChart { height: 275px; }
         }
