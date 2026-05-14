@@ -633,16 +633,13 @@ impl TrendStore {
         // Store full distribution
         let dist: Vec<(u8, u32)> = clients.iter().map(|(t, c)| (*t, *c as u32)).collect();
 
-        match self.client_points.last_mut() {
-            Some((ts, _)) if *ts == bucket => {
-                *self.client_points.last_mut().unwrap() = (bucket, dist);
-                self.client_cache_dirty = true;
-            }
-            _ => {
-                self.client_points.push((bucket, dist));
-                self.client_cache_dirty = true;
-            }
+        // 已有该 bucket 的点则直接跳过，不再覆盖（写入即冻结）
+        if self.client_points.last().is_some_and(|(ts, _)| *ts == bucket) {
+            return &self.client_cache;
         }
+
+        self.client_points.push((bucket, dist));
+        self.client_cache_dirty = true;
 
         // Prune old data
         let min_timestamp = bucket.saturating_sub(Self::RETENTION_SECS);
