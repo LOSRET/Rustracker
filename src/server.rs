@@ -568,6 +568,12 @@ impl TrendStore {
 
     fn record(&mut self, now: u64, snapshot: &TrackerSnapshot) -> Vec<TrendPointResponse> {
         let bucket = now - (now % Self::SAMPLE_SECS);
+
+        // 已有该 bucket 的点则直接返回缓存，不再覆盖（写入即冻结）
+        if self.points.last().is_some_and(|p| p.timestamp == bucket) {
+            return self.filled_cache.clone();
+        }
+
         let point = TrendPointResponse {
             timestamp: bucket,
             torrents: snapshot.totals.torrents,
@@ -576,32 +582,14 @@ impl TrendStore {
             leechers: snapshot.totals.leechers,
         };
 
-        let mut changed = false;
-
-        match self.points.last_mut() {
-            Some(last) if last.timestamp == bucket => {
-                if *last != point {
-                    *last = point;
-                    changed = true;
-                }
-            }
-            _ => {
-                self.points.push(point);
-                changed = true;
-            }
-        }
+        self.points.push(point);
 
         let min_timestamp = bucket.saturating_sub(Self::RETENTION_SECS);
-        let old_len = self.points.len();
         self.points.retain(|point| point.timestamp >= min_timestamp);
-        changed |= self.points.len() != old_len;
 
-        if changed || self.cache_start != min_timestamp || self.cache_end != bucket {
-            self.filled_cache = self.filled_points(min_timestamp, bucket);
-            self.cache_start = min_timestamp;
-            self.cache_end = bucket;
-        }
-
+        self.filled_cache = self.filled_points(min_timestamp, bucket);
+        self.cache_start = min_timestamp;
+        self.cache_end = bucket;
         self.filled_cache.clone()
     }
 
