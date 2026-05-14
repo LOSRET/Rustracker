@@ -182,7 +182,37 @@
             return { left: 4, right: 4, top: 52, bottom: 36, containLabel: true };
         }
 
-        const CLIENT_COLORS = ["#2563eb", "#15803d", "#b45309", "#6d28d9", "#b91c1c", "#0891b2", "#4f46e5", "#ca8a04", "#0d9488", "#be185d"];
+        const CLIENT_BRAND = [
+            ["Xunlei", "#1976D2"], ["迅雷", "#1976D2"],
+            ["qBittorrent", "#2196F3"],
+            ["Transmission", "#D32F2F"],
+            ["Deluge", "#388E3C"],
+            ["uTorrent", "#7CB342"], ["µTorrent", "#7CB342"],
+            ["BitComet", "#FF8F00"],
+            ["BiglyBT", "#00897B"],
+            ["Vuze", "#1565C0"],
+            ["aria2", "#455A64"],
+            ["libTorrent", "#7E57C2"],
+            ["BitTorrent", "#4CAF50"],
+            ["rTorrent", "#C62828"],
+            ["Tixati", "#E65100"],
+            ["WebTorrent", "#00ACC1"],
+            ["FrostWire", "#0097A7"],
+            ["ktorrent", "#1E88E5"],
+            ["LibreTorrent", "#43A047"],
+            ["Flud", "#26A69A"],
+            ["Motrix", "#6D28D9"],
+            ["Picotorrent", "#66BB6A"]
+        ];
+        const CLIENT_FALLBACK = ["#78909C", "#8D6E63", "#5C6BC0", "#EF5350", "#26C6DA"];
+
+        function resolveClientColor(name, idx) {
+            const lower = name.toLowerCase();
+            for (const [key, color] of CLIENT_BRAND) {
+                if (lower.includes(key.toLowerCase())) return color;
+            }
+            return CLIENT_FALLBACK[idx % CLIENT_FALLBACK.length];
+        }
 
         function renderClientChart() {
             const d = state.clientData || {};
@@ -219,9 +249,10 @@
                     return ti >= 0 ? (item.counts[ti] || 0) : 0;
                 })
             }));
+            const resolvedColors = names.map((n, i) => resolveClientColor(n, i));
             clientChart.setOption({
                 title: { text: "" },
-                color: CLIENT_COLORS,
+                color: resolvedColors,
                 tooltip: { trigger: "axis" },
                 legend: { type: "scroll", top: 0, left: "center", itemWidth: 16, itemGap: 14, textStyle: { fontSize: 11 }, data: names },
                 grid: chartGrid(),
