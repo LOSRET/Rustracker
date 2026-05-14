@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>rustracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
+    <script defer src="https://u.7471.top/script.js" data-website-id="dabdcda9-0b8c-4cc6-8d16-d99ba68462cb"></script>
+</head>
+<body>
+    <div class="app">
+        <aside class="side">
+            <div class="brand"><span class="mark">R</span><span>rustracker</span></div>
+            <div class="lang-bar">
+                <span class="lang-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path fill="currentColor" d="m11.9 22l4.55-12h2.1l4.55 12H21l-1.075-3.05h-4.85L14 22zM4 19l-1.4-1.4l5.05-5.05q-.875-.875-1.588-2T4.75 8h2.1q.5.975 1 1.7t1.2 1.45q.825-.825 1.713-2.313T12.1 6H1V4h7V2h2v2h7v2h-2.9q-.525 1.8-1.575 3.7t-2.075 2.9l2.4 2.45l-.75 2.05l-3.05-3.125zm11.7-1.8h3.6l-1.8-5.1z"/></svg></span>
+                <select id="langSelect" class="lang-sel">
+                    <option value="zh">中文</option>
+                    <option value="en">English</option>
+                </select>
+            </div>
+            <div class="nav-label" data-i18n="monitoring">监控</div>
+            <div class="nav-item"><span data-i18n="overview">Tracker 概览</span><span id="navState" data-i18n="running">运行中</span></div>
+            <a class="nav-item nav-link" href="#disclaimer"><span data-i18n="disc_link">Tracker 免责说明</span><span data-i18n="view">查看</span></a>
+            <p class="side-note" data-i18n="side_note">HTTP tracker 的连接、做种、下载和完成统计。</p>
+        </aside>
+
+        <main class="main">
+            <section class="topbar">
+                <div>
+                    <h1 data-i18n="title">Tracker 控制台</h1>
+                    <p class="subtle" data-i18n="subtitle">查看当前端口上的 peer、做种和下载状态。</p>
+                    <div class="status-line" id="statusText" data-i18n="loading">正在加载...</div>
+                    <div class="status-line" id="configText">上报间隔：- | 超时：-</div>
+                </div>
+                <div class="actions">
+                    <button class="button secondary" id="pauseBtn" type="button" data-i18n="pause">暂停刷新</button>
+                    <button class="button" id="refreshBtn" type="button" data-i18n="refresh">刷新</button>
+                </div>
+            </section>
+
+            <section class="metrics" aria-label="Tracker 指标">
+                <div class="metric peers"><span>Peers</span><strong id="metricPeers">0</strong></div>
+                <div class="metric seeders"><span>Seeders</span><strong id="metricSeeders">0</strong></div>
+                <div class="metric leechers"><span>Leechers</span><strong id="metricLeechers">0</strong></div>
+                <div class="metric completed"><span>Completed</span><strong id="metricCompleted">0</strong></div>
+            </section>
+
+            <section class="chart-panel" aria-label="Tracker 趋势图">
+                <div class="chart-head">
+                    <h2 class="chart-title" data-i18n="chart_title">Tracker 趋势</h2>
+                    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                        <span class="chart-note" data-i18n="chart_note">Torrents、Peers、Seeders 和 Leechers 随时间变化</span>
+                        <div class="range-group" id="rangeGroup">
+                            <button class="range-btn active" data-range="24h" type="button" data-i18n="range_24h">24小时</button>
+                            <button class="range-btn" data-range="3d" type="button" data-i18n="range_3d">3天</button>
+                            <button class="range-btn" data-range="7d" type="button" data-i18n="range_7d">7天</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="trendChart"></div>
+            </section>
+
+            <section class="disclaimer" id="disclaimer" aria-label="Tracker 免责说明">
+                <h2 data-i18n="disc_title">Tracker 免责说明</h2>
+                <p data-i18n="disc_p1">本站 Tracker 仅提供连接协调、状态记录与统计展示，不存储、不托管、不分发任何实际资源内容。</p>
+                <p data-i18n="disc_p2">页面中的 torrents、peers、seeders、leechers、客户端类型及趋势数据，来源于客户端上报与系统采样，可能存在延迟、缺失、偏差或伪造，不代表资源真实状态。</p>
+                <p data-i18n="disc_p3">本页面信息不代表任何资源的真实性、完整性、可用性、安全性或合法性，也不构成任何服务承诺或结果保证。</p>
+                <p data-i18n="disc_p4">对于第三方客户端行为、资源内容、传输结果及由此产生的任何直接或间接后果，本站不承担责任，使用者应自行判断并承担相关风险。</p>
+                <p data-i18n="disc_p5">受 Tracker 工作机制限制，本站不保留可用于长期识别、追踪或还原单个连接历史的完整日志，也无法对既往连接行为提供持续、完整或可验证的回溯记录。</p>
+                <div class="disclaimer-contact">
+                    <div><span data-i18n="blog_label">Blog</span>：<a href="https://blog.7471.top/" rel="noopener noreferrer" target="_blank">https://blog.7471.top/</a></div>
+                    <div><span data-i18n="contact_label">如有问题请联系</span>：<a href="mailto:tracker@mail.7471.top">tracker@mail.7471.top</a></div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <script src="/app.js"></script>
+</body>
+</html>
