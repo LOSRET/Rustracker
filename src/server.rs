@@ -532,7 +532,7 @@ struct ClientTrendData {
     history: Vec<ClientTrendPoint>,
 }
 
-const TOP_CLIENT_COUNT: usize = 10;
+const TOP_CLIENT_COUNT: usize = 15;
 
 #[derive(Debug, Default)]
 struct TrendStore {
