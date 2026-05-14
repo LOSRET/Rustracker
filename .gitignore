@@ -28,3 +28,6 @@ Thumbs.db
 
 # 调试日志
 *.log
+
+# Copilot Skills（本地使用）
+.github/skills/
