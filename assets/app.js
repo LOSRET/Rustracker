@@ -204,14 +204,25 @@
             ["Motrix", "#6D28D9"],
             ["Picotorrent", "#66BB6A"]
         ];
-        const CLIENT_FALLBACK = ["#78909C", "#8D6E63", "#5C6BC0", "#EF5350", "#26C6DA"];
+        const UNKNOWN_GRAY = "#9E9E9E";
 
-        function resolveClientColor(name, idx) {
-            const lower = name.toLowerCase();
+        function hashClientName(str) {
+            let h = 0;
+            for (let i = 0; i < str.length; i++) {
+                h = ((h << 5) - h + str.charCodeAt(i)) | 0;
+            }
+            return Math.abs(h);
+        }
+
+        function resolveClientColor(name) {
+            const trimmed = name.trim();
+            if (!trimmed || /^unknown$/i.test(trimmed)) return UNKNOWN_GRAY;
+            const lower = trimmed.toLowerCase();
             for (const [key, color] of CLIENT_BRAND) {
                 if (lower.includes(key.toLowerCase())) return color;
             }
-            return CLIENT_FALLBACK[idx % CLIENT_FALLBACK.length];
+            const h = hashClientName(trimmed) % 360;
+            return `hsl(${h}, 65%, 50%)`;
         }
 
         function renderClientChart() {
@@ -249,7 +260,7 @@
                     return ti >= 0 ? (item.counts[ti] || 0) : 0;
                 })
             }));
-            const resolvedColors = names.map((n, i) => resolveClientColor(n, i));
+            const resolvedColors = names.map((n) => resolveClientColor(n));
             clientChart.setOption({
                 title: { text: "" },
                 color: resolvedColors,
