@@ -52,10 +52,7 @@ fn fmt_mb(b: usize) -> String { format!("{:.1}", b as f64 / (1024.0 * 1024.0)) }
 
 // ─── Production distribution ──────────────────────────────────────
 
-fn prod_infohashes_and_peers() -> (Vec<InfoHash>, Vec<usize>) {
-    let torrents = 428_493;
-    let total_peers = 666_384;
-    let max_peers = 366;
+fn gen_distribution(torrents: usize, total_peers: usize, max_peers: usize) -> (Vec<InfoHash>, Vec<usize>) {
     let c = (max_peers - 1) as f64;
 
     let mut lo = 0.01f64; let mut hi = 2.0f64; let mut alpha = 0.5;
@@ -76,9 +73,8 @@ fn prod_infohashes_and_peers() -> (Vec<InfoHash>, Vec<usize>) {
     }
     while counts.len() < torrents { counts.push(1); }
     counts.truncate(torrents);
-    let mut sum: usize = counts.iter().sum();
-    if sum > total_peers {
-        let mut excess = sum - total_peers;
+    if counts.iter().sum::<usize>() > total_peers {
+        let mut excess = counts.iter().sum::<usize>() - total_peers;
         for i in (0..counts.len()).rev() {
             if excess == 0 { break; }
             if counts[i] > 1 { let r = excess.min(counts[i] - 1); counts[i] -= r; excess -= r; }
@@ -96,14 +92,10 @@ fn prod_infohashes_and_peers() -> (Vec<InfoHash>, Vec<usize>) {
     (hashes, counts)
 }
 
-// ─── Main ────────────────────────────────────────────────────────
-
-fn main() {
-    let (hashes, counts) = prod_infohashes_and_peers();
-    let n = hashes.len();
-    let total_peers: usize = counts.iter().sum();
-    let max_peer = counts.iter().max().copied().unwrap_or(0);
-    eprintln!("torrents={} peers={} max_peer={}", n, total_peers, max_peer);
+fn run_bench(label: &str, torrents: usize, total_peers: usize, max_peers: usize) {
+    let (hashes, counts) = gen_distribution(torrents, total_peers, max_peers);
+    let actual_peers: usize = counts.iter().sum();
+    eprintln!("[{label}] torrents={torrents} peers={actual_peers} max_peer={max_peers}");
 
     let interval = Duration::from_secs(1800);
     let timeout = Duration::from_secs(2700);
@@ -113,16 +105,13 @@ fn main() {
     let base_ip = Ipv4Addr::new(10, 0, 0, 1);
     let base_port: u16 = 6881;
 
-    let sample_every = n / 40; // ~10K per sample
-
-    // Header
-    println!("torrents_done,peers_added,rss_mb,delta_mb");
+    let sample_every = (torrents / 40).max(1);
 
     let baseline = mem::rss_bytes();
     let mut last_rss = baseline;
     let mut peers_done = 0usize;
 
-    for i in 0..n {
+    for i in 0..torrents {
         let count = counts[i];
         for j in 0..count {
             let ip_octets = base_ip.octets();
@@ -155,9 +144,8 @@ fn main() {
             let rss = mem::rss_bytes();
             let delta = rss.saturating_sub(last_rss);
             println!(
-                "{},{},{},{}",
-                i + 1,
-                peers_done,
+                "{},{},{},{},{}",
+                label, i + 1, peers_done,
                 fmt_mb(rss.saturating_sub(baseline)),
                 fmt_mb(delta),
             );
@@ -165,15 +153,21 @@ fn main() {
         }
     }
 
-    // Final snapshot
     let final_rss = mem::rss_bytes().saturating_sub(baseline);
     let snapshot = tracker.snapshot();
     eprintln!(
-        "done | rss={} torrents={} peers={} seeders={} leechers={}",
+        "[{label}] done | rss={} torrents={} peers={} seeders={} leechers={}",
         fmt_mb(final_rss),
         snapshot.totals.torrents,
         snapshot.totals.peers,
         snapshot.totals.seeders,
         snapshot.totals.leechers,
     );
+}
+
+// ─── Main ────────────────────────────────────────────────────────
+
+fn main() {
+    println!("label,torrents_done,peers_added,rss_mb,delta_mb");
+    run_bench("large", 1_000_000, 2_500_000, 500);
 }
