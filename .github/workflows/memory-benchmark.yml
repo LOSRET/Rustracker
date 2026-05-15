@@ -1,4 +1,4 @@
-name: Memory Benchmark
+name: Memory Benchmark (Real Tracker)
 
 on:
   workflow_dispatch:
@@ -15,25 +15,41 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Build
-        run: cargo build --release --example memory_ci_compare
+        run: cargo build --release --example memory_tracker_bench
 
-      - name: Run memory benchmark
-        run: cargo run --release --example memory_ci_compare | tee results.csv
+      - name: Run real-tracker memory benchmark
+        run: cargo run --release --example memory_tracker_bench 2>bench.log | tee results.csv
+
+      - name: Show summary
+        run: cat bench.log
 
       - name: Render results table
         run: |
-          echo "## DashMap vs BTreeMap Memory Comparison" >> $GITHUB_STEP_SUMMARY
+          echo "## Tracker RSS Growth Curve" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Type | Torrents | Peers | BTreeMap | DashMap | Diff | Diff% | BT Build | DM Build |" >> $GITHUB_STEP_SUMMARY
-          echo "|---:|---:|---:|---:|---:|---:|---:|---:|---:|" >> $GITHUB_STEP_SUMMARY
-          tail -n +2 results.csv | while IFS=',' read typ scale torrents peers bt dm diff pct bt_sec dm_sec; do
-            scale_fmt=$(printf "%'d" $scale)
+          echo "| Torrents | Peers | RSS | ΔRSS |" >> $GITHUB_STEP_SUMMARY
+          echo "|---:|---:|---:|---:|" >> $GITHUB_STEP_SUMMARY
+          tail -n +2 results.csv | while IFS=',' read torrents peers rss delta; do
+            torrents_fmt=$(printf "%'d" $torrents)
             peers_fmt=$(printf "%'d" $peers)
-            echo "| ${typ} | ${scale_fmt} | ${peers_fmt} | ${bt} MB | ${dm} MB | ${diff} MB | ${pct}% | ${bt_sec}s | ${dm_sec}s |" >> $GITHUB_STEP_SUMMARY
+            echo "| ${torrents_fmt} | ${peers_fmt} | ${rss} MB | ${delta} MB |" >> $GITHUB_STEP_SUMMARY
           done
+
+      - name: Check for memory jumps
+        run: |
+          MAX_JUMP=0
+          tail -n +2 results.csv | while IFS=',' read _ _ _ delta; do
+            delta_num=$(echo "$delta" | sed 's/ MB//')
+            if [ "$(echo "$delta_num > $MAX_JUMP" | bc -l 2>/dev/null || echo 0)" = "1" ]; then
+              MAX_JUMP=$delta_num
+            fi
+          done
+          echo "Max single-step RSS jump: ${MAX_JUMP} MB"
 
       - name: Upload results
         uses: actions/upload-artifact@v4
         with:
-          name: memory-benchmark-results
-          path: results.csv
+          name: tracker-memory-benchmark
+          path: |
+            results.csv
+            bench.log
