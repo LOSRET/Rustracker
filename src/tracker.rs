@@ -116,9 +116,6 @@ impl Tracker {
         // All swarm operations happen in this block; borrow released before client_counts access
         let (output, pending_decr, pending_incr) = {
             let swarm = self.swarms.entry(info_hash).or_default();
-            let old_peer = swarm.peer_state(endpoint);
-            let old_tag = old_peer.as_ref().map(|p| p.client_tag);
-            let was_complete = old_peer.as_ref().map_or(false, |p| p.is_complete());
 
             let mut decr: Vec<u8> = Vec::new();
             let mut incr: Option<u8> = None;
@@ -130,10 +127,12 @@ impl Tracker {
                     }
                 }
                 AnnounceEvent::Completed => {
+                    let old_peer = swarm.upsert_peer(endpoint, input.into_peer_state(now_secs));
+                    let was_complete = old_peer.as_ref().map_or(false, |p| p.is_complete());
                     if !was_complete {
                         swarm.downloaded = swarm.downloaded.saturating_add(1);
                     }
-                    swarm.upsert_peer(endpoint, input.into_peer_state(now_secs));
+                    let old_tag = old_peer.as_ref().map(|p| p.client_tag);
                     if let Some(tag) = old_tag {
                         if tag != new_tag {
                             decr.push(tag);
@@ -144,7 +143,8 @@ impl Tracker {
                     }
                 }
                 AnnounceEvent::Started | AnnounceEvent::Empty => {
-                    swarm.upsert_peer(endpoint, input.into_peer_state(now_secs));
+                    let old_peer = swarm.upsert_peer(endpoint, input.into_peer_state(now_secs));
+                    let old_tag = old_peer.as_ref().map(|p| p.client_tag);
                     if let Some(tag) = old_tag {
                         if tag != new_tag {
                             decr.push(tag);
@@ -388,22 +388,15 @@ fn jitter_seed(info_hash: InfoHash, peer_id: PeerId, now_secs: u32) -> u64 {
 }
 
 impl Swarm {
-    fn peer_state(&self, endpoint: PeerEndpoint) -> Option<PeerState> {
-        match endpoint {
-            PeerEndpoint::V4(key) => self.ipv4_peers.get(&key),
-            PeerEndpoint::V6(key) => self.ipv6_peers.get(&key),
-        }
-    }
-
-    fn upsert_peer(&mut self, endpoint: PeerEndpoint, peer: PeerState) {
+    fn upsert_peer(&mut self, endpoint: PeerEndpoint, peer: PeerState) -> Option<PeerState> {
         let is_complete = peer.is_complete();
         let old = match endpoint {
             PeerEndpoint::V4(key) => self.ipv4_peers.insert(key, peer),
             PeerEndpoint::V6(key) => self.ipv6_peers.insert(key, peer),
         };
 
-        if let Some(old_peer) = old {
-            self.remove_from_counters(&old_peer);
+        if let Some(ref old_peer) = old {
+            self.remove_from_counters(old_peer);
         }
 
         if is_complete {
@@ -411,6 +404,8 @@ impl Swarm {
         } else {
             self.incomplete = self.incomplete.saturating_add(1);
         }
+
+        old
     }
 
     fn remove_peer_tag(&mut self, endpoint: PeerEndpoint) -> Option<u8> {
@@ -545,10 +540,6 @@ impl Swarm {
 }
 
 impl PackedIpv4Peers {
-    fn get(&self, key: &Ipv4PeerKey) -> Option<PeerState> {
-        self.find(key).map(|index| self.state_at(index))
-    }
-
     fn insert(&mut self, key: Ipv4PeerKey, peer: PeerState) -> Option<PeerState> {
         if let Some(index) = self.find(&key) {
             let old = self.state_at(index);
@@ -707,10 +698,6 @@ impl PackedIpv4Peers {
 }
 
 impl PackedIpv6Peers {
-    fn get(&self, key: &Ipv6PeerKey) -> Option<PeerState> {
-        self.find(key).map(|index| self.state_at(index))
-    }
-
     fn insert(&mut self, key: Ipv6PeerKey, peer: PeerState) -> Option<PeerState> {
         if let Some(index) = self.find(&key) {
             let old = self.state_at(index);
