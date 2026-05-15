@@ -4,7 +4,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  # ── Real tracker benchmark (announce/expire path) ───────────────
   tracker:
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -46,10 +45,9 @@ jobs:
           name: tracker-bench
           path: results.csv
 
-  # ── DashMap vs BTreeMap container comparison ───────────────────
   compare:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -58,20 +56,31 @@ jobs:
       - name: Build
         run: cargo build --release --example memory_ci_compare
 
-      - name: Run container comparison
-        run: cargo run --release --example memory_ci_compare | tee compare.csv
+      - name: Run BTreeMap (clean process)
+        run: cargo run --release --example memory_ci_compare -- btree | tee btree.csv
 
-      - name: Render comparison
+      - name: Run DashMap (clean process)
+        run: cargo run --release --example memory_ci_compare -- dashmap | tee dashmap.csv
+
+      - name: Merge and render
         run: |
-          echo "## DashMap vs BTreeMap Container Memory" >> $GITHUB_STEP_SUMMARY
+          echo "## DashMap vs BTreeMap Container Memory (separate processes)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Type | Torrents | Peers | BTreeMap | DashMap | Diff | Diff% | BT Time | DM Time |" >> $GITHUB_STEP_SUMMARY
-          echo "|---:|---:|---:|---:|---:|---:|---:|---:|---:|" >> $GITHUB_STEP_SUMMARY
-          tail -n +2 compare.csv | while IFS=',' read typ scale torrents peers bt dm diff pct bt_sec dm_sec; do
-            echo "| ${typ} | $(printf "%'d" $scale) | $(printf "%'d" $peers) | ${bt} MB | ${dm} MB | ${diff} MB | ${pct}% | ${bt_sec}s | ${dm_sec}s |" >> $GITHUB_STEP_SUMMARY
+          echo "| Torrents | BTreeMap | DashMap | Diff | BT Time | DM Time |" >> $GITHUB_STEP_SUMMARY
+          echo "|---:|---:|---:|---:|---:|---:|" >> $GITHUB_STEP_SUMMARY
+          tail -n +2 btree.csv | while IFS=',' read _ scale _ _ bt_mb bt_sec; do
+            dm_line=$(grep "^dashmap,${scale}," dashmap.csv)
+            dm_mb=$(echo "$dm_line" | cut -d',' -f5)
+            dm_sec=$(echo "$dm_line" | cut -d',' -f6)
+            bt_num=$(echo "$bt_mb" | sed 's/ MB//')
+            dm_num=$(echo "$dm_mb" | sed 's/ MB//')
+            diff=$(echo "$dm_num - $bt_num" | bc -l)
+            echo "| $(printf "%'d" $scale) | ${bt_mb} MB | ${dm_mb} MB | ${diff} MB | ${bt_sec}s | ${dm_sec}s |" >> $GITHUB_STEP_SUMMARY
           done
 
       - uses: actions/upload-artifact@v4
         with:
           name: container-compare
-          path: compare.csv
+          path: |
+            btree.csv
+            dashmap.csv
