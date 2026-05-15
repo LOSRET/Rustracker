@@ -4,7 +4,7 @@
 
 [![Version](https://img.shields.io/badge/version-0.1.86-blue.svg)](https://github.com/rustracker/rustracker/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
-[![Rust](https://img.shields.io/badge/Rust-2021-edition-orange.svg)](https://www.rust-lang.org)
+[![Rust](https://img.shields.io/badge/Rust-2021--edition-orange.svg)](https://www.rust-lang.org)
 
 一个轻量、高性能的 HTTP BitTorrent 跟踪器，内置实时监控面板，使用 Rust 编写。
 
