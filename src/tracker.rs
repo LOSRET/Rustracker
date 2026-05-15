@@ -1,5 +1,5 @@
 use std::cmp::Reverse;
-use std::collections::{BinaryHeap, HashMap};
+use std::collections::{BTreeMap, BinaryHeap};
 use std::net::IpAddr;
 use std::time::{Duration, Instant};
 
@@ -59,7 +59,7 @@ pub struct Tracker {
     peer_timeout: Duration,
     started_at: Instant,
     next_expire_at: Instant,
-    swarms: HashMap<InfoHash, Swarm>,
+    swarms: BTreeMap<InfoHash, Swarm>,
     client_counts: Vec<(u8, u64)>,
 }
 
@@ -99,7 +99,7 @@ impl Tracker {
             peer_timeout,
             started_at,
             next_expire_at: started_at,
-            swarms: HashMap::new(),
+            swarms: BTreeMap::new(),
             client_counts: Vec::new(),
         }
     }
@@ -191,7 +191,7 @@ impl Tracker {
         output
     }
 
-    pub fn scrape(&self, info_hashes: &[InfoHash]) -> HashMap<InfoHash, TorrentStats> {
+    pub fn scrape(&self, info_hashes: &[InfoHash]) -> BTreeMap<InfoHash, TorrentStats> {
         info_hashes
             .iter()
             .copied()
@@ -322,11 +322,7 @@ impl Tracker {
             self.decr_client(tag);
         }
 
-        if self.swarms.capacity() > 64
-            && self.swarms.len() * 10 < self.swarms.capacity() * 7
-        {
-            self.swarms.shrink_to_fit();
-        }
+        // BTreeMap nodes are deallocated on removal; no shrink needed.
     }
 
     fn expire_sweep_interval(&self) -> Duration {
