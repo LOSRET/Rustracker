@@ -27,24 +27,23 @@ jobs:
         run: |
           echo "## Tracker RSS Growth Curve" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Torrents | Peers | RSS | ΔRSS |" >> $GITHUB_STEP_SUMMARY
-          echo "|---:|---:|---:|---:|" >> $GITHUB_STEP_SUMMARY
-          tail -n +2 results.csv | while IFS=',' read torrents peers rss delta; do
+          echo "| Label | Torrents | Peers | RSS | ΔRSS |" >> $GITHUB_STEP_SUMMARY
+          echo "|---:|---:|---:|---:|---:|" >> $GITHUB_STEP_SUMMARY
+          tail -n +2 results.csv | while IFS=',' read label torrents peers rss delta; do
             torrents_fmt=$(printf "%'d" $torrents)
             peers_fmt=$(printf "%'d" $peers)
-            echo "| ${torrents_fmt} | ${peers_fmt} | ${rss} MB | ${delta} MB |" >> $GITHUB_STEP_SUMMARY
+            echo "| ${label} | ${torrents_fmt} | ${peers_fmt} | ${rss} MB | ${delta} MB |" >> $GITHUB_STEP_SUMMARY
           done
 
       - name: Check for memory jumps
         run: |
-          MAX_JUMP=0
-          tail -n +2 results.csv | while IFS=',' read _ _ _ delta; do
+          echo "Checking for RSS jumps > 5 MB..."
+          tail -n +2 results.csv | while IFS=',' read label _ _ _ delta; do
             delta_num=$(echo "$delta" | sed 's/ MB//')
-            if [ "$(echo "$delta_num > $MAX_JUMP" | bc -l 2>/dev/null || echo 0)" = "1" ]; then
-              MAX_JUMP=$delta_num
+            if [ "$(echo "$delta_num > 5" | bc -l 2>/dev/null || echo 0)" = "1" ]; then
+              echo "⚠️  Jump: ${label} ΔRSS=${delta}"
             fi
           done
-          echo "Max single-step RSS jump: ${MAX_JUMP} MB"
 
       - name: Upload results
         uses: actions/upload-artifact@v4
