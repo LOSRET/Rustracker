@@ -169,5 +169,5 @@ fn run_bench(label: &str, torrents: usize, total_peers: usize, max_peers: usize)
 
 fn main() {
     println!("label,torrents_done,peers_added,rss_mb,delta_mb");
-    run_bench("large", 1_000_000, 2_500_000, 500);
+    run_bench("large", 10_000_000, 25_000_000, 500);
 }
