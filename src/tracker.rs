@@ -1,4 +1,5 @@
-use std::collections::HashMap;
+use std::cmp::Reverse;
+use std::collections::{BinaryHeap, HashMap};
 use std::net::IpAddr;
 use std::time::{Duration, Instant};
 
@@ -206,24 +207,52 @@ impl Tracker {
     }
 
     pub fn top_torrents(&self, sort_by: &str, limit: usize) -> Vec<(InfoHash, usize, usize, u64)> {
-        let mut entries: Vec<(InfoHash, usize, usize, u64)> = self
-            .swarms
-            .iter()
-            .map(|(info_hash, swarm)| {
-                let stats = swarm.stats();
-                (*info_hash, stats.complete, stats.incomplete, stats.downloaded)
+        if limit == 0 {
+            return Vec::new();
+        }
+
+        // Min-heap via Reverse: smallest sort key stays at the top.
+        // Heap capacity is `limit`, so memory is O(limit) instead of O(N).
+        let mut heap: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>> =
+            BinaryHeap::with_capacity(limit);
+
+        for (info_hash, swarm) in &self.swarms {
+            let stats = swarm.stats();
+            let key: u64 = match sort_by {
+                "seeders" => stats.complete as u64,
+                "leechers" => stats.incomplete as u64,
+                "downloaded" => stats.downloaded,
+                _ => (stats.complete + stats.incomplete) as u64,
+            };
+
+            let entry = Reverse((key, *info_hash, stats.complete, stats.incomplete, stats.downloaded));
+
+            if heap.len() < limit {
+                heap.push(entry);
+            } else {
+                let min_key = heap.peek().unwrap().0 .0;
+                if key > min_key {
+                    heap.pop();
+                    heap.push(entry);
+                }
+            }
+        }
+
+        let mut result: Vec<_> = heap
+            .into_iter()
+            .map(|Reverse((_, info_hash, seeders, leechers, downloaded))| {
+                (info_hash, seeders, leechers, downloaded)
             })
             .collect();
 
         match sort_by {
-            "seeders" => entries.sort_by(|a, b| b.1.cmp(&a.1)),
-            "leechers" => entries.sort_by(|a, b| b.2.cmp(&a.2)),
-            "downloaded" => entries.sort_by(|a, b| b.3.cmp(&a.3)),
-            _ => entries.sort_by(|a, b| (b.1 + b.2).cmp(&(a.1 + a.2))),
+            "seeders" => result.sort_by(|a, b| b.1.cmp(&a.1)),
+            "leechers" => result.sort_by(|a, b| b.2.cmp(&a.2)),
+            "downloaded" => result.sort_by(|a, b| b.3.cmp(&a.3)),
+            _ => result.sort_by(|a, b| (b.1 + b.2).cmp(&(a.1 + a.2))),
         }
 
-        entries.truncate(limit);
-        entries
+        result
     }
 
     pub fn snapshot(&self) -> TrackerSnapshot {

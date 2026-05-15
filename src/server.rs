@@ -1,5 +1,6 @@
 use std::collections::hash_map::DefaultHasher;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::cmp::Reverse;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -421,19 +422,55 @@ impl TrackerPool {
     }
 
     async fn top_torrents(&self, sort_by: &str, limit: usize) -> Vec<(crate::types::InfoHash, usize, usize, u64)> {
-        let mut all = Vec::new();
+        if limit == 0 {
+            return Vec::new();
+        }
+
+        // Min-heap to merge top-`limit` results from each shard without
+        // collecting all entries.  Memory stays O(limit).
+        let mut heap: BinaryHeap<Reverse<(u64, crate::types::InfoHash, usize, usize, u64)>> =
+            BinaryHeap::with_capacity(limit);
+
         for shard in &self.shards {
-            let shard_data = shard.read().await.top_torrents(sort_by, limit);
-            all.extend(shard_data);
+            for (info_hash, seeders, leechers, downloaded) in
+                shard.read().await.top_torrents(sort_by, limit)
+            {
+                let key: u64 = match sort_by {
+                    "seeders" => seeders as u64,
+                    "leechers" => leechers as u64,
+                    "downloaded" => downloaded,
+                    _ => (seeders + leechers) as u64,
+                };
+
+                let entry = Reverse((key, info_hash, seeders, leechers, downloaded));
+
+                if heap.len() < limit {
+                    heap.push(entry);
+                } else {
+                    let min_key = heap.peek().unwrap().0 .0;
+                    if key > min_key {
+                        heap.pop();
+                        heap.push(entry);
+                    }
+                }
+            }
         }
+
+        let mut result: Vec<_> = heap
+            .into_iter()
+            .map(|Reverse((_, info_hash, seeders, leechers, downloaded))| {
+                (info_hash, seeders, leechers, downloaded)
+            })
+            .collect();
+
         match sort_by {
-            "seeders" => all.sort_by(|a, b| b.1.cmp(&a.1)),
-            "leechers" => all.sort_by(|a, b| b.2.cmp(&a.2)),
-            "downloaded" => all.sort_by(|a, b| b.3.cmp(&a.3)),
-            _ => all.sort_by(|a, b| (b.1 + b.2).cmp(&(a.1 + a.2))),
+            "seeders" => result.sort_by(|a, b| b.1.cmp(&a.1)),
+            "leechers" => result.sort_by(|a, b| b.2.cmp(&a.2)),
+            "downloaded" => result.sort_by(|a, b| b.3.cmp(&a.3)),
+            _ => result.sort_by(|a, b| (b.1 + b.2).cmp(&(a.1 + a.2))),
         }
-        all.truncate(limit);
-        all
+
+        result
     }
 
     async fn snapshot(&self) -> TrackerSnapshot {
