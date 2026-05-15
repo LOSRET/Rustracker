@@ -136,13 +136,32 @@ jobs:
           body: |
             ## rustracker v${{ needs.check-version.outputs.version }}
 
+            ### What's Changed
+            ${{ steps.changelog.outputs.changelog }}
+
+            ### Downloads
+            - `rustracker-linux.tar.gz` — Linux full package (binary + installer)
+            - `rustracker-linux` — Linux x86_64 binary
+            - `rustracker.exe` — Windows x86_64 binary
+
+            ### Linux Installation
+            ```bash
+            tar -xzf rustracker-linux.tar.gz
+            cd rustracker-linux
+            sudo sh install-linux.sh
+            ```
+
+            ---
+
+            ## rustracker v${{ needs.check-version.outputs.version }}
+
             ### 更新内容
             ${{ steps.changelog.outputs.changelog }}
 
             ### 下载
-            - `rustracker-linux.tar.gz` - Linux 完整包（含二进制和安装脚本）
-            - `rustracker-linux` - Linux 64位二进制
-            - `rustracker.exe` - Windows 64位二进制
+            - `rustracker-linux.tar.gz` — Linux 完整包（含二进制和安装脚本）
+            - `rustracker-linux` — Linux 64位二进制
+            - `rustracker.exe` — Windows 64位二进制
 
             ### Linux 安装
             ```bash
