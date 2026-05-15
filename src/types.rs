@@ -39,7 +39,7 @@ pub struct PeerState {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct TorrentStats {
     pub complete: usize,
-    pub downloaded: u64,
+    pub downloaded: u32,
     pub incomplete: usize,
 }
 
