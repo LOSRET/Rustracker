@@ -113,6 +113,39 @@
             }
         }
 
+        async function loadMetrics() {
+            try {
+                const statsRes = await fetch("/api/stats", { cache: "no-store" });
+                if (!statsRes.ok) throw new Error(`HTTP ${statsRes.status}`);
+                state.data = await statsRes.json();
+                const data = state.data || {};
+                $("metricPeers").textContent = number(data.peers);
+                $("metricSeeders").textContent = number(data.seeders);
+                $("metricLeechers").textContent = number(data.leechers);
+                $("metricTorrents").textContent = number(data.torrents);
+                $("metricCompleted").textContent = number(data.completed);
+                $("configText").textContent = tf("config_fmt");
+                setStatus(`${t("last_update")} ${new Date().toLocaleTimeString(state.lang === "zh" ? "zh-CN" : "en-US")}`);
+            } catch (error) {
+                setStatus(`${t("read_error")}: ${error.message}`, true);
+            }
+        }
+
+        async function loadCharts() {
+            try {
+                const [statsRes, clientsRes] = await Promise.all([
+                    fetch("/api/stats", { cache: "no-store" }),
+                    fetch("/api/clients", { cache: "no-store" })
+                ]);
+                if (statsRes.ok) state.data = await statsRes.json();
+                if (clientsRes.ok) state.clientData = await clientsRes.json();
+                renderChart();
+                renderClientChart();
+            } catch (error) {
+                // Chart refresh failures are non-critical
+            }
+        }
+
         function render() {
             const data = state.data || {};
             $("metricPeers").textContent = number(data.peers);
@@ -374,7 +407,8 @@
         setLang(state.lang);
         loadStats();
         window.addEventListener("resize", () => { chart.resize(); clientChart.resize(); });
-        setInterval(() => { loadStats(); }, 5000);
+        setInterval(loadMetrics, 5000);
+        setInterval(loadCharts, 600000);
 
         /* ===== Mobile sidebar toggle ===== */
         const side = $("side"), overlay = $("overlay"), hamburger = $("hamburger");
