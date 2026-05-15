@@ -64,7 +64,7 @@ jobs:
 
       - name: Merge and render
         run: |
-          echo "## DashMap vs BTreeMap Container Memory (separate processes)" >> $GITHUB_STEP_SUMMARY
+          echo "## DashMap vs BTreeMap Container Memory (capacity-based)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Torrents | BTreeMap | DashMap | Diff | BT Time | DM Time |" >> $GITHUB_STEP_SUMMARY
           echo "|---:|---:|---:|---:|---:|---:|" >> $GITHUB_STEP_SUMMARY
@@ -72,9 +72,7 @@ jobs:
             dm_line=$(grep "^dashmap,${scale}," dashmap.csv)
             dm_mb=$(echo "$dm_line" | cut -d',' -f5)
             dm_sec=$(echo "$dm_line" | cut -d',' -f6)
-            bt_num=$(echo "$bt_mb" | sed 's/ MB//')
-            dm_num=$(echo "$dm_mb" | sed 's/ MB//')
-            diff=$(echo "$dm_num - $bt_num" | bc -l)
+            diff=$(echo "$dm_mb - $bt_mb" | bc -l)
             echo "| $(printf "%'d" $scale) | ${bt_mb} MB | ${dm_mb} MB | ${diff} MB | ${bt_sec}s | ${dm_sec}s |" >> $GITHUB_STEP_SUMMARY
           done
 

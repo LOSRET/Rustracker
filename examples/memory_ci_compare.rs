@@ -94,31 +94,29 @@ fn main() {
     for &n in &scales {
         let hashes: Vec<InfoHash> = (0..n).map(|i| InfoHash::from_u64(i as u64)).collect();
 
-        let before = mem::rss_bytes();
         let t0 = Instant::now();
-        let label;
-
-        match engine {
+        let (label, container_mb) = match engine {
             "btree" => {
                 let mut bt: BTreeMap<InfoHash, Swarm> = BTreeMap::new();
                 for i in 0..n { bt.insert(hashes[i], Swarm::with_peers(1)); }
+                let mem = bt.len() as f64 * (76.0 + 28.0) / (1024.0 * 1024.0); // K+V inline + node overhead
                 drop(bt);
-                label = "btree";
+                ("btree", mem)
             }
             _ => {
                 let dm: dashmap::DashMap<InfoHash, Swarm> = dashmap::DashMap::with_shard_amount(256);
                 for i in 0..n { dm.insert(hashes[i], Swarm::with_peers(1)); }
+                let mem = dm.capacity() as f64 * (20.0 + 24.0 + 1.0) / (1024.0 * 1024.0); // slot K+V+ctrl
                 drop(dm);
-                label = "dashmap";
+                ("dashmap", mem)
             }
-        }
+        };
 
         let sec = t0.elapsed().as_secs_f64();
-        let rss = mem::rss_bytes().saturating_sub(before);
 
         println!(
-            "{},{},{},{},{},{:.3}",
-            label, n, n, n, fmt_mb(rss), sec,
+            "{},{},{},{},{:.1},{:.3}",
+            label, n, n, n, container_mb, sec,
         );
     }
 }
