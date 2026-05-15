@@ -32,7 +32,7 @@ pub struct AnnounceOutput {
     pub interval: u64,
     pub complete: usize,
     pub incomplete: usize,
-    pub downloaded: u64,
+    pub downloaded: u32,
     pub peers: Vec<PeerContact>,
 }
 
@@ -67,9 +67,8 @@ pub struct Tracker {
 struct Swarm {
     ipv4_peers: PackedIpv4Peers,
     ipv6_peers: PackedIpv6Peers,
-    complete: usize,
-    incomplete: usize,
-    downloaded: u64,
+    complete: u32,
+    downloaded: u32,
 }
 
 #[derive(Debug, Default)]
@@ -221,11 +220,11 @@ impl Tracker {
             let key: u64 = match sort_by {
                 "seeders" => stats.complete as u64,
                 "leechers" => stats.incomplete as u64,
-                "downloaded" => stats.downloaded,
+                "downloaded" => stats.downloaded as u64,
                 _ => (stats.complete + stats.incomplete) as u64,
             };
 
-            let entry = Reverse((key, *info_hash, stats.complete, stats.incomplete, stats.downloaded));
+            let entry = Reverse((key, *info_hash, stats.complete, stats.incomplete, stats.downloaded as u64));
 
             if heap.len() < limit {
                 heap.push(entry);
@@ -265,7 +264,7 @@ impl Tracker {
                 totals.seeders += stats.complete;
                 totals.leechers += stats.incomplete;
                 totals.peers += swarm.len();
-                totals.downloaded = totals.downloaded.saturating_add(stats.downloaded);
+                totals.downloaded = totals.downloaded.saturating_add(stats.downloaded as u64);
                 totals
             });
 
@@ -397,8 +396,6 @@ impl Swarm {
 
         if is_complete {
             self.complete = self.complete.saturating_add(1);
-        } else {
-            self.incomplete = self.incomplete.saturating_add(1);
         }
 
         old
@@ -418,7 +415,6 @@ impl Swarm {
 
     fn expire(&mut self, now_secs: u32, timeout_secs: u32) -> Vec<u8> {
         let mut expired_complete: usize = 0;
-        let mut expired_incomplete: usize = 0;
         let mut expired_tags: Vec<u8> = Vec::new();
 
         self.ipv4_peers.retain(|_, peer| {
@@ -426,8 +422,6 @@ impl Swarm {
             if !keep {
                 if peer.is_complete() {
                     expired_complete += 1;
-                } else {
-                    expired_incomplete += 1;
                 }
                 expired_tags.push(peer.client_tag);
             }
@@ -439,16 +433,13 @@ impl Swarm {
             if !keep {
                 if peer.is_complete() {
                     expired_complete += 1;
-                } else {
-                    expired_incomplete += 1;
                 }
                 expired_tags.push(peer.client_tag);
             }
             keep
         });
 
-        self.complete = self.complete.saturating_sub(expired_complete);
-        self.incomplete = self.incomplete.saturating_sub(expired_incomplete);
+        self.complete = self.complete.saturating_sub(expired_complete as u32);
 
         self.ipv4_peers.shrink_if_idle();
         self.ipv6_peers.shrink_if_idle();
@@ -459,16 +450,15 @@ impl Swarm {
     fn remove_from_counters(&mut self, peer: &PeerState) {
         if peer.is_complete() {
             self.complete = self.complete.saturating_sub(1);
-        } else {
-            self.incomplete = self.incomplete.saturating_sub(1);
         }
     }
 
     fn stats(&self) -> TorrentStats {
+        let complete = self.complete as usize;
         TorrentStats {
-            complete: self.complete,
+            complete,
             downloaded: self.downloaded,
-            incomplete: self.incomplete,
+            incomplete: self.len().saturating_sub(complete),
         }
     }
 
