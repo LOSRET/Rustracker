@@ -1,17 +1,16 @@
-name: Memory Benchmark (Real Tracker)
+name: Memory Benchmark
 
 on:
   workflow_dispatch:
 
 jobs:
-  benchmark:
+  # ── Real tracker benchmark (announce/expire path) ───────────────
+  tracker:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-
       - uses: dtolnay/rust-toolchain@stable
-
       - uses: Swatinem/rust-cache@v2
 
       - name: Build
@@ -23,32 +22,56 @@ jobs:
       - name: Show summary
         run: cat bench.log
 
-      - name: Render results table
+      - name: Render results
         run: |
-          echo "## Tracker RSS Growth Curve" >> $GITHUB_STEP_SUMMARY
+          echo "## Real Tracker RSS Curve (DashMap, 10M torrents / 25M peers)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Label | Torrents | Peers | RSS | ΔRSS |" >> $GITHUB_STEP_SUMMARY
-          echo "|---:|---:|---:|---:|---:|" >> $GITHUB_STEP_SUMMARY
-          tail -n +2 results.csv | while IFS=',' read label torrents peers rss delta; do
-            torrents_fmt=$(printf "%'d" $torrents)
-            peers_fmt=$(printf "%'d" $peers)
-            echo "| ${label} | ${torrents_fmt} | ${peers_fmt} | ${rss} MB | ${delta} MB |" >> $GITHUB_STEP_SUMMARY
+          echo "| Torrents | Peers | RSS | ΔRSS |" >> $GITHUB_STEP_SUMMARY
+          echo "|---:|---:|---:|---:|" >> $GITHUB_STEP_SUMMARY
+          tail -n +2 results.csv | while IFS=',' read _ torrents peers rss delta; do
+            echo "| $(printf "%'d" $torrents) | $(printf "%'d" $peers) | ${rss} MB | ${delta} MB |" >> $GITHUB_STEP_SUMMARY
           done
 
-      - name: Check for memory jumps
+      - name: Check jumps
         run: |
-          echo "Checking for RSS jumps > 5 MB..."
           tail -n +2 results.csv | while IFS=',' read label _ _ _ delta; do
-            delta_num=$(echo "$delta" | sed 's/ MB//')
-            if [ "$(echo "$delta_num > 5" | bc -l 2>/dev/null || echo 0)" = "1" ]; then
-              echo "⚠️  Jump: ${label} ΔRSS=${delta}"
+            d=$(echo "$delta" | sed 's/ MB//')
+            if [ "$(echo "$d > 5" | bc -l 2>/dev/null || echo 0)" = "1" ]; then
+              echo "⚠️  ${label} ΔRSS=${delta}"
             fi
           done
 
-      - name: Upload results
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: tracker-memory-benchmark
-          path: |
-            results.csv
-            bench.log
+          name: tracker-bench
+          path: results.csv
+
+  # ── DashMap vs BTreeMap container comparison ───────────────────
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build --release --example memory_ci_compare
+
+      - name: Run container comparison
+        run: cargo run --release --example memory_ci_compare | tee compare.csv
+
+      - name: Render comparison
+        run: |
+          echo "## DashMap vs BTreeMap Container Memory" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Type | Torrents | Peers | BTreeMap | DashMap | Diff | Diff% | BT Time | DM Time |" >> $GITHUB_STEP_SUMMARY
+          echo "|---:|---:|---:|---:|---:|---:|---:|---:|---:|" >> $GITHUB_STEP_SUMMARY
+          tail -n +2 compare.csv | while IFS=',' read typ scale torrents peers bt dm diff pct bt_sec dm_sec; do
+            echo "| ${typ} | $(printf "%'d" $scale) | $(printf "%'d" $peers) | ${bt} MB | ${dm} MB | ${diff} MB | ${pct}% | ${bt_sec}s | ${dm_sec}s |" >> $GITHUB_STEP_SUMMARY
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: container-compare
+          path: compare.csv
