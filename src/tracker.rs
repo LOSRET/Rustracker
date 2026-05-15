@@ -323,7 +323,7 @@ impl Tracker {
         }
 
         if self.swarms.capacity() > 64
-            && self.swarms.len() < self.swarms.capacity() / 2
+            && self.swarms.len() * 10 < self.swarms.capacity() * 7
         {
             self.swarms.shrink_to_fit();
         }
@@ -594,7 +594,7 @@ impl PackedIpv4Peers {
             return;
         }
         if self.bytes.capacity() > IPV4_ENTRY_LEN * 32
-            && self.bytes.len() * 5 < self.bytes.capacity() * 4
+            && self.bytes.len() * 9 < self.bytes.capacity() * 10
         {
             self.bytes.shrink_to_fit();
         }
@@ -756,7 +756,7 @@ impl PackedIpv6Peers {
             return;
         }
         if self.bytes.capacity() > IPV6_ENTRY_LEN * 32
-            && self.bytes.len() * 5 < self.bytes.capacity() * 4
+            && self.bytes.len() * 9 < self.bytes.capacity() * 10
         {
             self.bytes.shrink_to_fit();
         }
