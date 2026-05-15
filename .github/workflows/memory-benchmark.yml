@@ -1,0 +1,39 @@
+name: Memory Benchmark
+
+on:
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build --release --example memory_ci_compare
+
+      - name: Run memory benchmark
+        run: cargo run --release --example memory_ci_compare | tee results.csv
+
+      - name: Render results table
+        run: |
+          echo "## DashMap vs BTreeMap Memory Comparison" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Type | Torrents | Peers | BTreeMap | DashMap | Diff | Diff% | BT Build | DM Build |" >> $GITHUB_STEP_SUMMARY
+          echo "|---:|---:|---:|---:|---:|---:|---:|---:|---:|" >> $GITHUB_STEP_SUMMARY
+          tail -n +2 results.csv | while IFS=',' read typ scale torrents peers bt dm diff pct bt_sec dm_sec; do
+            scale_fmt=$(printf "%'d" $scale)
+            peers_fmt=$(printf "%'d" $peers)
+            echo "| ${typ} | ${scale_fmt} | ${peers_fmt} | ${bt} MB | ${dm} MB | ${diff} MB | ${pct}% | ${bt_sec}s | ${dm_sec}s |" >> $GITHUB_STEP_SUMMARY
+          done
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: memory-benchmark-results
+          path: results.csv

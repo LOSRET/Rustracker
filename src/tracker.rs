@@ -1,7 +1,9 @@
 use std::cmp::Reverse;
-use std::collections::{BTreeMap, BinaryHeap};
+use std::collections::BinaryHeap;
 use std::net::IpAddr;
 use std::time::{Duration, Instant};
+
+use dashmap::DashMap;
 
 use crate::types::{
     AnnounceEvent, InfoHash, Ipv4PeerKey, Ipv6PeerKey, PeerContact, PeerId, PeerState, TorrentStats,
@@ -59,7 +61,7 @@ pub struct Tracker {
     peer_timeout: Duration,
     started_at: Instant,
     next_expire_at: Instant,
-    swarms: BTreeMap<InfoHash, Swarm>,
+    swarms: DashMap<InfoHash, Swarm>,
     client_counts: Vec<(u8, u64)>,
 }
 
@@ -98,7 +100,7 @@ impl Tracker {
             peer_timeout,
             started_at,
             next_expire_at: started_at,
-            swarms: BTreeMap::new(),
+            swarms: DashMap::with_shard_amount(256),
             client_counts: Vec::new(),
         }
     }
@@ -114,7 +116,7 @@ impl Tracker {
 
         // All swarm operations happen in this block; borrow released before client_counts access
         let (output, pending_decr, pending_incr) = {
-            let swarm = self.swarms.entry(info_hash).or_default();
+            let mut swarm = self.swarms.entry(info_hash).or_insert_with(Swarm::default);
 
             let mut decr: Vec<u8> = Vec::new();
             let mut incr: Option<u8> = None;
@@ -190,7 +192,7 @@ impl Tracker {
         output
     }
 
-    pub fn scrape(&self, info_hashes: &[InfoHash]) -> BTreeMap<InfoHash, TorrentStats> {
+    pub fn scrape(&self, info_hashes: &[InfoHash]) -> std::collections::HashMap<InfoHash, TorrentStats> {
         info_hashes
             .iter()
             .copied()
@@ -198,7 +200,7 @@ impl Tracker {
                 let stats = self
                     .swarms
                     .get(&info_hash)
-                    .map(Swarm::stats)
+                    .map(|r| r.stats())
                     .unwrap_or_default();
                 (info_hash, stats)
             })
@@ -215,7 +217,9 @@ impl Tracker {
         let mut heap: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>> =
             BinaryHeap::with_capacity(limit);
 
-        for (info_hash, swarm) in &self.swarms {
+        for entry in self.swarms.iter() {
+            let info_hash = entry.key();
+            let swarm = entry.value();
             let stats = swarm.stats();
             let key: u64 = match sort_by {
                 "seeders" => stats.complete as u64,
@@ -255,18 +259,16 @@ impl Tracker {
     }
 
     pub fn snapshot(&self) -> TrackerSnapshot {
-        let totals = self
-            .swarms
-            .values()
-            .fold(TrackerTotals::default(), |mut totals, swarm| {
-                let stats = swarm.stats();
-                totals.torrents += 1;
-                totals.seeders += stats.complete;
-                totals.leechers += stats.incomplete;
-                totals.peers += swarm.len();
-                totals.downloaded = totals.downloaded.saturating_add(stats.downloaded as u64);
-                totals
-            });
+        let mut totals = TrackerTotals::default();
+        for entry in self.swarms.iter() {
+            let swarm = entry.value();
+            let stats = swarm.stats();
+            totals.torrents += 1;
+            totals.seeders += stats.complete;
+            totals.leechers += stats.incomplete;
+            totals.peers += swarm.len();
+            totals.downloaded = totals.downloaded.saturating_add(stats.downloaded as u64);
+        }
 
         let clients = self.client_distribution().to_vec();
 
@@ -320,8 +322,6 @@ impl Tracker {
         for tag in all_expired_tags {
             self.decr_client(tag);
         }
-
-        // BTreeMap nodes are deallocated on removal; no shrink needed.
     }
 
     fn expire_sweep_interval(&self) -> Duration {
