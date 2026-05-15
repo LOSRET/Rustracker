@@ -48,6 +48,13 @@ mod mem {
     }
 }
 
+fn flush_pages() {
+    // Large alloc+free forces glibc to trim and return pages to OS
+    let v = vec![0u8; 256 * 1024 * 1024];
+    drop(v);
+    std::thread::sleep(std::time::Duration::from_millis(50));
+}
+
 fn fmt_mb(bytes: usize) -> String {
     format!("{:.1}", bytes as f64 / (1024.0 * 1024.0))
 }
@@ -151,6 +158,9 @@ fn main() {
         let bt_rss = mem::rss_bytes().saturating_sub(before);
         drop(bt);
 
+        // Flush to force glibc to return BTreeMap pages before measuring DashMap
+        flush_pages();
+
         // DashMap
         let before = mem::rss_bytes();
         let t0 = Instant::now();
@@ -167,6 +177,9 @@ fn main() {
             n, n, n, fmt_mb(bt_rss), fmt_mb(dm_rss),
             diff / (1024.0 * 1024.0), pct, bt_sec, dm_sec,
         );
+
+        // Flush between scales to reset RSS baseline
+        flush_pages();
     }
 
     // ── Pass 2: production data (Zipf distribution) ──────────────
@@ -183,6 +196,8 @@ fn main() {
     let bt_sec = t0.elapsed().as_secs_f64();
     let bt_rss = mem::rss_bytes().saturating_sub(before);
     drop(bt);
+
+    flush_pages();
 
     // DashMap
     let before = mem::rss_bytes();
