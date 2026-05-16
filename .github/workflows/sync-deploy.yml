@@ -1,4 +1,4 @@
-name: Build release artifacts
+name: 自用部署
 
 on:
   push:
