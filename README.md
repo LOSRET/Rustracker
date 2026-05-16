@@ -242,6 +242,66 @@ cargo run --release -- --trends-file /var/lib/rustracker/trends.jsonl
 - **Expiry**: Background task sweeps expired peers every 1 second
 - **Client ID**: Compile-time 256×256 lookup table for Azureus-style peer ID prefixes, plus prefix matching for non-standard formats
 
+## Project Structure
+
+```
+rustracker/
+├── Cargo.toml                     # Rust project manifest and dependencies
+├── LICENSE                        # MIT license
+├── README.md                      # English documentation
+├── README-zh.md                   # Chinese documentation
+├── install-linux.sh               # Linux systemd installer (interactive menu)
+│
+├── src/                           # Rust source code
+│   ├── main.rs                    # Entry point: CLI parsing, Tokio runtime, graceful shutdown
+│   ├── lib.rs                     # Library root: re-exports all modules
+│   ├── server.rs                  # Axum HTTP server, routing, AppState, static asset caching
+│   ├── handlers.rs                # HTTP handlers: announce, scrape, healthz, dashboard, APIs
+│   ├── tracker.rs                 # TrackerPool — 64-shard concurrent tracker (RwLock<BTreeMap>)
+│   ├── swarm.rs                   # Swarm — per-torrent peer set with packed binary storage
+│   ├── protocol.rs                # BEP 3 protocol: bencode response construction, compact encoding
+│   ├── bencode.rs                 # Lightweight bencode encoder (zero external dependency)
+│   ├── types.rs                   # Core types: InfoHash, PeerId, PeerAddr
+│   ├── client_id.rs               # 102-client peer ID identification (compile-time lookup table)
+│   ├── blacklist.rs               # Torrent blacklist with 5-sec hot-reload file watcher
+│   └── trends.rs                  # Trend data collection, 7-day JSONL persistence, history API
+│
+├── assets/                        # Web dashboard static files
+│   ├── index.html                 # Dashboard HTML (production, inlined CSS/JS)
+│   ├── index-build.html           # Dashboard HTML (development, external assets)
+│   ├── style.css                  # Dashboard styles
+│   └── app.js                     # Dashboard logic: ECharts charts, i18n, API calls
+│
+├── examples/                      # Load testing and benchmarking tools
+│   ├── announce_load.rs           # Simple concurrent announce load test
+│   ├── load_test.rs               # Advanced load test (Zipf distribution, peer lifecycle)
+│   ├── rps_bench.rs               # Requests-per-second benchmark
+│   ├── unified_bench.rs           # Unified benchmark suite
+│   ├── memory_tracker_bench.rs    # Memory usage benchmark
+│   ├── memory_tracker_btree.rs    # BTree memory layout analysis
+│   ├── memory_staircase_test.rs   # Memory staircase growth test
+│   └── memory_ci_compare.rs       # CI memory regression comparison
+│
+└── tests/                         # Integration tests
+    └── tracker_http.rs            # HTTP endpoint integration tests
+```
+
+**Source module overview:**
+
+| Module | Responsibility |
+|--------|---------------|
+| `main.rs` | CLI argument parsing (`clap`), async runtime setup, signal handling |
+| `server.rs` | Axum router, shared `AppState`, 1-hour static asset cache headers |
+| `handlers.rs` | Request handlers for `/announce`, `/scrape`, `/healthz`, `/api/*`, `/` |
+| `tracker.rs` | 64-shard `TrackerPool` — per-shard `RwLock<BTreeMap<InfoHash, Swarm>>` |
+| `swarm.rs` | Per-torrent peer collection — packed binary IPv4 (6B) / IPv6 (18B) per peer |
+| `protocol.rs` | BEP 3 compliant bencode response builder, compact peer encoding |
+| `bencode.rs` | Minimal bencode serializer — no external crate dependency |
+| `types.rs` | `InfoHash` (20 bytes), `PeerId` (20 bytes), `PeerAddr` (IP + port) |
+| `client_id.rs` | Compile-time 256×256 lookup table for `-XX####-` Azureus peer ID prefixes |
+| `blacklist.rs` | `HashSet<InfoHash>` hot-reload via 5-second file polling |
+| `trends.rs` | In-memory ring buffer + optional JSONL persistence, 7-day retention |
+
 ## Client Identification
 
 The tracker recognizes **102 BitTorrent clients** from peer ID prefixes, including:
