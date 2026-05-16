@@ -146,7 +146,11 @@ async fn main() {
         let permit = sem.clone().acquire_owned().await.unwrap();
 
         let current_peers = active_peers.len();
-        let is_new = if current_peers >= max_peers { false } else {
+        let is_new = if current_peers == 0 {
+            true
+        } else if current_peers >= max_peers {
+            false
+        } else {
             let p_new = if current_peers < 1000 { 0.95 } else {
                 let ratio = current_peers as f64 / max_peers as f64;
                 (1.0 - ratio).powf(2.0).max(0.01)
