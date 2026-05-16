@@ -4,81 +4,50 @@ on:
   workflow_dispatch:
 
 jobs:
-  tracker:
+  tracker-dashmap:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-
       - name: Build
         run: cargo build --release --example memory_tracker_bench
-
-      - name: Run real-tracker memory benchmark
+      - name: Run
         run: cargo run --release --example memory_tracker_bench 2>bench.log | tee results.csv
-
       - name: Show summary
         run: cat bench.log
-
-      - name: Render results
+      - name: Render
         run: |
           echo "## Real Tracker RSS Curve (DashMap, 10M torrents / 25M peers)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Torrents | Peers | RSS | ΔRSS |" >> $GITHUB_STEP_SUMMARY
           echo "|---:|---:|---:|---:|" >> $GITHUB_STEP_SUMMARY
-          tail -n +2 results.csv | while IFS=',' read _ torrents peers rss delta; do
-            echo "| $(printf "%'d" $torrents) | $(printf "%'d" $peers) | ${rss} MB | ${delta} MB |" >> $GITHUB_STEP_SUMMARY
+          tail -n +2 results.csv | while IFS=',' read _ t p rss delta; do
+            echo "| $(printf "%'d" $t) | $(printf "%'d" $p) | ${rss} MB | ${delta} MB |" >> $GITHUB_STEP_SUMMARY
           done
-
-      - name: Check jumps
-        run: |
-          tail -n +2 results.csv | while IFS=',' read label _ _ _ delta; do
-            d=$(echo "$delta" | sed 's/ MB//')
-            if [ "$(echo "$d > 5" | bc -l 2>/dev/null || echo 0)" = "1" ]; then
-              echo "⚠️  ${label} ΔRSS=${delta}"
-            fi
-          done
-
       - uses: actions/upload-artifact@v4
-        with:
-          name: tracker-bench
-          path: results.csv
+        with: { name: dashmap-bench, path: results.csv }
 
-  compare:
+  tracker-btree:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-
       - name: Build
-        run: cargo build --release --example memory_ci_compare
-
-      - name: Run BTreeMap (clean process)
-        run: cargo run --release --example memory_ci_compare -- btree | tee btree.csv
-
-      - name: Run DashMap (clean process)
-        run: cargo run --release --example memory_ci_compare -- dashmap | tee dashmap.csv
-
-      - name: Merge and render
+        run: cargo build --release --example memory_tracker_btree
+      - name: Run
+        run: cargo run --release --example memory_tracker_btree 2>bench.log | tee results.csv
+      - name: Show summary
+        run: cat bench.log
+      - name: Render
         run: |
-          echo "## DashMap vs BTreeMap Container Memory (capacity-based)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Torrents | BTreeMap | DashMap | Diff | BT Time | DM Time |" >> $GITHUB_STEP_SUMMARY
-          echo "|---:|---:|---:|---:|---:|---:|" >> $GITHUB_STEP_SUMMARY
-          tail -n +2 btree.csv | while IFS=',' read _ scale _ _ bt_mb bt_sec; do
-            dm_line=$(grep "^dashmap,${scale}," dashmap.csv)
-            dm_mb=$(echo "$dm_line" | cut -d',' -f5)
-            dm_sec=$(echo "$dm_line" | cut -d',' -f6)
-            diff=$(echo "$dm_mb - $bt_mb" | bc -l)
-            echo "| $(printf "%'d" $scale) | ${bt_mb} MB | ${dm_mb} MB | ${diff} MB | ${bt_sec}s | ${dm_sec}s |" >> $GITHUB_STEP_SUMMARY
+          echo "## Real Tracker RSS Curve (BTreeMap, 10M torrents / 25M peers)" >> $GITHUB_STEP_SUMMARY
+          echo "| Torrents | Peers | RSS | ΔRSS |" >> $GITHUB_STEP_SUMMARY
+          echo "|---:|---:|---:|---:|" >> $GITHUB_STEP_SUMMARY
+          tail -n +2 results.csv | while IFS=',' read _ t p rss delta; do
+            echo "| $(printf "%'d" $t) | $(printf "%'d" $p) | ${rss} MB | ${delta} MB |" >> $GITHUB_STEP_SUMMARY
           done
-
       - uses: actions/upload-artifact@v4
-        with:
-          name: container-compare
-          path: |
-            btree.csv
-            dashmap.csv
+        with: { name: btree-bench, path: results.csv }
