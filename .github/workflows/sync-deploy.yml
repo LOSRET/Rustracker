@@ -57,18 +57,7 @@ jobs:
   build:
     needs: [check-version, sync]
     if: needs.check-version.outputs.changed == 'true'
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            artifact: rustracker-linux-selfuse
-            binary: rustracker
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            artifact: rustracker-exe-selfuse
-            binary: rustracker.exe
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
@@ -77,22 +66,20 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: x86_64-unknown-linux-gnu
 
-      - name: Build (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        run: RUSTFLAGS="-C target-cpu=x86-64-v2" cargo build --release --target ${{ matrix.target }}
+      - name: Build
+        run: RUSTFLAGS="-C target-cpu=x86-64-v2" cargo build --release --target x86_64-unknown-linux-gnu
 
-      - name: Build (Windows)
-        if: matrix.os == 'windows-latest'
-        run: cargo build --release --target ${{ matrix.target }}
-
-      - name: Rename Linux binary
-        if: matrix.os == 'ubuntu-latest'
-        run: mv target/${{ matrix.target }}/release/${{ matrix.binary }} target/${{ matrix.target }}/release/${{ matrix.artifact }}
+      - name: Package
+        run: |
+          mkdir -p pkg
+          cp target/x86_64-unknown-linux-gnu/release/rustracker pkg/
+          cp install-linux.sh pkg/
+          tar -czf rustracker-selfuse.tar.gz -C pkg rustracker install-linux.sh
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact }}
-          path: target/${{ matrix.target }}/release/${{ matrix.artifact }}
+          name: rustracker-selfuse
+          path: rustracker-selfuse.tar.gz
