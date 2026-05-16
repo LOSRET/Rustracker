@@ -1,8 +1,8 @@
-﻿//! Unified benchmark: memory + RPS on the same tracker
+﻿//! Unified benchmark: memory + RPS + CPU on the same tracker
 //!
 //! Simulates a real tracker lifecycle in a single loop:
 //!   - Mixed traffic: new joins + re-announces via HTTP
-//!   - Periodic RSS sampling
+//!   - Periodic RSS + CPU sampling
 //!   - One CSV with all metrics
 //!
 //! Usage: cargo run --release --example unified_bench
@@ -33,6 +33,40 @@ mod mem {
             .and_then(|l| l.split_whitespace().nth(1)?.parse::<usize>().ok())
             .unwrap_or(0) * 1024
     }
+}
+
+// ─── CPU usage from /proc/stat ────────────────────────────────────
+
+/// Snapshot of /proc/stat CPU counters (user, nice, system, idle, iowait, irq, softirq, steal)
+#[derive(Clone, Copy)]
+struct CpuTimes { user: u64, nice: u64, system: u64, idle: u64, iowait: u64, irq: u64, softirq: u64, steal: u64 }
+
+impl CpuTimes {
+    fn read() -> Option<Self> {
+        let content = std::fs::read_to_string("/proc/stat").ok()?;
+        let line = content.lines().find(|l| l.starts_with("cpu "))?;
+        let nums: Vec<u64> = line.split_whitespace().skip(1).filter_map(|s| s.parse().ok()).collect();
+        if nums.len() < 8 { return None; }
+        Some(CpuTimes {
+            user: nums[0], nice: nums[1], system: nums[2], idle: nums[3],
+            iowait: nums[4], irq: nums[5], softirq: nums[6], steal: nums[7],
+        })
+    }
+
+    fn total(&self) -> u64 {
+        self.user + self.nice + self.system + self.idle + self.iowait + self.irq + self.softirq + self.steal
+    }
+
+    fn busy(&self) -> u64 {
+        self.total() - self.idle - self.iowait
+    }
+}
+
+/// CPU usage % between two snapshots
+fn cpu_usage_pct(prev: &CpuTimes, curr: &CpuTimes) -> f64 {
+    let d_total = curr.total().saturating_sub(prev.total());
+    let d_busy = curr.busy().saturating_sub(prev.busy());
+    if d_total == 0 { 0.0 } else { d_busy as f64 / d_total as f64 * 100.0 }
 }
 
 fn fmt_mb(b: usize) -> String { format!("{:.1}", b as f64 / (1024.0 * 1024.0)) }
@@ -112,9 +146,10 @@ async fn main() {
     let mut next_sample = sample_interval;
 
     // CSV: all metrics in one line per sample
-    println!("request,peers,new_joins,reannounces,rps,rss_mb");
+    println!("request,peers,new_joins,reannounces,rps,rss_mb,cpu_pct");
     let bench_start = Instant::now();
     let baseline_rss = mem::rss_bytes();
+    let mut prev_cpu = CpuTimes::read();
 
     for _ in 0..total_requests {
         let current_peers = active_peers.len();
@@ -173,16 +208,27 @@ async fn main() {
             let elapsed = bench_start.elapsed().as_secs_f64();
             let rps = request_count as f64 / elapsed;
             let rss = mem::rss_bytes().saturating_sub(baseline_rss);
+
+            // CPU usage since last sample
+            let cpu_pct = if let (Some(prev), Some(curr)) = (prev_cpu, CpuTimes::read()) {
+                let pct = cpu_usage_pct(&prev, &curr);
+                prev_cpu = Some(curr);
+                pct
+            } else {
+                prev_cpu = CpuTimes::read();
+                0.0
+            };
+
             println!(
-                "{},{},{},{},{:.0},{}",
+                "{},{},{},{},{:.0},{},{:.1}",
                 request_count, active_peers.len(),
                 new_join_count, reannounce_count,
-                rps, fmt_mb(rss),
+                rps, fmt_mb(rss), cpu_pct,
             );
             eprintln!(
-                "  req={:>8}  peers={:>10}  rps={:>10.0}  new={:>8}  re={:>8}  rss={}",
+                "  req={:>8}  peers={:>10}  rps={:>10.0}  new={:>8}  re={:>8}  rss={:>8}  cpu={:.1}%",
                 request_count, active_peers.len(), rps,
-                new_join_count, reannounce_count, fmt_mb(rss),
+                new_join_count, reannounce_count, fmt_mb(rss), cpu_pct,
             );
             next_sample += sample_interval;
         }

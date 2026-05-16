@@ -19,11 +19,11 @@ jobs:
         run: cat bench.log
       - name: Summary
         run: |
-          echo "# Unified Benchmark (memory + RPS, same tracker)" >> $GITHUB_STEP_SUMMARY
-          echo "| Requests | Peers | New Joins | Re-announces | RPS | RSS |" >> $GITHUB_STEP_SUMMARY
-          echo "|---:|---:|---:|---:|---:|---:|" >> $GITHUB_STEP_SUMMARY
-          tail -n +2 bench.csv | while IFS=',' read req peers new re rps rss; do
-            echo "| $(printf "%'d" $req) | $(printf "%'d" $peers) | $(printf "%'d" $new) | $(printf "%'d" $re) | $(printf "%'.0f" $rps) | ${rss} MB |" >> $GITHUB_STEP_SUMMARY
+          echo "# Unified Benchmark (memory + RPS + CPU)" >> $GITHUB_STEP_SUMMARY
+          echo "| Requests | Peers | New Joins | Re-announces | RPS | RSS | CPU% |" >> $GITHUB_STEP_SUMMARY
+          echo "|---:|---:|---:|---:|---:|---:|---:|" >> $GITHUB_STEP_SUMMARY
+          tail -n +2 bench.csv | while IFS=',' read req peers new re rps rss cpu; do
+            echo "| $(printf "%'d" $req) | $(printf "%'d" $peers) | $(printf "%'d" $new) | $(printf "%'d" $re) | $(printf "%'.0f" $rps) | ${rss} MB | ${cpu}% |" >> $GITHUB_STEP_SUMMARY
           done
       - uses: actions/upload-artifact@v4
         with: { name: benchmark, path: bench.csv }
