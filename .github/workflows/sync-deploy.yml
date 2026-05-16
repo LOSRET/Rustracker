@@ -1,4 +1,4 @@
-name: Sync deploy branch
+name: Sync self-use branch
 
 on:
   push:
@@ -16,18 +16,18 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Sync deploy branch
+      - name: Sync self-use branch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          if git show-ref --verify --quiet refs/heads/deploy; then
-            echo "deploy branch exists, rebasing..."
-            git checkout deploy
+          if git show-ref --verify --quiet refs/heads/self-use; then
+            echo "self-use branch exists, rebasing..."
+            git checkout self-use
             git rebase main
           else
-            echo "deploy branch not found, creating from main..."
-            git checkout -b deploy
+            echo "self-use branch not found, creating from main..."
+            git checkout -b self-use
           fi
 
-          git push origin deploy --force
+          git push origin self-use --force
