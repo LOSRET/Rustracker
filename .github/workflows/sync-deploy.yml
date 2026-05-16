@@ -1,0 +1,33 @@
+name: Sync deploy branch
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Sync deploy branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if git show-ref --verify --quiet refs/heads/deploy; then
+            echo "deploy branch exists, rebasing..."
+            git checkout deploy
+            git rebase main
+          else
+            echo "deploy branch not found, creating from main..."
+            git checkout -b deploy
+          fi
+
+          git push origin deploy --force
