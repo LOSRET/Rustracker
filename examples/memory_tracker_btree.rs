@@ -5,9 +5,9 @@
 
 use std::collections::BTreeMap;
 use std::net::{IpAddr, Ipv4Addr};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
-use rustracker::tracker::{AnnounceInput, Tracker};
+use rustracker::tracker::AnnounceInput;
 use rustracker::types::{AnnounceEvent, InfoHash, PeerId};
 
 // ─── RSS ─────────────────────────────────────────────────────────
@@ -73,7 +73,6 @@ impl BTreeTracker {
     fn new() -> Self { Self { swarms: BTreeMap::new() } }
 
     fn announce(&mut self, input: AnnounceInput) {
-        use std::collections::btree_map::Entry;
         let swarm = self.swarms.entry(input.info_hash).or_default();
         let is_seeder = input.left == 0;
         // Push 12-byte peer entry (matching PackedIpv4Peers format)
@@ -99,7 +98,7 @@ fn main() {
     let total_peers: usize = counts.iter().sum();
     eprintln!("btree torrents={} peers={}", n, total_peers);
 
-    let now = Instant::now();
+    let _now = Instant::now();
     let mut tracker = BTreeTracker::new();
 
     let base_ip = Ipv4Addr::new(10, 0, 0, 1);

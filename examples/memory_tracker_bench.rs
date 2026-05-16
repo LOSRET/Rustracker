@@ -55,11 +55,11 @@ fn fmt_mb(b: usize) -> String { format!("{:.1}", b as f64 / (1024.0 * 1024.0)) }
 fn gen_distribution(torrents: usize, total_peers: usize, max_peers: usize) -> (Vec<InfoHash>, Vec<usize>) {
     let c = (max_peers - 1) as f64;
 
-    let mut lo = 0.01f64; let mut hi = 2.0f64; let mut alpha = 0.5;
+    let mut lo = 0.01f64; let mut hi = 2.0f64;
     let mut counts: Vec<usize> = Vec::new();
 
     for _ in 0..50 {
-        alpha = (lo + hi) / 2.0;
+        let alpha = (lo + hi) / 2.0;
         let mut sum: usize = 0; counts.clear();
         for rank in 1..=torrents {
             let extra = (c / (rank as f64).powf(alpha)) as usize;
