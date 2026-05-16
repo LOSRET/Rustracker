@@ -367,16 +367,16 @@ pub(crate) fn load_trends_from_file(
     };
 
     // Rebuild caches
-    if !store.points.is_empty() {
-        let bucket = store.points.last().unwrap().timestamp;
+    if let Some(last_point) = store.points.last() {
+        let bucket = last_point.timestamp;
         let min_t = bucket.saturating_sub(retention);
         store.filled_cache = store.filled_points(min_t, bucket);
         store.cache_start = min_t;
         store.cache_end = bucket;
     }
 
-    if !store.client_points.is_empty() {
-        let bucket = store.client_points.last().unwrap().0;
+    if let Some(last_client) = store.client_points.last() {
+        let bucket = last_client.0;
         let latest = store
             .client_points
             .last()

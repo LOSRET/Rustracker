@@ -59,22 +59,28 @@ pub(crate) async fn index(State(state): State<AppState>) -> Html<String> {
 }
 
 pub(crate) async fn style() -> Response<Body> {
-    Response::builder()
+    match Response::builder()
         .header(header::CONTENT_TYPE, "text/css; charset=utf-8")
         .header(header::CACHE_CONTROL, "public, max-age=3600")
         .body(Body::from(STYLE_CSS))
-        .unwrap()
+    {
+        Ok(resp) => resp,
+        Err(_) => Response::new(Body::empty()),
+    }
 }
 
 pub(crate) async fn app_js() -> Response<Body> {
-    Response::builder()
+    match Response::builder()
         .header(
             header::CONTENT_TYPE,
             "application/javascript; charset=utf-8",
         )
         .header(header::CACHE_CONTROL, "public, max-age=3600")
         .body(Body::from(APP_JS))
-        .unwrap()
+    {
+        Ok(resp) => resp,
+        Err(_) => Response::new(Body::empty()),
+    }
 }
 
 pub(crate) async fn stats(State(state): State<AppState>) -> Json<StatsResponse> {
