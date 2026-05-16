@@ -1,6 +1,10 @@
 pub mod bencode;
+pub mod blacklist;
 pub mod client_id;
+pub mod handlers;
 pub mod protocol;
 pub mod server;
+pub mod swarm;
 pub mod tracker;
+pub mod trends;
 pub mod types;
