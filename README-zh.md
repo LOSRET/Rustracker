@@ -2,7 +2,7 @@
 
 # rustracker
 
-[![Version](https://img.shields.io/badge/version-0.1.86-blue.svg)](https://github.com/rustracker/rustracker/releases)
+[![Version](https://img.shields.io/badge/version-0.1.88-blue.svg)](https://github.com/LOSRET/rustracker/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-2021--edition-orange.svg)](https://www.rust-lang.org)
 
@@ -45,7 +45,7 @@
 ### 从源码构建并运行
 
 ```bash
-git clone https://github.com/rustracker/rustracker.git
+git clone https://github.com/LOSRET/rustracker.git
 cd rustracker
 cargo run --release -- --listen 127.0.0.1:8080
 ```
@@ -54,7 +54,7 @@ cargo run --release -- --listen 127.0.0.1:8080
 
 ### 预编译二进制
 
-从 [GitHub Releases](https://github.com/rustracker/rustracker/releases) 下载最新版本：
+从 [GitHub Releases](https://github.com/LOSRET/rustracker/releases) 下载最新版本：
 - `rustracker.exe` — Windows x86_64
 - `rustracker-linux` — Linux x86_64
 - `rustracker-linux-vX.Y.Z.tar.gz` — Linux 归档包（含安装脚本）
