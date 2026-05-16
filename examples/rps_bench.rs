@@ -1,11 +1,17 @@
-//! RPS benchmark through the full HTTP stack
+//! RPS benchmark: concurrent load + re-announce
 //!
-//! Sends real HTTP requests through axum router → query parsing →
-//! tracker announce → bencode response → HTTP response.
-//! Gradually ramps up peer scale to show RPS degradation.
+//! Simulates a real tracker where new peers join AND existing peers
+//! re-announce simultaneously on the same instance.
+//!
+//! For each scale step:
+//!   - Loader task: continuously adds NEW peers (simulating joins)
+//!   - RPS task: re-announces EXISTING peers (simulating re-announce traffic)
+//!   - Both run concurrently on the same tracker
 //!
 //! Usage: cargo run --release --example rps_bench
 
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use axum::body::Body;
@@ -77,9 +83,19 @@ fn announce_uri(info_hash: [u8; 20], peer_id: [u8; 20], port: u16, left: u64) ->
     )
 }
 
-// ─── Pre-load via HTTP ────────────────────────────────────────────
+// ─── Send one HTTP announce ───────────────────────────────────────
 
-async fn load_peers(app: &axum::Router, num_torrents: usize, num_peers: usize) {
+async fn http_announce(app: &axum::Router, uri: String) {
+    let resp = app.clone()
+        .oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let _ = resp.into_body().collect().await;
+}
+
+// ─── Loader: adds NEW peers, updates counter ──────────────────────
+
+async fn loader(app: &axum::Router, num_torrents: usize, num_peers: usize, counter: &AtomicUsize) {
     let peers_per = (num_peers / num_torrents).max(1);
     for t in 0..num_torrents {
         let ih = make_info_hash(t);
@@ -88,34 +104,73 @@ async fn load_peers(app: &axum::Router, num_torrents: usize, num_peers: usize) {
             if idx >= num_peers { return; }
             let left = if j % 3 == 0 { 0 } else { 1_000_000_000 };
             let uri = announce_uri(ih, make_peer_id(idx), (6881 + idx % 60000) as u16, left);
-            let resp = app.clone()
-                .oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
-                .await
-                .unwrap();
-            let _ = resp.into_body().collect().await;
+            http_announce(app, uri).await;
+            counter.store(idx + 1, Ordering::Relaxed);
         }
     }
 }
 
-// ─── RPS measurement burst ────────────────────────────────────────
+// ─── RPS: re-announces EXISTING peers ─────────────────────────────
 
-async fn measure_rps(app: &axum::Router, num_torrents: usize, burst_size: usize) -> (f64, f64) {
-    let t0 = Instant::now();
-    for k in 0..burst_size {
-        let torrent_idx = k % num_torrents;
+async fn rps_loop(
+    app: &axum::Router,
+    num_torrents: usize,
+    counter: &AtomicUsize,
+    stop: &AtomicUsize,
+    results: &mut Vec<(usize, f64)>,
+) {
+    let mut next_sample_at: usize = 10_000;
+    let mut burst_count: usize = 0;
+    let burst_start = Instant::now();
+
+    loop {
+        let loaded = counter.load(Ordering::Relaxed);
+        if loaded == 0 {
+            tokio::task::yield_now().await;
+            continue;
+        }
+
+        // Re-announce an existing peer (cycling through loaded peers)
+        let peer_idx = burst_count % loaded;
+        let torrent_idx = peer_idx % num_torrents;
         let ih = make_info_hash(torrent_idx);
-        // peer_id uses 1B offset to avoid colliding with pre-loaded peers
-        let pid = make_peer_id(1_000_000_000 + k);
-        let uri = announce_uri(ih, pid, (40000 + k % 60000) as u16, 500_000_000);
-        let resp = app.clone()
-            .oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
-            .await
-            .unwrap();
-        let _ = resp.into_body().collect().await;
+        // Re-use the same peer_id as the original load → this is a re-announce
+        let uri = announce_uri(ih, make_peer_id(peer_idx), (6881 + peer_idx % 60000) as u16, 0);
+        http_announce(app, uri).await;
+        burst_count += 1;
+
+        // Record RPS at milestones
+        if loaded >= next_sample_at {
+            let elapsed = burst_start.elapsed().as_secs_f64();
+            if elapsed > 0.0 {
+                let rps = burst_count as f64 / elapsed;
+                results.push((loaded, rps));
+                eprintln!(
+                    "  peers={:>10}  rps={:>10.0}  re-announces={}",
+                    loaded, rps, burst_count,
+                );
+            }
+            next_sample_at += 10_000;
+            if next_sample_at > 1_000_000 {
+                next_sample_at += 900_000; // sparser samples at scale
+            }
+        }
+
+        // Check if loader is done
+        if stop.load(Ordering::Relaxed) == 1 && loaded >= counter.load(Ordering::Relaxed) {
+            // Final measurement
+            let elapsed = burst_start.elapsed().as_secs_f64();
+            if elapsed > 0.0 {
+                let rps = burst_count as f64 / elapsed;
+                results.push((loaded, rps));
+                eprintln!(
+                    "  peers={:>10}  rps={:>10.0}  re-announces={} (final)",
+                    loaded, rps, burst_count,
+                );
+            }
+            break;
+        }
     }
-    let elapsed = t0.elapsed();
-    let rps = burst_size as f64 / elapsed.as_secs_f64();
-    (rps, elapsed.as_secs_f64() * 1000.0)
 }
 
 // ─── Main ────────────────────────────────────────────────────────
@@ -133,36 +188,58 @@ async fn main() {
         (1_000_000,10_000_000),
     ];
 
-    let burst_size: usize = 50_000; // HTTP overhead is larger, use smaller burst
     let app = router(AppState::sharded(
         Duration::from_secs(1800),
         Duration::from_secs(2700),
         16,
     ));
 
-    println!("peers,rps,elapsed_ms,rss_mb");
+    println!("peers,rps");
 
+    let counter = Arc::new(AtomicUsize::new(0));
+    let stop = Arc::new(AtomicUsize::new(0));
+    let mut all_results: Vec<(usize, f64)> = Vec::new();
     let mut loaded_peers: usize = 0;
 
     for &(torrents, target_peers) in &schedule {
         let to_load = target_peers.saturating_sub(loaded_peers);
-        if to_load > 0 {
-            eprint!("Loading {} peers ({} torrents) via HTTP ... ", to_load, torrents);
-            let t0 = Instant::now();
-            load_peers(&app, torrents, to_load).await;
-            loaded_peers = target_peers;
-            eprintln!("done in {:.1}s", t0.elapsed().as_secs_f64());
-        }
+        if to_load == 0 { continue; }
 
-        let (rps, elapsed_ms) = measure_rps(&app, torrents, burst_size).await;
-        let rss = mem::rss_bytes();
-        println!("{},{:.0},{:.1},{:.1}", target_peers, rps, elapsed_ms, fmt_mb(rss));
+        eprint!("Loading {} peers ({} torrents) while measuring RPS ... ", to_load, torrents);
+        let t0 = Instant::now();
+        stop.store(0, Ordering::Relaxed);
 
-        eprintln!(
-            "  peers={:>10}  rps={:>10.0}  elapsed={:>7.1}ms  rss={}",
-            target_peers, rps, elapsed_ms, fmt_mb(rss),
-        );
+        // Spawn loader and RPS measurement concurrently
+        let loader_app = app.clone();
+        let loader_counter = counter.clone();
+        let rps_counter = counter.clone();
+        let rps_stop = stop.clone();
+        let rps_app = app.clone();
+
+        let loader_handle = tokio::spawn(async move {
+            loader(&loader_app, torrents, to_load, &loader_counter).await;
+        });
+        let rps_handle = tokio::spawn(async move {
+            let mut results = Vec::new();
+            rps_loop(&rps_app, torrents, &rps_counter, &rps_stop, &mut results).await;
+            results
+        });
+
+        // Wait for loader to finish, then signal RPS to stop
+        loader_handle.await.unwrap();
+        stop.store(1, Ordering::Relaxed);
+        let step_results = rps_handle.await.unwrap();
+        loaded_peers = target_peers;
+
+        eprintln!("  loader done in {:.1}s", t0.elapsed().as_secs_f64());
+        all_results.extend(step_results);
     }
 
-    eprintln!("\nDone.");
+    // Output final CSV
+    for (peers, rps) in &all_results {
+        let rss = mem::rss_bytes();
+        println!("{},{:.0},{:.1}", peers, rps, fmt_mb(rss));
+    }
+
+    eprintln!("\nDone. Total data points: {}", all_results.len());
 }

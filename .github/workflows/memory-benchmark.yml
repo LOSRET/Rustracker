@@ -31,10 +31,10 @@ jobs:
           done
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## Announce RPS by Peer Scale" >> $GITHUB_STEP_SUMMARY
-          echo "| Peers | RPS | Elapsed | RSS |" >> $GITHUB_STEP_SUMMARY
-          echo "|---:|---:|---:|---:|" >> $GITHUB_STEP_SUMMARY
-          tail -n +2 rps.csv | while IFS=',' read peers rps elapsed rss; do
-            echo "| $(printf "%'d" $peers) | $(printf "%'.0f" $rps) | ${elapsed} ms | ${rss} MB |" >> $GITHUB_STEP_SUMMARY
+          echo "| Peers | RPS | RSS |" >> $GITHUB_STEP_SUMMARY
+          echo "|---:|---:|---:|" >> $GITHUB_STEP_SUMMARY
+          tail -n +2 rps.csv | while IFS=',' read peers rps rss; do
+            echo "| $(printf "%'d" $peers) | $(printf "%'.0f" $rps) | ${rss} MB |" >> $GITHUB_STEP_SUMMARY
           done
 
       - uses: actions/upload-artifact@v4
