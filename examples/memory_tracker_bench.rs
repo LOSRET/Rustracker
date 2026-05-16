@@ -5,9 +5,10 @@
 //!
 //! Usage: cargo run --release --example memory_tracker_bench
 
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::time::{Duration, Instant};
 
+use rustracker::protocol::announce_response;
 use rustracker::tracker::{AnnounceInput, Tracker};
 use rustracker::types::{AnnounceEvent, InfoHash, PeerId};
 
@@ -114,11 +115,22 @@ fn run_bench(label: &str, torrents: usize, total_peers: usize, max_peers: usize)
     for i in 0..torrents {
         let count = counts[i];
         for j in 0..count {
-            let ip_octets = base_ip.octets();
-            let mut ip = ip_octets;
-            ip[3] = ((peers_done + j) % 254 + 1) as u8;
-            let ip = IpAddr::V4(Ipv4Addr::from(ip));
-            let port = (base_port as usize + (peers_done + j) % 60000) as u16;
+            let idx = peers_done + j;
+            let port = (base_port as usize + idx % 60000) as u16;
+            // 30% IPv4, 70% IPv6
+            let ip = if idx % 10 < 3 {
+                let mut octets = base_ip.octets();
+                octets[3] = (idx % 254 + 1) as u8;
+                IpAddr::V4(Ipv4Addr::from(octets))
+            } else {
+                IpAddr::V6(Ipv6Addr::new(
+                    0x2001, 0xdb8, 0, 0,
+                    (idx >> 48 & 0xffff) as u16,
+                    (idx >> 32 & 0xffff) as u16,
+                    (idx >> 16 & 0xffff) as u16,
+                    (idx & 0xffff) as u16,
+                ))
+            };
 
             let mut pid = [0u8; 20];
             pid[0..8].copy_from_slice(&((peers_done + j) as u64).to_le_bytes());
@@ -136,7 +148,10 @@ fn run_bench(label: &str, torrents: usize, total_peers: usize, max_peers: usize)
                 client_tag: 1,
             };
 
-            tracker.announce(input, now);
+            let output = tracker.announce(input, now);
+            // Encode bencode response (simulates real request path)
+            let _resp = announce_response(output, true);
+            drop(_resp);
         }
         peers_done += count;
 
