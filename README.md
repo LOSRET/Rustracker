@@ -361,17 +361,11 @@ RUST_LOG=debug cargo run --release
 RUST_LOG=rustracker=trace cargo run --release
 ```
 
-## Protocol Scope
-
-This is an **HTTP tracker** only. It does not implement the UDP tracker protocol (BEP 15).
-
-State is kept in memory — peer lists and counters are lost when the process restarts (unless `--trends-file` is enabled for trend persistence).
-
-**Before exposing as a public tracker**, consider adding:
-- Rate limiting (e.g. via a reverse proxy)
-- Metrics collection (Prometheus, etc.)
-- Persistent peer storage
-
 ## License
 
 [MIT](./LICENSE)
+
+## Acknowledgments
+
+- [opentracker](https://erdgeist.org/arts/software/opentracker/) by Dirk Engling — peer selection algorithm design inspired by opentracker's fixed-point even-spacing random selection strategy. Licensed under [Beerware](https://erdgeist.org/beerware.html).
+- [PBH-BTN/quick-references](https://github.com/PBH-BTN/quick-references) — BitTorrent client identification peer_id reference table.

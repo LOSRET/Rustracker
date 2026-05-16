@@ -361,17 +361,11 @@ RUST_LOG=debug cargo run --release
 RUST_LOG=rustracker=trace cargo run --release
 ```
 
-## 协议范围
-
-这是一个**仅支持 HTTP 的跟踪器**，不实现 UDP 跟踪器协议（BEP 15）。
-
-状态保存在内存中——进程重启后 peer 列表和计数器会丢失（除非启用了 `--trends-file` 进行趋势数据持久化）。
-
-**在公开部署前**，建议添加：
-- 速率限制（如通过反向代理）
-- 指标采集（Prometheus 等）
-- 持久化 peer 存储
-
 ## 许可证
 
 [MIT](./LICENSE)
+
+## 致谢
+
+- [opentracker](https://erdgeist.org/arts/software/opentracker/)（作者 Dirk Engling）— peer 选择算法设计受 opentracker 的定步长均匀随机选择策略启发。采用 [Beerware](https://erdgeist.org/beerware.html) 许可证。
+- [PBH-BTN/quick-references](https://github.com/PBH-BTN/quick-references) — BitTorrent 客户端 peer_id 识别参考表。
