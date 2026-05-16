@@ -2,7 +2,7 @@
 
 # rustracker
 
-[![Version](https://img.shields.io/badge/version-0.1.86-blue.svg)](https://github.com/rustracker/rustracker/releases)
+[![Version](https://img.shields.io/badge/version-0.1.88-blue.svg)](https://github.com/LOSRET/rustracker/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-2021--edition-orange.svg)](https://www.rust-lang.org)
 
@@ -45,7 +45,7 @@ A lightweight, high-performance HTTP BitTorrent tracker with a real-time dashboa
 ### Build & Run
 
 ```bash
-git clone https://github.com/rustracker/rustracker.git
+git clone https://github.com/LOSRET/rustracker.git
 cd rustracker
 cargo run --release -- --listen 127.0.0.1:8080
 ```
@@ -54,7 +54,7 @@ Open `http://127.0.0.1:8080` in your browser to see the dashboard.
 
 ### Pre-built Binaries
 
-Download the latest release from [GitHub Releases](https://github.com/rustracker/rustracker/releases):
+Download the latest release from [GitHub Releases](https://github.com/LOSRET/rustracker/releases):
 - `rustracker.exe` — Windows x86_64
 - `rustracker-linux` — Linux x86_64
 - `rustracker-linux-vX.Y.Z.tar.gz` — Linux archive with installer
