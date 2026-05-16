@@ -75,6 +75,14 @@ enum PeerEndpoint {
     V6(Ipv6PeerKey),
 }
 
+/// One-pass Top-K for all three rankings (peers, seeders, leechers).
+/// Three min-heaps share a single iteration over the swarm table.
+pub(crate) struct Top100All {
+    pub peers: Vec<(InfoHash, usize, usize, u64)>,
+    pub seeders: Vec<(InfoHash, usize, usize, u64)>,
+    pub leechers: Vec<(InfoHash, usize, usize, u64)>,
+}
+
 impl Tracker {
     pub fn new(interval: Duration, peer_timeout: Duration) -> Self {
         Self::with_started_at(interval, peer_timeout, Instant::now())
@@ -193,61 +201,94 @@ impl Tracker {
             .collect()
     }
 
-    pub fn top_torrents(&self, sort_by: &str, limit: usize) -> Vec<(InfoHash, usize, usize, u64)> {
+    pub(crate) fn top_torrents_all(&self, limit: usize) -> Top100All {
         if limit == 0 {
-            return Vec::new();
+            return Top100All {
+                peers: Vec::new(),
+                seeders: Vec::new(),
+                leechers: Vec::new(),
+            };
         }
 
-        // Min-heap via Reverse: smallest sort key stays at the top.
-        // Heap capacity is `limit`, so memory is O(limit) instead of O(N).
-        let mut heap: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>> =
+        let mut heap_p: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>> =
             BinaryHeap::with_capacity(limit);
-        // Cached heap-top threshold: skip constructing the Reverse tuple
-        // for the 99.9% of torrents whose key is below this value.
-        let mut min_key: u64 = 0;
+        let mut heap_s: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>> =
+            BinaryHeap::with_capacity(limit);
+        let mut heap_l: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>> =
+            BinaryHeap::with_capacity(limit);
+        let mut min_p: u64 = 0;
+        let mut min_s: u64 = 0;
+        let mut min_l: u64 = 0;
 
         for (info_hash, swarm) in &self.swarms {
             let stats = swarm.stats();
-            let key: u64 = match sort_by {
-                "seeders" => stats.complete as u64,
-                "leechers" => stats.incomplete as u64,
-                "downloaded" => stats.downloaded as u64,
-                _ => (stats.complete + stats.incomplete) as u64,
-            };
+            let peers = (stats.complete + stats.incomplete) as u64;
+            let seeders = stats.complete as u64;
+            let leechers = stats.incomplete as u64;
 
-            // Fast path: heap is full and this torrent can't enter top-K.
-            if heap.len() >= limit && key <= min_key {
+            // Fast path: all three heaps are full and this torrent is
+            // below every threshold — skip without constructing entries.
+            if heap_p.len() >= limit && peers <= min_p
+                && heap_s.len() >= limit && seeders <= min_s
+                && heap_l.len() >= limit && leechers <= min_l
+            {
                 continue;
             }
 
-            let entry = Reverse((key, *info_hash, stats.complete, stats.incomplete, stats.downloaded as u64));
-
-            if heap.len() < limit {
-                heap.push(entry);
-                if heap.len() == limit {
-                    min_key = heap.peek().unwrap().0 .0;
-                }
-            } else {
-                heap.pop();
-                heap.push(entry);
-                min_key = heap.peek().unwrap().0 .0;
-            }
+            let dl = stats.downloaded as u64;
+            Self::try_heap_insert(&mut heap_p, &mut min_p, limit, peers, *info_hash, stats.complete, stats.incomplete, dl);
+            Self::try_heap_insert(&mut heap_s, &mut min_s, limit, seeders, *info_hash, stats.complete, stats.incomplete, dl);
+            Self::try_heap_insert(&mut heap_l, &mut min_l, limit, leechers, *info_hash, stats.complete, stats.incomplete, dl);
         }
 
+        Top100All {
+            peers: Self::drain_heap_by(heap_p, 0),
+            seeders: Self::drain_heap_by(heap_s, 1),
+            leechers: Self::drain_heap_by(heap_l, 2),
+        }
+    }
+
+    fn try_heap_insert(
+        heap: &mut BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>>,
+        min_key: &mut u64,
+        limit: usize,
+        key: u64,
+        info_hash: InfoHash,
+        complete: usize,
+        incomplete: usize,
+        downloaded: u64,
+    ) {
+        if heap.len() >= limit && key <= *min_key {
+            return;
+        }
+        let entry = Reverse((key, info_hash, complete, incomplete, downloaded));
+        if heap.len() < limit {
+            heap.push(entry);
+            if heap.len() == limit {
+                *min_key = heap.peek().unwrap().0.0;
+            }
+        } else {
+            heap.pop();
+            heap.push(entry);
+            *min_key = heap.peek().unwrap().0.0;
+        }
+    }
+
+    fn drain_heap_by(
+        heap: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>>,
+        sort_field: u8, // 0 = peers (1+2), 1 = seeders, 2 = leechers
+    ) -> Vec<(InfoHash, usize, usize, u64)> {
         let mut result: Vec<_> = heap
             .into_iter()
             .map(|Reverse((_, info_hash, seeders, leechers, downloaded))| {
                 (info_hash, seeders, leechers, downloaded)
             })
             .collect();
-
-        match sort_by {
-            "seeders" => result.sort_by(|a, b| b.1.cmp(&a.1)),
-            "leechers" => result.sort_by(|a, b| b.2.cmp(&a.2)),
-            "downloaded" => result.sort_by(|a, b| b.3.cmp(&a.3)),
+        match sort_field {
+            1 => result.sort_by(|a, b| b.1.cmp(&a.1)),
+            2 => result.sort_by(|a, b| b.2.cmp(&a.2)),
             _ => result.sort_by(|a, b| (b.1 + b.2).cmp(&(a.1 + a.2))),
         }
-
         result
     }
 

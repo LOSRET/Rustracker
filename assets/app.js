@@ -360,7 +360,7 @@
             $("top100Refresh").disabled = true;
             $("top100Status").textContent = state.lang === "zh" ? "加载中..." : "Loading...";
             try {
-                const res = await fetch(`/api/top100?sort=${state.top100Sort}&limit=100`, { cache: "no-store" });
+                const res = await fetch(`/api/top100?limit=100`, { cache: "no-store" });
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 state.top100Data = await res.json();
                 renderTop100();
@@ -377,11 +377,12 @@
         function renderTop100() {
             const data = state.top100Data;
             const body = $("top100Body");
-            if (!data || !data.torrents.length) {
+            const torrents = data ? data[state.top100Sort] : null;
+            if (!torrents || !torrents.length) {
                 body.innerHTML = `<tr><td colspan="6" class="top100-empty">${t("top100_empty")}</td></tr>`;
                 return;
             }
-            body.innerHTML = data.torrents.map((item, i) => `
+            body.innerHTML = torrents.map((item, i) => `
                 <tr>
                     <td class="col-rank">${i + 1}</td>
                     <td class="col-hash" title="${item.info_hash}"><code>${item.info_hash}</code></td>
@@ -399,8 +400,7 @@
             $("sortGroup").querySelectorAll(".sort-btn").forEach((b) => b.classList.remove("active"));
             btn.classList.add("active");
             state.top100Sort = btn.dataset.sort;
-            state.top100Data = null;
-            loadTop100();
+            renderTop100();
         });
 
         $("langSelect").value = state.lang;
