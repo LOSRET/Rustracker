@@ -242,6 +242,66 @@ cargo run --release -- --trends-file /var/lib/rustracker/trends.jsonl
 - **过期清理**：后台任务每 1 秒清扫过期 peer
 - **客户端识别**：编译时生成的 256×256 查找表，用于 Azureus 风格的 peer ID 前缀匹配，同时支持非标准格式的前缀匹配
 
+## 仓库结构
+
+```
+rustracker/
+├── Cargo.toml                     # Rust 项目清单与依赖声明
+├── LICENSE                        # MIT 许可证
+├── README.md                      # 英文文档
+├── README-zh.md                   # 中文文档
+├── install-linux.sh               # Linux systemd 安装脚本（交互式菜单）
+│
+├── src/                           # Rust 源代码
+│   ├── main.rs                    # 入口：CLI 解析、Tokio 运行时、优雅关闭
+│   ├── lib.rs                     # 库根：重新导出所有模块
+│   ├── server.rs                  # Axum HTTP 服务器、路由、AppState、静态资源缓存
+│   ├── handlers.rs                # HTTP 处理器：announce、scrape、healthz、面板、API
+│   ├── tracker.rs                 # TrackerPool — 64 分片并发 Tracker（RwLock<BTreeMap>）
+│   ├── swarm.rs                   # Swarm — 每种子的 Peer 集合，紧凑二进制存储
+│   ├── protocol.rs                # BEP 3 协议：Bencode 响应构建、紧凑 Peer 编码
+│   ├── bencode.rs                 # 轻量 Bencode 编码器（零外部依赖）
+│   ├── types.rs                   # 核心类型：InfoHash、PeerId、PeerAddr
+│   ├── client_id.rs               # 102 种客户端 Peer ID 识别（编译时查找表）
+│   ├── blacklist.rs               # 种子黑名单，5 秒热重载文件监视
+│   └── trends.rs                  # 趋势数据采集、7 天 JSONL 持久化、历史 API
+│
+├── assets/                        # Web 监控面板静态文件
+│   ├── index.html                 # 面板 HTML（生产版，内联 CSS/JS）
+│   ├── index-build.html           # 面板 HTML（开发版，外部引用资源）
+│   ├── style.css                  # 面板样式
+│   └── app.js                     # 面板逻辑：ECharts 图表、国际化、API 调用
+│
+├── examples/                      # 负载测试与性能基准
+│   ├── announce_load.rs           # 简单并发通告负载测试
+│   ├── load_test.rs               # 高级负载测试（Zipf 分布、Peer 生命周期）
+│   ├── rps_bench.rs               # 每秒请求数基准
+│   ├── unified_bench.rs           # 统一基准测试套件
+│   ├── memory_tracker_bench.rs    # 内存占用基准
+│   ├── memory_tracker_btree.rs    # BTree 内存布局分析
+│   ├── memory_staircase_test.rs   # 内存阶梯增长测试
+│   └── memory_ci_compare.rs       # CI 内存回归对比
+│
+└── tests/                         # 集成测试
+    └── tracker_http.rs            # HTTP 端点集成测试
+```
+
+**源码模块概览：**
+
+| 模块 | 职责 |
+|------|------|
+| `main.rs` | CLI 参数解析（`clap`）、异步运行时初始化、信号处理 |
+| `server.rs` | Axum 路由、共享 `AppState`、1 小时静态资源缓存头 |
+| `handlers.rs` | `/announce`、`/scrape`、`/healthz`、`/api/*`、`/` 请求处理 |
+| `tracker.rs` | 64 分片 `TrackerPool` — 每分片 `RwLock<BTreeMap<InfoHash, Swarm>>` |
+| `swarm.rs` | 每种子 Peer 集合 — IPv4 每 peer 6 字节、IPv6 每 peer 18 字节紧凑存储 |
+| `protocol.rs` | BEP 3 规范 Bencode 响应构建、紧凑 Peer 编码 |
+| `bencode.rs` | 最小化 Bencode 序列化器 — 无外部 crate 依赖 |
+| `types.rs` | `InfoHash`（20 字节）、`PeerId`（20 字节）、`PeerAddr`（IP + 端口） |
+| `client_id.rs` | 编译时 256×256 查找表，匹配 `-XX####-` Azureus 风格 Peer ID 前缀 |
+| `blacklist.rs` | `HashSet<InfoHash>` 通过 5 秒轮询实现热重载 |
+| `trends.rs` | 内存环形缓冲 + 可选 JSONL 持久化，7 天保留 |
+
 ## 客户端识别
 
 Tracker 可从 peer ID 前缀识别 **102 种 BitTorrent 客户端**，包括：
