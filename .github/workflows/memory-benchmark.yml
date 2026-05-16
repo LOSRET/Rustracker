@@ -27,3 +27,27 @@ jobs:
           done
       - uses: actions/upload-artifact@v4
         with: { name: btree-bench, path: results.csv }
+
+  rps-bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --release --example rps_bench
+      - name: Run
+        run: cargo run --release --example rps_bench 2>rps.log | tee rps.csv
+      - name: Show summary
+        run: cat rps.log
+      - name: Render
+        run: |
+          echo "## Announce RPS by Peer Scale" >> $GITHUB_STEP_SUMMARY
+          echo "| Peers | RPS | Elapsed | RSS |" >> $GITHUB_STEP_SUMMARY
+          echo "|---:|---:|---:|---:|" >> $GITHUB_STEP_SUMMARY
+          tail -n +2 rps.csv | while IFS=',' read peers rps elapsed rss; do
+            echo "| $(printf "%'d" $peers) | $(printf "%'.0f" $rps) | ${elapsed} ms | ${rss} MB |" >> $GITHUB_STEP_SUMMARY
+          done
+      - uses: actions/upload-artifact@v4
+        with: { name: rps-bench, path: rps.csv }
