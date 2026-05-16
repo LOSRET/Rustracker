@@ -128,6 +128,7 @@ pub(crate) struct Top100Response {
     pub peers: Vec<Top100Entry>,
     pub seeders: Vec<Top100Entry>,
     pub leechers: Vec<Top100Entry>,
+    pub downloaded: Vec<Top100Entry>,
 }
 
 pub(crate) async fn top100(
@@ -140,6 +141,7 @@ pub(crate) async fn top100(
         peers: top100_map(all.peers),
         seeders: top100_map(all.seeders),
         leechers: top100_map(all.leechers),
+        downloaded: top100_map(all.downloaded),
     })
 }
 

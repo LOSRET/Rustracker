@@ -248,6 +248,7 @@ impl TrackerPool {
                 peers: Vec::new(),
                 seeders: Vec::new(),
                 leechers: Vec::new(),
+                downloaded: Vec::new(),
             };
         }
 
@@ -256,6 +257,8 @@ impl TrackerPool {
         let mut hs: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>> =
             BinaryHeap::with_capacity(limit);
         let mut hl: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>> =
+            BinaryHeap::with_capacity(limit);
+        let mut hd: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>> =
             BinaryHeap::with_capacity(limit);
 
         for shard in &self.shards {
@@ -272,12 +275,16 @@ impl TrackerPool {
                 let key = leechers as u64;
                 shard_heap_push(&mut hl, limit, key, info_hash, seeders, leechers, downloaded);
             }
+            for (info_hash, seeders, leechers, downloaded) in all.downloaded {
+                shard_heap_push(&mut hd, limit, downloaded, info_hash, seeders, leechers, downloaded);
+            }
         }
 
         Top100All {
             peers: drain_and_sort(hp, 0),
             seeders: drain_and_sort(hs, 1),
             leechers: drain_and_sort(hl, 2),
+            downloaded: drain_and_sort(hd, 3),
         }
     }
 
@@ -368,6 +375,7 @@ fn drain_and_sort(
     match sort_field {
         1 => result.sort_by(|a, b| b.1.cmp(&a.1)),
         2 => result.sort_by(|a, b| b.2.cmp(&a.2)),
+        3 => result.sort_by(|a, b| b.3.cmp(&a.3)),
         _ => result.sort_by(|a, b| (b.1 + b.2).cmp(&(a.1 + a.2))),
     }
     result

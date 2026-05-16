@@ -75,12 +75,13 @@ enum PeerEndpoint {
     V6(Ipv6PeerKey),
 }
 
-/// One-pass Top-K for all three rankings (peers, seeders, leechers).
-/// Three min-heaps share a single iteration over the swarm table.
+/// One-pass Top-K for all four rankings (peers, seeders, leechers, downloaded).
+/// Four min-heaps share a single iteration over the swarm table.
 pub(crate) struct Top100All {
     pub peers: Vec<(InfoHash, usize, usize, u64)>,
     pub seeders: Vec<(InfoHash, usize, usize, u64)>,
     pub leechers: Vec<(InfoHash, usize, usize, u64)>,
+    pub downloaded: Vec<(InfoHash, usize, usize, u64)>,
 }
 
 impl Tracker {
@@ -207,6 +208,7 @@ impl Tracker {
                 peers: Vec::new(),
                 seeders: Vec::new(),
                 leechers: Vec::new(),
+                downloaded: Vec::new(),
             };
         }
 
@@ -216,21 +218,26 @@ impl Tracker {
             BinaryHeap::with_capacity(limit);
         let mut heap_l: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>> =
             BinaryHeap::with_capacity(limit);
+        let mut heap_d: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>> =
+            BinaryHeap::with_capacity(limit);
         let mut min_p: u64 = 0;
         let mut min_s: u64 = 0;
         let mut min_l: u64 = 0;
+        let mut min_d: u64 = 0;
 
         for (info_hash, swarm) in &self.swarms {
             let stats = swarm.stats();
             let peers = (stats.complete + stats.incomplete) as u64;
             let seeders = stats.complete as u64;
             let leechers = stats.incomplete as u64;
+            let downloaded = stats.downloaded as u64;
 
-            // Fast path: all three heaps are full and this torrent is
+            // Fast path: all four heaps are full and this torrent is
             // below every threshold — skip without constructing entries.
             if heap_p.len() >= limit && peers <= min_p
                 && heap_s.len() >= limit && seeders <= min_s
                 && heap_l.len() >= limit && leechers <= min_l
+                && heap_d.len() >= limit && downloaded <= min_d
             {
                 continue;
             }
@@ -239,12 +246,14 @@ impl Tracker {
             Self::try_heap_insert(&mut heap_p, &mut min_p, limit, peers, *info_hash, stats.complete, stats.incomplete, dl);
             Self::try_heap_insert(&mut heap_s, &mut min_s, limit, seeders, *info_hash, stats.complete, stats.incomplete, dl);
             Self::try_heap_insert(&mut heap_l, &mut min_l, limit, leechers, *info_hash, stats.complete, stats.incomplete, dl);
+            Self::try_heap_insert(&mut heap_d, &mut min_d, limit, downloaded, *info_hash, stats.complete, stats.incomplete, dl);
         }
 
         Top100All {
             peers: Self::drain_heap_by(heap_p, 0),
             seeders: Self::drain_heap_by(heap_s, 1),
             leechers: Self::drain_heap_by(heap_l, 2),
+            downloaded: Self::drain_heap_by(heap_d, 3),
         }
     }
 
@@ -287,6 +296,7 @@ impl Tracker {
         match sort_field {
             1 => result.sort_by(|a, b| b.1.cmp(&a.1)),
             2 => result.sort_by(|a, b| b.2.cmp(&a.2)),
+            3 => result.sort_by(|a, b| b.3.cmp(&a.3)),
             _ => result.sort_by(|a, b| (b.1 + b.2).cmp(&(a.1 + a.2))),
         }
         result
