@@ -13,7 +13,7 @@ use tokio::time::MissedTickBehavior;
 
 use crate::blacklist;
 use crate::handlers;
-use crate::tracker::{AnnounceInput, Tracker, TrackerSnapshot};
+use crate::tracker::{AnnounceInput, Top100All, Tracker, TrackerSnapshot};
 use crate::trends::{self, TrendStore};
 use crate::types::InfoHash;
 
@@ -242,56 +242,43 @@ impl TrackerPool {
         stats
     }
 
-    pub(crate) async fn top_torrents(&self, sort_by: &str, limit: usize) -> Vec<(InfoHash, usize, usize, u64)> {
+    pub(crate) async fn top_torrents_all(&self, limit: usize) -> Top100All {
         if limit == 0 {
-            return Vec::new();
+            return Top100All {
+                peers: Vec::new(),
+                seeders: Vec::new(),
+                leechers: Vec::new(),
+            };
         }
 
-        // Min-heap to merge top-`limit` results from each shard without
-        // collecting all entries.  Memory stays O(limit).
-        let mut heap: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>> =
+        let mut hp: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>> =
+            BinaryHeap::with_capacity(limit);
+        let mut hs: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>> =
+            BinaryHeap::with_capacity(limit);
+        let mut hl: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>> =
             BinaryHeap::with_capacity(limit);
 
         for shard in &self.shards {
-            for (info_hash, seeders, leechers, downloaded) in
-                shard.read().await.top_torrents(sort_by, limit)
-            {
-                let key: u64 = match sort_by {
-                    "seeders" => seeders as u64,
-                    "leechers" => leechers as u64,
-                    "downloaded" => downloaded,
-                    _ => (seeders + leechers) as u64,
-                };
-
-                let entry = Reverse((key, info_hash, seeders, leechers, downloaded));
-
-                if heap.len() < limit {
-                    heap.push(entry);
-                } else if let Some(top) = heap.peek() {
-                    let min_key = top.0 .0;
-                    if key > min_key {
-                        heap.pop();
-                        heap.push(entry);
-                    }
-                }
+            let all = shard.read().await.top_torrents_all(limit);
+            for (info_hash, seeders, leechers, downloaded) in all.peers {
+                let key = (seeders + leechers) as u64;
+                shard_heap_push(&mut hp, limit, key, info_hash, seeders, leechers, downloaded);
+            }
+            for (info_hash, seeders, leechers, downloaded) in all.seeders {
+                let key = seeders as u64;
+                shard_heap_push(&mut hs, limit, key, info_hash, seeders, leechers, downloaded);
+            }
+            for (info_hash, seeders, leechers, downloaded) in all.leechers {
+                let key = leechers as u64;
+                shard_heap_push(&mut hl, limit, key, info_hash, seeders, leechers, downloaded);
             }
         }
 
-        let mut result: Vec<_> = heap
-            .into_iter()
-            .map(|Reverse((_, info_hash, seeders, leechers, downloaded))| {
-                (info_hash, seeders, leechers, downloaded)
-            })
-            .collect();
-
-        match sort_by {
-            "seeders" => result.sort_by(|a, b| b.1.cmp(&a.1)),
-            "leechers" => result.sort_by(|a, b| b.2.cmp(&a.2)),
-            "downloaded" => result.sort_by(|a, b| b.3.cmp(&a.3)),
-            _ => result.sort_by(|a, b| (b.1 + b.2).cmp(&(a.1 + a.2))),
+        Top100All {
+            peers: drain_and_sort(hp, 0),
+            seeders: drain_and_sort(hs, 1),
+            leechers: drain_and_sort(hl, 2),
         }
-
-        result
     }
 
     pub(crate) async fn snapshot(&self) -> TrackerSnapshot {
@@ -345,6 +332,45 @@ impl TrackerPool {
             }
         }
     }
+}
+
+/// Push into a min-heap, keeping at most `limit` entries.
+fn shard_heap_push(
+    heap: &mut BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>>,
+    limit: usize,
+    key: u64,
+    info_hash: InfoHash,
+    seeders: usize,
+    leechers: usize,
+    downloaded: u64,
+) {
+    if heap.len() < limit {
+        heap.push(Reverse((key, info_hash, seeders, leechers, downloaded)));
+    } else if let Some(top) = heap.peek() {
+        if key > top.0.0 {
+            heap.pop();
+            heap.push(Reverse((key, info_hash, seeders, leechers, downloaded)));
+        }
+    }
+}
+
+/// Drain a min-heap and sort by the given field (0=peers, 1=seeders, 2=leechers).
+fn drain_and_sort(
+    heap: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>>,
+    sort_field: u8,
+) -> Vec<(InfoHash, usize, usize, u64)> {
+    let mut result: Vec<_> = heap
+        .into_iter()
+        .map(|Reverse((_, info_hash, seeders, leechers, downloaded))| {
+            (info_hash, seeders, leechers, downloaded)
+        })
+        .collect();
+    match sort_field {
+        1 => result.sort_by(|a, b| b.1.cmp(&a.1)),
+        2 => result.sort_by(|a, b| b.2.cmp(&a.2)),
+        _ => result.sort_by(|a, b| (b.1 + b.2).cmp(&(a.1 + a.2))),
+    }
+    result
 }
 
 fn file_mtime(path: &Path) -> SystemTime {

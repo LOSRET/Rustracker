@@ -110,8 +110,7 @@ pub(crate) async fn healthz() -> &'static str {
 // ── top100 ───────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct Top100Query {
-    pub sort: Option<String>,
+pub(crate) struct Top100LimitQuery {
     pub limit: Option<usize>,
 }
 
@@ -126,32 +125,35 @@ pub(crate) struct Top100Entry {
 
 #[derive(Debug, Serialize)]
 pub(crate) struct Top100Response {
-    pub sort: String,
-    pub torrents: Vec<Top100Entry>,
+    pub peers: Vec<Top100Entry>,
+    pub seeders: Vec<Top100Entry>,
+    pub leechers: Vec<Top100Entry>,
 }
 
 pub(crate) async fn top100(
     State(state): State<AppState>,
-    axum::extract::Query(query): axum::extract::Query<Top100Query>,
+    axum::extract::Query(query): axum::extract::Query<Top100LimitQuery>,
 ) -> Json<Top100Response> {
-    let sort_by = query.sort.unwrap_or_else(|| "peers".to_string());
     let limit = query.limit.unwrap_or(100).min(500);
-    let entries = state.tracker.top_torrents(&sort_by, limit).await;
+    let all = state.tracker.top_torrents_all(limit).await;
     Json(Top100Response {
-        sort: sort_by,
-        torrents: entries
-            .into_iter()
-            .map(
-                |(info_hash, seeders, leechers, downloaded)| Top100Entry {
-                    info_hash: format!("{info_hash}"),
-                    seeders,
-                    leechers,
-                    peers: seeders + leechers,
-                    downloaded,
-                },
-            )
-            .collect(),
+        peers: top100_map(all.peers),
+        seeders: top100_map(all.seeders),
+        leechers: top100_map(all.leechers),
     })
+}
+
+fn top100_map(entries: Vec<(InfoHash, usize, usize, u64)>) -> Vec<Top100Entry> {
+    entries
+        .into_iter()
+        .map(|(info_hash, seeders, leechers, downloaded)| Top100Entry {
+            info_hash: format!("{info_hash}"),
+            seeders,
+            leechers,
+            peers: seeders + leechers,
+            downloaded,
+        })
+        .collect()
 }
 
 // ── BitTorrent announce / scrape ─────────────────────────────────────────────
