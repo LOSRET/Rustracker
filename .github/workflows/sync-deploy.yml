@@ -5,9 +5,6 @@ on:
     branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
   check-version:
     runs-on: ubuntu-latest
@@ -47,12 +44,14 @@ jobs:
       - name: Inject contact info
         run: |
           if ! grep -q 'disclaimer-contact' assets/index.html; then
-            sed -i '/data-i18n="disc_p5"/r /dev/stdin' assets/index.html <<'EOF'
+            cat > /tmp/contact.html <<'EOF'
                 <div class="disclaimer-contact">
                     <div><span data-i18n="blog_label">Blog</span>：<a href="https://blog.7471.top/" rel="noopener noreferrer" target="_blank">https://blog.7471.top/</a></div>
                     <div><span data-i18n="contact_label">如有问题请联系</span>：<a href="mailto:tracker@mail.7471.top">tracker@mail.7471.top</a></div>
                 </div>
 EOF
+            sed -i '/data-i18n="disc_p5"/r /tmp/contact.html' assets/index.html
+            rm -f /tmp/contact.html
           fi
 
       - name: Install Rust
@@ -87,12 +86,14 @@ EOF
         shell: bash
         run: |
           if ! grep -q 'disclaimer-contact' assets/index.html; then
-            sed -i '/data-i18n="disc_p5"/r /dev/stdin' assets/index.html <<'EOF'
+            cat > /tmp/contact.html <<'EOF'
                 <div class="disclaimer-contact">
                     <div><span data-i18n="blog_label">Blog</span>：<a href="https://blog.7471.top/" rel="noopener noreferrer" target="_blank">https://blog.7471.top/</a></div>
                     <div><span data-i18n="contact_label">如有问题请联系</span>：<a href="mailto:tracker@mail.7471.top">tracker@mail.7471.top</a></div>
                 </div>
 EOF
+            sed -i '/data-i18n="disc_p5"/r /tmp/contact.html' assets/index.html
+            rm -f /tmp/contact.html
           fi
 
       - name: Install Rust
