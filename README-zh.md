@@ -2,7 +2,7 @@
 
 # rustracker
 
-[![Version](https://img.shields.io/badge/version-0.1.88-blue.svg)](https://github.com/LOSRET/rustracker/releases)
+[![Version](https://img.shields.io/github/v/release/LOSRET/rustracker?color=blue&label=version)](https://github.com/LOSRET/rustracker/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-2021--edition-orange.svg)](https://www.rust-lang.org)
 
