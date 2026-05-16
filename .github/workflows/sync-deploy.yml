@@ -1,4 +1,4 @@
-name: Sync self-use branch
+name: Build release artifacts
 
 on:
   push:
@@ -37,76 +37,72 @@ jobs:
             echo "changed=false" >> $GITHUB_OUTPUT
           fi
 
-  sync:
+  build-linux:
+    needs: check-version
+    if: needs.check-version.outputs.changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Sync self-use branch
+      - name: Inject contact info
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          if git show-ref --verify --quiet refs/remotes/origin/self-use; then
-            echo "self-use branch exists, rebasing..."
-            git checkout self-use
-            git rebase main
-          else
-            echo "self-use branch not found, creating from main..."
-            git checkout -b self-use
-          fi
-
           if ! grep -q 'disclaimer-contact' assets/index.html; then
-            echo "Injecting contact info into disclaimer..."
             sed -i '/data-i18n="disc_p5"/r /dev/stdin' assets/index.html <<'EOF'
                 <div class="disclaimer-contact">
                     <div><span data-i18n="blog_label">Blog</span>：<a href="https://blog.7471.top/" rel="noopener noreferrer" target="_blank">https://blog.7471.top/</a></div>
                     <div><span data-i18n="contact_label">如有问题请联系</span>：<a href="mailto:tracker@mail.7471.top">tracker@mail.7471.top</a></div>
                 </div>
 EOF
-            git add assets/index.html
-            git commit -m "auto: add contact info to disclaimer for self-use"
           fi
-
-          git push origin self-use --force
-
-  build:
-    needs: [check-version, sync]
-    if: needs.check-version.outputs.changed == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: self-use
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: x86_64-unknown-linux-gnu,x86_64-pc-windows-gnu
+          targets: x86_64-unknown-linux-gnu
 
-      - name: Build Linux
+      - name: Build
         run: RUSTFLAGS="-C target-cpu=x86-64-v2" cargo build --release --target x86_64-unknown-linux-gnu
 
-      - name: Build Windows
-        run: RUSTFLAGS="-C target-cpu=x86-64-v2" cargo build --release --target x86_64-pc-windows-gnu
-
-      - name: Package Linux
+      - name: Package
         run: |
           mkdir -p pkg
           cp target/x86_64-unknown-linux-gnu/release/rustracker pkg/rustracker-linux
           cp install-linux.sh pkg/
           tar -czf rustracker-selfuse.tar.gz -C pkg rustracker-linux install-linux.sh
 
-      - name: Upload Linux artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: rustracker-selfuse-linux
           path: rustracker-selfuse.tar.gz
 
-      - name: Upload Windows artifact
+  build-windows:
+    needs: check-version
+    if: needs.check-version.outputs.changed == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Inject contact info
+        shell: bash
+        run: |
+          if ! grep -q 'disclaimer-contact' assets/index.html; then
+            sed -i '/data-i18n="disc_p5"/r /dev/stdin' assets/index.html <<'EOF'
+                <div class="disclaimer-contact">
+                    <div><span data-i18n="blog_label">Blog</span>：<a href="https://blog.7471.top/" rel="noopener noreferrer" target="_blank">https://blog.7471.top/</a></div>
+                    <div><span data-i18n="contact_label">如有问题请联系</span>：<a href="mailto:tracker@mail.7471.top">tracker@mail.7471.top</a></div>
+                </div>
+EOF
+          fi
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: rustracker-selfuse-windows
-          path: target/x86_64-pc-windows-gnu/release/rustracker.exe
+          path: target/release/rustracker.exe
