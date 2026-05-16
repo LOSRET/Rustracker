@@ -12,34 +12,18 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Build
-        run: cargo build --release --example memory_tracker_bench --example rps_bench
-
-      - name: Memory benchmark
-        run: cargo run --release --example memory_tracker_bench 2>mem.log | tee mem.csv
-      - name: RPS benchmark
-        run: cargo run --release --example rps_bench 2>rps.log | tee rps.csv
-
+        run: cargo build --release --example unified_bench
+      - name: Run
+        run: cargo run --release --example unified_bench 2>bench.log | tee bench.csv
+      - name: Show log
+        run: cat bench.log
       - name: Summary
         run: |
-          echo "# Benchmark Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## RSS Curve (10M torrents / 25M peers)" >> $GITHUB_STEP_SUMMARY
-          echo "| Torrents | Peers | RSS | ΔRSS |" >> $GITHUB_STEP_SUMMARY
-          echo "|---:|---:|---:|---:|" >> $GITHUB_STEP_SUMMARY
-          tail -n +2 mem.csv | while IFS=',' read _ t p rss delta; do
-            echo "| $(printf "%'d" $t) | $(printf "%'d" $p) | ${rss} MB | ${delta} MB |" >> $GITHUB_STEP_SUMMARY
-          done
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Announce RPS (mixed new-join + re-announce)" >> $GITHUB_STEP_SUMMARY
-          echo "| Requests | Peers | RPS | New Joins | Re-announces | RSS |" >> $GITHUB_STEP_SUMMARY
+          echo "# Unified Benchmark (memory + RPS, same tracker)" >> $GITHUB_STEP_SUMMARY
+          echo "| Requests | Peers | New Joins | Re-announces | RPS | RSS |" >> $GITHUB_STEP_SUMMARY
           echo "|---:|---:|---:|---:|---:|---:|" >> $GITHUB_STEP_SUMMARY
-          tail -n +2 rps.csv | while IFS=',' read req peers rps new re rss; do
-            echo "| $(printf "%'d" $req) | $(printf "%'d" $peers) | $(printf "%'.0f" $rps) | $(printf "%'d" $new) | $(printf "%'d" $re) | ${rss} MB |" >> $GITHUB_STEP_SUMMARY
+          tail -n +2 bench.csv | while IFS=',' read req peers new re rps rss; do
+            echo "| $(printf "%'d" $req) | $(printf "%'d" $peers) | $(printf "%'d" $new) | $(printf "%'d" $re) | $(printf "%'.0f" $rps) | ${rss} MB |" >> $GITHUB_STEP_SUMMARY
           done
-
       - uses: actions/upload-artifact@v4
-        with:
-          name: benchmark-results
-          path: |
-            mem.csv
-            rps.csv
+        with: { name: benchmark, path: bench.csv }
