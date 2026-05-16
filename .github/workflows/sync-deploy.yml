@@ -8,20 +8,42 @@ permissions:
   contents: write
 
 jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.check.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - id: check
+        name: Check if version changed
+        run: |
+          git show HEAD~1:Cargo.toml > old.toml 2>/dev/null || true
+          old=$(grep '^version' old.toml | head -1 | sed 's/.*"\(.*\)".*/\1/' || echo "")
+          new=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          rm -f old.toml
+          if [ "$old" != "$new" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "Version changed: $old -> $new"
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
   sync:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Sync self-use branch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          if git show-ref --verify --quiet refs/heads/self-use; then
+          if git show-ref --verify --quiet refs/remotes/origin/self-use; then
             echo "self-use branch exists, rebasing..."
             git checkout self-use
             git rebase main
@@ -31,3 +53,46 @@ jobs:
           fi
 
           git push origin self-use --force
+
+  build:
+    needs: [check-version, sync]
+    if: needs.check-version.outputs.changed == 'true'
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact: rustracker-linux-selfuse
+            binary: rustracker
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: rustracker-exe-selfuse
+            binary: rustracker.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: self-use
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: RUSTFLAGS="-C target-cpu=x86-64-v2" cargo build --release --target ${{ matrix.target }}
+
+      - name: Build (Windows)
+        if: matrix.os == 'windows-latest'
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Rename Linux binary
+        if: matrix.os == 'ubuntu-latest'
+        run: mv target/${{ matrix.target }}/release/${{ matrix.binary }} target/${{ matrix.target }}/release/${{ matrix.artifact }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: target/${{ matrix.target }}/release/${{ matrix.artifact }}
