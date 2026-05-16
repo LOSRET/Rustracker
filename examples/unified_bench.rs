@@ -71,6 +71,50 @@ fn cpu_usage_pct(prev: &CpuTimes, curr: &CpuTimes) -> f64 {
 
 fn fmt_mb(b: usize) -> String { format!("{:.1}", b as f64 / (1024.0 * 1024.0)) }
 
+// ─── Latency tracker ─────────────────────────────────────────────
+
+struct LatencyTracker {
+    buf: Vec<u64>, // microseconds
+    pos: usize,
+}
+
+impl LatencyTracker {
+    fn new(capacity: usize) -> Self {
+        Self { buf: Vec::with_capacity(capacity), pos: 0 }
+    }
+
+    fn record(&mut self, us: u64) {
+        if self.buf.len() < self.buf.capacity() {
+            self.buf.push(us);
+        } else {
+            self.buf[self.pos] = us;
+        }
+        self.pos = (self.pos + 1) % self.buf.capacity();
+    }
+
+    /// Returns (avg, p50, p99, max) in microseconds
+    fn stats(&self) -> (f64, u64, u64, u64) {
+        if self.buf.is_empty() { return (0.0, 0, 0, 0); }
+        let mut sorted = self.buf.clone();
+        sorted.sort_unstable();
+        let avg = sorted.iter().sum::<u64>() as f64 / sorted.len() as f64;
+        let p50 = sorted[sorted.len() / 2];
+        let p99 = sorted[(sorted.len() as f64 * 0.99) as usize];
+        let max = *sorted.last().unwrap();
+        (avg, p50, p99, max)
+    }
+
+    fn clear(&mut self) {
+        self.buf.clear();
+        self.pos = 0;
+    }
+}
+
+fn fmt_us(us: u64) -> String {
+    if us >= 1000 { format!("{:.1}ms", us as f64 / 1000.0) }
+    else { format!("{}us", us) }
+}
+
 fn percent_encode(bytes: [u8; 20]) -> String {
     let mut s = String::with_capacity(60);
     for &b in &bytes {
@@ -146,10 +190,11 @@ async fn main() {
     let mut next_sample = sample_interval;
 
     // CSV: all metrics in one line per sample
-    println!("request,peers,new_joins,reannounces,rps,rss_mb,cpu_pct");
+    println!("request,peers,new_joins,reannounces,rps,rss_mb,cpu_pct,avg_us,p50_us,p99_us,max_us");
     let bench_start = Instant::now();
     let baseline_rss = mem::rss_bytes();
     let mut prev_cpu = CpuTimes::read();
+    let mut latency = LatencyTracker::new(10_000); // rolling window of 10k requests
 
     for _ in 0..total_requests {
         let current_peers = active_peers.len();
@@ -175,11 +220,13 @@ async fn main() {
                 make_peer_id(next_peer_idx),
                 port, left,
             );
+            let t_req = Instant::now();
             let resp = app.clone()
                 .oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
                 .await
                 .unwrap();
             let _ = resp.into_body().collect().await;
+            latency.record(t_req.elapsed().as_micros() as u64);
 
             active_peers.push((torrent_idx, port));
             next_peer_idx += 1;
@@ -193,11 +240,13 @@ async fn main() {
                 port,
                 rng.next_usize(2_000_000_000) as u64,
             );
+            let t_req = Instant::now();
             let resp = app.clone()
                 .oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
                 .await
                 .unwrap();
             let _ = resp.into_body().collect().await;
+            latency.record(t_req.elapsed().as_micros() as u64);
 
             reannounce_count += 1;
         }
@@ -219,16 +268,21 @@ async fn main() {
                 0.0
             };
 
+            let (avg, p50, p99, max_lat) = latency.stats();
+            latency.clear();
+
             println!(
-                "{},{},{},{},{:.0},{},{:.1}",
+                "{},{},{},{},{:.0},{},{:.1},{},{},{},{}",
                 request_count, active_peers.len(),
                 new_join_count, reannounce_count,
                 rps, fmt_mb(rss), cpu_pct,
+                avg as u64, p50, p99, max_lat,
             );
             eprintln!(
-                "  req={:>8}  peers={:>10}  rps={:>10.0}  new={:>8}  re={:>8}  rss={:>8}  cpu={:.1}%",
+                "  req={:>8}  peers={:>10}  rps={:>10.0}  new={:>8}  re={:>8}  rss={:>8}  cpu={:.1}%  lat: avg={} p50={} p99={} max={}",
                 request_count, active_peers.len(), rps,
                 new_join_count, reannounce_count, fmt_mb(rss), cpu_pct,
+                fmt_us(avg as u64), fmt_us(p50), fmt_us(p99), fmt_us(max_lat),
             );
             next_sample += sample_interval;
         }
