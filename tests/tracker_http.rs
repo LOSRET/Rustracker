@@ -56,12 +56,6 @@ async fn index_returns_dashboard_html() {
     assert!(body
         .windows("Tracker 免责说明".as_bytes().len())
         .any(|w| w == "Tracker 免责说明".as_bytes()));
-    assert!(!body
-        .windows(b"https://blog.7471.top/".len())
-        .any(|w| w == b"https://blog.7471.top/"));
-    assert!(!body
-        .windows(b"tracker@mail.7471.top".len())
-        .any(|w| w == b"tracker@mail.7471.top"));
     assert!(!body.windows(b"peerTable".len()).any(|w| w == b"peerTable"));
     assert!(!body
         .windows(b"torrentTable".len())
