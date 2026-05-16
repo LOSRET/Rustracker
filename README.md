@@ -398,6 +398,16 @@ Features: Zipf distribution for realistic torrent popularity, peer lifecycle eve
 cargo build --release
 ```
 
+### Build without Dashboard
+
+To compile a pure tracker binary without the embedded web UI (smaller binary, no HTML/CSS/JS bundled):
+
+```bash
+cargo build --release --no-default-features
+```
+
+This disables the `dashboard` feature — the `/`, `/style.css`, and `/app.js` routes are excluded at compile time. All tracker protocol endpoints (`/announce`, `/scrape`, `/healthz`, `/api/*`) remain fully functional.
+
 ### Test
 
 ```bash

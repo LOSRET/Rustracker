@@ -27,6 +27,7 @@ pub struct AppState {
     pub(crate) tracker: Arc<TrackerPool>,
     pub(crate) trends: Arc<RwLock<TrendStore>>,
     pub(crate) blacklist: Arc<RwLock<Arc<HashSet<InfoHash>>>>,
+    #[cfg(feature = "dashboard")]
     pub(crate) versioned_index: String,
 }
 
@@ -52,6 +53,7 @@ impl AppState {
             tracker: Arc::new(TrackerPool::single(tracker)),
             trends: Arc::new(RwLock::new(loaded)),
             blacklist: Arc::new(RwLock::new(Arc::new(HashSet::new()))),
+            #[cfg(feature = "dashboard")]
             versioned_index: handlers::make_versioned_index(),
         }
     }
@@ -95,6 +97,7 @@ impl AppState {
             tracker: Arc::new(TrackerPool::new(interval, peer_timeout, shards)),
             trends: Arc::new(RwLock::new(loaded)),
             blacklist: Arc::new(RwLock::new(Arc::new(initial))),
+            #[cfg(feature = "dashboard")]
             versioned_index: handlers::make_versioned_index(),
         };
 
@@ -177,17 +180,21 @@ impl AppState {
 }
 
 pub fn router(state: AppState) -> Router {
-    Router::new()
-        .route("/", get(handlers::index))
-        .route("/style.css", get(handlers::style))
-        .route("/app.js", get(handlers::app_js))
+    let r = Router::new()
         .route("/api/stats", get(handlers::stats))
         .route("/api/clients", get(handlers::clients))
         .route("/api/top100", get(handlers::top100))
         .route("/announce", get(handlers::announce))
         .route("/scrape", get(handlers::scrape))
-        .route("/healthz", get(handlers::healthz))
-        .with_state(state)
+        .route("/healthz", get(handlers::healthz));
+
+    #[cfg(feature = "dashboard")]
+    let r = r
+        .route("/", get(handlers::index))
+        .route("/style.css", get(handlers::style))
+        .route("/app.js", get(handlers::app_js));
+
+    r.with_state(state)
 }
 
 // ── TrackerPool ────────────────────────────────────────────────────────────

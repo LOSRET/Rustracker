@@ -38,6 +38,7 @@ async fn healthz_returns_ok() {
     assert_eq!(response.status(), StatusCode::OK);
 }
 
+#[cfg(feature = "dashboard")]
 #[tokio::test]
 async fn index_returns_dashboard_html() {
     let response = app()

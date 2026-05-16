@@ -46,10 +46,17 @@ jobs:
             target: x86_64-unknown-linux-gnu
             artifact: rustracker-linux
             binary: rustracker
+            cargo_flags: ""
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact: rustracker-linux-nodashboard
+            binary: rustracker
+            cargo_flags: "--no-default-features"
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             artifact: rustracker.exe
             binary: rustracker.exe
+            cargo_flags: ""
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -61,11 +68,11 @@ jobs:
 
       - name: Build (Linux)
         if: matrix.os == 'ubuntu-latest'
-        run: RUSTFLAGS="-C target-cpu=x86-64-v2" cargo build --release --target ${{ matrix.target }}
+        run: RUSTFLAGS="-C target-cpu=x86-64-v2" cargo build --release --target ${{ matrix.target }} ${{ matrix.cargo_flags }}
 
       - name: Build (Windows)
         if: matrix.os == 'windows-latest'
-        run: cargo build --release --target ${{ matrix.target }}
+        run: cargo build --release --target ${{ matrix.target }} ${{ matrix.cargo_flags }}
 
       - name: Rename Linux binary
         if: matrix.os == 'ubuntu-latest'
@@ -89,6 +96,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: rustracker-linux
+          path: release/
+
+      - name: Download Linux nodashboard binary
+        uses: actions/download-artifact@v4
+        with:
+          name: rustracker-linux-nodashboard
           path: release/
 
       - name: Download Windows binary
@@ -141,7 +154,8 @@ jobs:
 
             ### Downloads
             - `rustracker-linux.tar.gz` — Linux full package (binary + installer)
-            - `rustracker-linux` — Linux x86_64 binary
+            - `rustracker-linux` — Linux x86_64 binary (with dashboard)
+            - `rustracker-linux-nodashboard` — Linux x86_64 binary (tracker only, no web UI)
             - `rustracker.exe` — Windows x86_64 binary
 
             ### Linux Installation
@@ -160,7 +174,8 @@ jobs:
 
             ### 下载
             - `rustracker-linux.tar.gz` — Linux 完整包（含二进制和安装脚本）
-            - `rustracker-linux` — Linux 64位二进制
+            - `rustracker-linux` — Linux 64位二进制（含面板）
+            - `rustracker-linux-nodashboard` — Linux 64位二进制（纯 Tracker，无 Web 面板）
             - `rustracker.exe` — Windows 64位二进制
 
             ### Linux 安装
@@ -171,6 +186,7 @@ jobs:
             ```
           files: |
             release/rustracker-linux
+            release/rustracker-linux-nodashboard
             release/rustracker.exe
             rustracker-linux.tar.gz
           draft: false

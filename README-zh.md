@@ -398,6 +398,16 @@ cargo run --release --example load_test -- \
 cargo build --release
 ```
 
+### 构建无面板版本
+
+编译纯 Tracker 二进制，不嵌入 Web 前端（体积更小，不含 HTML/CSS/JS）：
+
+```bash
+cargo build --release --no-default-features
+```
+
+此模式关闭 `dashboard` feature——`/`、`/style.css`、`/app.js` 路由在编译时排除。所有 Tracker 协议端点（`/announce`、`/scrape`、`/healthz`、`/api/*`）功能完整。
+
 ### 测试
 
 ```bash
