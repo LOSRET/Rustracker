@@ -1,0 +1,244 @@
+//! HTTP request handlers for the tracker.
+//!
+//! Includes BitTorrent announce/scrape endpoints, web UI serving,
+//! and JSON stats endpoints.
+
+use std::net::SocketAddr;
+use std::time::Instant;
+
+use axum::body::Body;
+use axum::extract::{ConnectInfo, OriginalUri, State};
+use axum::http::{header, HeaderMap, HeaderValue, Response, StatusCode};
+use axum::response::Html;
+use axum::Json;
+use serde::Deserialize;
+use serde::Serialize;
+
+use crate::bencode;
+use crate::client_id;
+use crate::protocol::{
+    announce_response, parse_announce_query, parse_scrape_query, peer_ip, scrape_response,
+};
+use crate::server::AppState;
+use crate::tracker::AnnounceInput;
+use crate::trends::{self, ClientsResponse, StatsResponse};
+use crate::types::InfoHash;
+
+// ── Web UI ───────────────────────────────────────────────────────────────────
+
+pub(crate) const INDEX_HTML: &str = include_str!("../assets/index.html");
+pub(crate) const STYLE_CSS: &str = include_str!("../assets/style.css");
+pub(crate) const APP_JS: &str = include_str!("../assets/app.js");
+
+pub(crate) fn make_versioned_index() -> String {
+    let hash = fnv1a_hash(STYLE_CSS.as_bytes(), APP_JS.as_bytes());
+    let v = format!("{hash:08x}");
+    INDEX_HTML
+        .replace("/style.css", &format!("/style.css?v={v}"))
+        .replace("/app.js", &format!("/app.js?v={v}"))
+}
+
+/// FNV-1a hash over two byte slices, computed once at startup.
+fn fnv1a_hash(a: &[u8], b: &[u8]) -> u32 {
+    let mut h: u32 = 0x811c_9dc5;
+    for &byte in a {
+        h ^= byte as u32;
+        h = h.wrapping_mul(0x0100_0193);
+    }
+    for &byte in b {
+        h ^= byte as u32;
+        h = h.wrapping_mul(0x0100_0193);
+    }
+    h
+}
+
+// ── Route handlers ───────────────────────────────────────────────────────────
+
+pub(crate) async fn index(State(state): State<AppState>) -> Html<String> {
+    Html(state.versioned_index.clone())
+}
+
+pub(crate) async fn style() -> Response<Body> {
+    Response::builder()
+        .header(header::CONTENT_TYPE, "text/css; charset=utf-8")
+        .header(header::CACHE_CONTROL, "public, max-age=3600")
+        .body(Body::from(STYLE_CSS))
+        .unwrap()
+}
+
+pub(crate) async fn app_js() -> Response<Body> {
+    Response::builder()
+        .header(
+            header::CONTENT_TYPE,
+            "application/javascript; charset=utf-8",
+        )
+        .header(header::CACHE_CONTROL, "public, max-age=3600")
+        .body(Body::from(APP_JS))
+        .unwrap()
+}
+
+pub(crate) async fn stats(State(state): State<AppState>) -> Json<StatsResponse> {
+    let snapshot = state.tracker.snapshot().await;
+    let now = trends::unix_timestamp();
+    let history = state.trends.write().await.record(now, &snapshot);
+    Json(StatsResponse::from_snapshot(snapshot, history))
+}
+
+pub(crate) async fn clients(State(state): State<AppState>) -> Json<ClientsResponse> {
+    let snapshot = state.tracker.snapshot().await;
+    let now = trends::unix_timestamp();
+    let mut store = state.trends.write().await;
+    let client_data = store.record_clients(now, &snapshot.clients);
+    Json(ClientsResponse {
+        timestamp: now,
+        tags: client_data.top_tags.clone(),
+        clients: client_data.top_clients.clone(),
+        history: client_data.history.clone(),
+    })
+}
+
+pub(crate) async fn healthz() -> &'static str {
+    "ok"
+}
+
+// ── top100 ───────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct Top100Query {
+    pub sort: Option<String>,
+    pub limit: Option<usize>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct Top100Entry {
+    pub info_hash: String,
+    pub seeders: usize,
+    pub leechers: usize,
+    pub peers: usize,
+    pub downloaded: u64,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct Top100Response {
+    pub sort: String,
+    pub torrents: Vec<Top100Entry>,
+}
+
+pub(crate) async fn top100(
+    State(state): State<AppState>,
+    axum::extract::Query(query): axum::extract::Query<Top100Query>,
+) -> Json<Top100Response> {
+    let sort_by = query.sort.unwrap_or_else(|| "peers".to_string());
+    let limit = query.limit.unwrap_or(100).min(500);
+    let entries = state.tracker.top_torrents(&sort_by, limit).await;
+    Json(Top100Response {
+        sort: sort_by,
+        torrents: entries
+            .into_iter()
+            .map(
+                |(info_hash, seeders, leechers, downloaded)| Top100Entry {
+                    info_hash: format!("{info_hash}"),
+                    seeders,
+                    leechers,
+                    peers: seeders + leechers,
+                    downloaded,
+                },
+            )
+            .collect(),
+    })
+}
+
+// ── BitTorrent announce / scrape ─────────────────────────────────────────────
+
+pub(crate) async fn announce(
+    State(state): State<AppState>,
+    OriginalUri(uri): OriginalUri,
+    headers: HeaderMap,
+    connect_info: Option<ConnectInfo<SocketAddr>>,
+) -> Response<Body> {
+    let query = uri.query().unwrap_or_default();
+    let parsed = match parse_announce_query(query) {
+        Ok(parsed) => parsed,
+        Err(error) => {
+            return bencoded_response(
+                StatusCode::BAD_REQUEST,
+                bencode::failure(error.to_string()),
+            )
+        }
+    };
+
+    if state.blacklist.read().await.contains(&parsed.info_hash) {
+        return bencoded_response(
+            StatusCode::OK,
+            bencode::failure("torrent is blacklisted"),
+        );
+    }
+
+    let input = AnnounceInput {
+        info_hash: parsed.info_hash,
+        peer_id: parsed.peer_id,
+        ip: peer_ip(
+            cloudflare_connecting_ip(&headers).or(parsed.ip),
+            connect_info.map(|ConnectInfo(addr)| addr),
+        ),
+        port: parsed.port,
+        uploaded: parsed.uploaded,
+        downloaded: parsed.downloaded,
+        left: parsed.left,
+        event: parsed.event,
+        numwant: parsed.numwant,
+        client_tag: client_id::identify(parsed.peer_id.as_bytes()),
+    };
+
+    let output = state
+        .tracker
+        .announce(parsed.info_hash, input, Instant::now())
+        .await;
+    bencoded_response(StatusCode::OK, announce_response(output, parsed.compact))
+}
+
+pub(crate) async fn scrape(
+    State(state): State<AppState>,
+    OriginalUri(uri): OriginalUri,
+) -> Response<Body> {
+    let query = uri.query().unwrap_or_default();
+    let parsed = match parse_scrape_query(query) {
+        Ok(parsed) => parsed,
+        Err(error) => {
+            return bencoded_response(
+                StatusCode::BAD_REQUEST,
+                bencode::failure(error.to_string()),
+            )
+        }
+    };
+
+    let bl = state.blacklist.read().await;
+    let allowed: Vec<InfoHash> = parsed
+        .info_hashes
+        .iter()
+        .copied()
+        .filter(|h| !bl.contains(h))
+        .collect();
+    drop(bl);
+    let stats = state.tracker.scrape(&allowed).await;
+    bencoded_response(StatusCode::OK, scrape_response(stats))
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+pub(crate) fn bencoded_response(status: StatusCode, body: Vec<u8>) -> Response<Body> {
+    let mut response = Response::new(Body::from(body));
+    *response.status_mut() = status;
+    response.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("text/plain; charset=ISO-8859-1"),
+    );
+    response
+}
+
+pub(crate) fn cloudflare_connecting_ip(headers: &HeaderMap) -> Option<std::net::IpAddr> {
+    headers
+        .get("cf-connecting-ip")
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse().ok())
+}
