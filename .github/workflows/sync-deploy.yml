@@ -3,6 +3,7 @@ name: Sync self-use branch
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -20,6 +21,11 @@ jobs:
       - id: check
         name: Check if version changed
         run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "Manual trigger - building regardless"
+            exit 0
+          fi
           git show HEAD~1:Cargo.toml > old.toml 2>/dev/null || true
           old=$(grep '^version' old.toml | head -1 | sed 's/.*"\(.*\)".*/\1/' || echo "")
           new=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
@@ -74,9 +80,9 @@ jobs:
       - name: Package
         run: |
           mkdir -p pkg
-          cp target/x86_64-unknown-linux-gnu/release/rustracker pkg/
+          cp target/x86_64-unknown-linux-gnu/release/rustracker pkg/rustracker-linux
           cp install-linux.sh pkg/
-          tar -czf rustracker-selfuse.tar.gz -C pkg rustracker install-linux.sh
+          tar -czf rustracker-selfuse.tar.gz -C pkg rustracker-linux install-linux.sh
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
