@@ -1,9 +1,7 @@
 use std::cmp::Reverse;
-use std::collections::BinaryHeap;
+use std::collections::{BinaryHeap, BTreeMap};
 use std::net::IpAddr;
 use std::time::{Duration, Instant};
-
-use dashmap::DashMap;
 
 use crate::types::{
     AnnounceEvent, InfoHash, Ipv4PeerKey, Ipv6PeerKey, PeerContact, PeerId, PeerState, TorrentStats,
@@ -61,7 +59,7 @@ pub struct Tracker {
     peer_timeout: Duration,
     started_at: Instant,
     next_expire_at: Instant,
-    swarms: DashMap<InfoHash, Swarm>,
+    swarms: BTreeMap<InfoHash, Swarm>,
     client_counts: Vec<(u8, u64)>,
 }
 
@@ -100,7 +98,7 @@ impl Tracker {
             peer_timeout,
             started_at,
             next_expire_at: started_at,
-            swarms: DashMap::with_shard_amount(256),
+            swarms: BTreeMap::new(),
             client_counts: Vec::new(),
         }
     }
@@ -116,7 +114,7 @@ impl Tracker {
 
         // All swarm operations happen in this block; borrow released before client_counts access
         let (output, pending_decr, pending_incr) = {
-            let mut swarm = self.swarms.entry(info_hash).or_insert_with(Swarm::default);
+            let swarm = self.swarms.entry(info_hash).or_insert_with(Swarm::default);
 
             let mut decr: Vec<u8> = Vec::new();
             let mut incr: Option<u8> = None;
@@ -217,9 +215,7 @@ impl Tracker {
         let mut heap: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>> =
             BinaryHeap::with_capacity(limit);
 
-        for entry in self.swarms.iter() {
-            let info_hash = entry.key();
-            let swarm = entry.value();
+        for (info_hash, swarm) in &self.swarms {
             let stats = swarm.stats();
             let key: u64 = match sort_by {
                 "seeders" => stats.complete as u64,
@@ -260,8 +256,7 @@ impl Tracker {
 
     pub fn snapshot(&self) -> TrackerSnapshot {
         let mut totals = TrackerTotals::default();
-        for entry in self.swarms.iter() {
-            let swarm = entry.value();
+        for (_info_hash, swarm) in &self.swarms {
             let stats = swarm.stats();
             totals.torrents += 1;
             totals.seeders += stats.complete;

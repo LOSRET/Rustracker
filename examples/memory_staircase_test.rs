@@ -79,8 +79,10 @@ mod mem {
 
 #[derive(Default)]
 struct Swarm {
+    #[allow(dead_code)]
     complete: usize,
     incomplete: usize,
+    #[allow(dead_code)]
     downloaded: u64,
     /// 模拟 peer 数据：每个 peer 12 字节（IPv4 紧凑存储）
     peers: Vec<u8>,
@@ -201,8 +203,8 @@ fn main() {
     // ─── 64 Shard vs 单 BTreeMap 对比 ────────────────────
     test_shard_vs_single();
 
-    // ─── DashMap 多规模内存实测 ──────────────────────────
-    test_dashmap_vs_btreemap_scaling();
+    // ─── HashMap 多规模内存实测 ──────────────────────────
+    test_hashmap_vs_btreemap_scaling();
 
     println!("═══════════════════════════════════════════════════════════════");
     println!("  精细采样完成");
@@ -394,7 +396,7 @@ fn print_fine_samples(title: &str, samples: &[FineSample]) {
 
 // ─── 测试 3: 提取实际内存后，测试 Vec<u8> 倍增精细行为 ──────────
 
-fn test_vec_growth_fine(baseline: usize) {
+fn test_vec_growth_fine(_baseline: usize) {
     println!("═══ 测试 A: 单 Vec<u8> 写入模式对比 (0→10M 条目) ═══");
     println!();
 
@@ -491,7 +493,7 @@ fn test_vec_growth_fine(baseline: usize) {
 
 // ─── 测试 B: 模拟生产环境：多 Swarm 同时增长 ──────────────────────
 
-fn test_multi_swarm_growth(baseline: usize) {
+fn test_multi_swarm_growth(_baseline: usize) {
     println!("═══ 测试 B: 多 Swarm 同时增长 (模拟生产场景) ═══");
     println!();
 
@@ -562,7 +564,7 @@ fn test_multi_swarm_growth(baseline: usize) {
 
 // ─── 测试 C: 伸缩振荡 (模拟 expire → shrink → regrow) ─────────────
 
-fn test_shrink_regrow(baseline: usize) {
+fn test_shrink_regrow(_baseline: usize) {
     println!("═══ 测试 C: 伸缩振荡 (expire → shrink → regrow) ═══");
     println!();
 
@@ -642,7 +644,7 @@ fn test_shrink_regrow(baseline: usize) {
 
 // ─── 测试 D: 模拟生产场景——Zipf 分布 + 批量 announce ─────────────
 
-fn test_production_simulation(baseline: usize) {
+fn test_production_simulation(_baseline: usize) {
     println!("═══ 测试 D: 生产场景模拟 (Zipf 热门分布) ═══");
     println!();
 
@@ -1009,7 +1011,7 @@ fn test_shard_vs_single() {
     }
 
     // 微调到精确总数
-    let mut sum: usize = peer_counts.iter().sum();
+    let sum: usize = peer_counts.iter().sum();
     if sum > total_peers {
         let mut excess = sum - total_peers;
         for i in (0..peer_counts.len()).rev() {
@@ -1018,7 +1020,6 @@ fn test_shard_vs_single() {
                 let reduce = excess.min(peer_counts[i] - 1);
                 peer_counts[i] -= reduce;
                 excess -= reduce;
-                sum -= reduce;
             }
         }
     } else if sum < total_peers {
@@ -1029,7 +1030,6 @@ fn test_shard_vs_single() {
                 let add = deficit.min(max_peers - peer_counts[i]);
                 peer_counts[i] += add;
                 deficit -= add;
-                sum += add;
             }
         }
     }
@@ -1138,16 +1138,16 @@ fn test_shard_vs_single() {
     println!();
 }
 
-// ─── 测试 G: DashMap vs BTreeMap 多规模内存实测 ────────────────────
+// ─── 测试 G: HashMap vs BTreeMap 多规模内存实测 ────────────────────
 
-fn test_dashmap_vs_btreemap_scaling() {
-    println!("═══ 测试 G: DashMap vs BTreeMap 多规模内存对比 ═══");
+fn test_hashmap_vs_btreemap_scaling() {
+    println!("═══ 测试 G: HashMap vs BTreeMap 多规模内存对比 ═══");
     println!();
 
     let scales = [1_000_000, 2_000_000, 3_000_000, 4_000_000, 5_000_000, 6_000_000, 7_000_000, 8_000_000, 9_000_000, 10_000_000];
     let peers_per = 1; // 1 peer/torrent 省内存，突出容器开销
 
-    println!("  {:>9}  {:>10}  {:>10}  {:>10}  {:>10}", "torrents", "BTreeMap", "DashMap", "差额", "比例");
+    println!("  {:>9}  {:>10}  {:>10}  {:>10}  {:>10}", "torrents", "BTreeMap", "HashMap", "差额", "比例");
     println!("  {}  {}  {}  {}  {}", "─".repeat(9), "─".repeat(10), "─".repeat(10), "─".repeat(10), "─".repeat(10));
 
     for &n in &scales {
@@ -1163,23 +1163,23 @@ fn test_dashmap_vs_btreemap_scaling() {
         let bt_rss = rss_now().saturating_sub(before);
         drop(bt);
 
-        // ═══ DashMap ═══
+        // ═══ HashMap ═══
         let before = rss_now();
-        let dm: dashmap::DashMap<InfoHash, Swarm> = dashmap::DashMap::with_shard_amount(256);
+        let mut hm: HashMap<InfoHash, Swarm> = HashMap::new();
         for i in 0..n {
-            dm.insert(hashes_ref[i], Swarm::with_peers(peers_per));
+            hm.insert(hashes_ref[i], Swarm::with_peers(peers_per));
         }
-        let dm_rss = rss_now().saturating_sub(before);
-        drop(dm);
+        let hm_rss = rss_now().saturating_sub(before);
+        drop(hm);
 
-        let diff = dm_rss as i64 - bt_rss as i64;
+        let diff = hm_rss as i64 - bt_rss as i64;
         let pct = if bt_rss > 0 { diff as f64 / bt_rss as f64 * 100.0 } else { 0.0 };
         let abs_diff = diff.unsigned_abs() as usize;
         let sign = if diff >= 0 { "+" } else { "-" };
         println!("  {:>9}  {:>10}  {:>10}  {}{:>9}  {:>+9.0}%",
             format_with_commas(n),
             fmt_mb(bt_rss),
-            fmt_mb(dm_rss),
+            fmt_mb(hm_rss),
             sign,
             fmt_mb(abs_diff),
             pct,

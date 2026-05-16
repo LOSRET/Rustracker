@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  tracker-dashmap:
+  tracker-btree:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -17,39 +17,6 @@ jobs:
         run: cargo run --release --example memory_tracker_bench 2>bench.log | tee results.csv
       - name: Show summary
         run: cat bench.log
-      - name: Render
-        run: |
-          echo "## Real Tracker RSS Curve (DashMap, 10M torrents / 25M peers)" >> $GITHUB_STEP_SUMMARY
-          echo "| Torrents | Peers | RSS | ΔRSS |" >> $GITHUB_STEP_SUMMARY
-          echo "|---:|---:|---:|---:|" >> $GITHUB_STEP_SUMMARY
-          tail -n +2 results.csv | while IFS=',' read _ t p rss delta; do
-            echo "| $(printf "%'d" $t) | $(printf "%'d" $p) | ${rss} MB | ${delta} MB |" >> $GITHUB_STEP_SUMMARY
-          done
-      - uses: actions/upload-artifact@v4
-        with: { name: dashmap-bench, path: results.csv }
-
-  tracker-btree:
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-
-      - name: Swap tracker.rs to BTreeMap (pre-DashMap version)
-        run: git show 3d71dba^:src/tracker.rs > src/tracker.rs
-
-      - name: Build & run (real Tracker with BTreeMap)
-        run: cargo run --release --example memory_tracker_bench 2>bench.log | tee results.csv
-
-      - name: Restore tracker.rs
-        run: git checkout src/tracker.rs
-
-      - name: Show summary
-        run: cat bench.log
-
       - name: Render
         run: |
           echo "## Real Tracker RSS Curve (BTreeMap, 10M torrents / 25M peers)" >> $GITHUB_STEP_SUMMARY

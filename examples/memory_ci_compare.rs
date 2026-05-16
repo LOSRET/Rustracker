@@ -1,4 +1,4 @@
-//! CI memory comparison: DashMap vs BTreeMap
+//! CI memory comparison: HashMap vs BTreeMap
 //!
 //! Focused test for GitHub Actions — only runs the container memory comparison
 //! at key scales, skipping all other tests.
@@ -11,6 +11,7 @@ use std::time::Instant;
 // ─── RSS measurement (cross-platform) ────────────────────────────
 
 #[cfg(windows)]
+#[allow(dead_code)]
 mod mem {
     use std::mem;
     #[repr(C)]
@@ -37,6 +38,7 @@ mod mem {
 }
 
 #[cfg(unix)]
+#[allow(dead_code)]
 mod mem {
     pub fn rss_bytes() -> usize {
         std::fs::read_to_string("/proc/self/status")
@@ -48,6 +50,7 @@ mod mem {
     }
 }
 
+#[allow(dead_code)]
 fn fmt_mb(bytes: usize) -> String {
     format!("{:.1}", bytes as f64 / (1024.0 * 1024.0))
 }
@@ -67,6 +70,7 @@ impl InfoHash {
 
 #[derive(Default)]
 struct Swarm {
+    #[allow(dead_code)]
     peers: Vec<u8>,
 }
 
@@ -80,7 +84,7 @@ impl Swarm {
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let engine = args.get(1).map(|s| s.as_str()).unwrap_or("dashmap");
+    let engine = args.get(1).map(|s| s.as_str()).unwrap_or("hashmap");
 
     // Header
     println!("type,scale,torrents,peers,container_mb,build_sec");
@@ -104,11 +108,11 @@ fn main() {
                 ("btree", mem)
             }
             _ => {
-                let dm: dashmap::DashMap<InfoHash, Swarm> = dashmap::DashMap::with_shard_amount(256);
-                for i in 0..n { dm.insert(hashes[i], Swarm::with_peers(1)); }
-                let mem = dm.capacity() as f64 * (20.0 + 24.0 + 1.0) / (1024.0 * 1024.0); // slot K+V+ctrl
-                drop(dm);
-                ("dashmap", mem)
+                let mut hm: std::collections::HashMap<InfoHash, Swarm> = std::collections::HashMap::new();
+                for i in 0..n { hm.insert(hashes[i], Swarm::with_peers(1)); }
+                let mem = hm.capacity() as f64 * (20.0 + 24.0 + 1.0) / (1024.0 * 1024.0); // slot K+V+ctrl
+                drop(hm);
+                ("hashmap", mem)
             }
         };
 
