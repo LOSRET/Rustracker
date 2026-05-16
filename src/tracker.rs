@@ -202,6 +202,9 @@ impl Tracker {
         // Heap capacity is `limit`, so memory is O(limit) instead of O(N).
         let mut heap: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>> =
             BinaryHeap::with_capacity(limit);
+        // Cached heap-top threshold: skip constructing the Reverse tuple
+        // for the 99.9% of torrents whose key is below this value.
+        let mut min_key: u64 = 0;
 
         for (info_hash, swarm) in &self.swarms {
             let stats = swarm.stats();
@@ -212,16 +215,22 @@ impl Tracker {
                 _ => (stats.complete + stats.incomplete) as u64,
             };
 
+            // Fast path: heap is full and this torrent can't enter top-K.
+            if heap.len() >= limit && key <= min_key {
+                continue;
+            }
+
             let entry = Reverse((key, *info_hash, stats.complete, stats.incomplete, stats.downloaded as u64));
 
             if heap.len() < limit {
                 heap.push(entry);
-            } else if let Some(top) = heap.peek() {
-                let min_key = top.0 .0;
-                if key > min_key {
-                    heap.pop();
-                    heap.push(entry);
+                if heap.len() == limit {
+                    min_key = heap.peek().unwrap().0 .0;
                 }
+            } else {
+                heap.pop();
+                heap.push(entry);
+                min_key = heap.peek().unwrap().0 .0;
             }
         }
 
