@@ -274,12 +274,16 @@ impl Tracker {
         if heap.len() < limit {
             heap.push(entry);
             if heap.len() == limit {
-                *min_key = heap.peek().unwrap().0.0;
+                if let Some(peek) = heap.peek() {
+                    *min_key = peek.0.0;
+                }
             }
         } else {
             heap.pop();
             heap.push(entry);
-            *min_key = heap.peek().unwrap().0.0;
+            if let Some(peek) = heap.peek() {
+                *min_key = peek.0.0;
+            }
         }
     }
 
