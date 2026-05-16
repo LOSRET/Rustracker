@@ -1,9 +1,13 @@
 [package]
 name = "rustracker"
-version = "0.1.98"
+version = "0.1.99"
 edition = "2021"
 description = "A minimal HTTP BitTorrent tracker written in Rust"
 license = "MIT"
+
+[features]
+default = ["dashboard"]
+dashboard = []
 
 [dependencies]
 anyhow = "1.0"

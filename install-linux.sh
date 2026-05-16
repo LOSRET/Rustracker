@@ -62,8 +62,10 @@ find_binary() {
     SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
     for candidate in \
         "$SCRIPT_DIR/rustracker-linux" \
+        "$SCRIPT_DIR/rustracker-linux-nodashboard" \
         "$SCRIPT_DIR/rustracker" \
         "$SCRIPT_DIR/target/x86_64-unknown-linux-gnu/release/rustracker" \
+        "$SCRIPT_DIR/target/x86_64-unknown-linux-musl/release/rustracker" \
         "$SCRIPT_DIR/target/release/rustracker"
     do
         if [ -f "$candidate" ]; then
@@ -72,7 +74,7 @@ find_binary() {
         fi
     done
 
-    echo "未找到 Linux 二进制文件。请把 rustracker-linux 或 rustracker 放在脚本同目录。" >&2
+    echo "未找到 Linux 二进制文件。请把 rustracker-linux、rustracker-linux-nodashboard 或 rustracker 放在脚本同目录。" >&2
     return 1
 }
 

@@ -9,6 +9,7 @@ use std::time::Instant;
 use axum::body::Body;
 use axum::extract::{ConnectInfo, OriginalUri, State};
 use axum::http::{header, HeaderMap, HeaderValue, Response, StatusCode};
+#[cfg(feature = "dashboard")]
 use axum::response::Html;
 use axum::Json;
 use serde::Deserialize;
@@ -26,10 +27,14 @@ use crate::types::InfoHash;
 
 // ── Web UI ───────────────────────────────────────────────────────────────────
 
+#[cfg(feature = "dashboard")]
 pub(crate) const INDEX_HTML: &str = include_str!("../assets/index.html");
+#[cfg(feature = "dashboard")]
 pub(crate) const STYLE_CSS: &str = include_str!("../assets/style.css");
+#[cfg(feature = "dashboard")]
 pub(crate) const APP_JS: &str = include_str!("../assets/app.js");
 
+#[cfg(feature = "dashboard")]
 pub(crate) fn make_versioned_index() -> String {
     let hash = fnv1a_hash(STYLE_CSS.as_bytes(), APP_JS.as_bytes());
     let v = format!("{hash:08x}");
@@ -39,6 +44,7 @@ pub(crate) fn make_versioned_index() -> String {
 }
 
 /// FNV-1a hash over two byte slices, computed once at startup.
+#[cfg(feature = "dashboard")]
 fn fnv1a_hash(a: &[u8], b: &[u8]) -> u32 {
     let mut h: u32 = 0x811c_9dc5;
     for &byte in a {
@@ -54,10 +60,12 @@ fn fnv1a_hash(a: &[u8], b: &[u8]) -> u32 {
 
 // ── Route handlers ───────────────────────────────────────────────────────────
 
+#[cfg(feature = "dashboard")]
 pub(crate) async fn index(State(state): State<AppState>) -> Html<String> {
     Html(state.versioned_index.clone())
 }
 
+#[cfg(feature = "dashboard")]
 pub(crate) async fn style() -> Response<Body> {
     match Response::builder()
         .header(header::CONTENT_TYPE, "text/css; charset=utf-8")
@@ -69,6 +77,7 @@ pub(crate) async fn style() -> Response<Body> {
     }
 }
 
+#[cfg(feature = "dashboard")]
 pub(crate) async fn app_js() -> Response<Body> {
     match Response::builder()
         .header(
