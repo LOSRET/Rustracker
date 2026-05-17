@@ -9,8 +9,8 @@ use std::time::UNIX_EPOCH;
 
 use serde::{Deserialize, Serialize};
 
-use crate::client_id;
-use crate::tracker::TrackerSnapshot;
+use crate::protocol::client_id;
+use crate::core::tracker::TrackerSnapshot;
 
 // ── Response types exported for handlers ─────────────────────────────────────
 

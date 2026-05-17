@@ -3,8 +3,9 @@ use std::collections::{BinaryHeap, BTreeMap};
 use std::net::IpAddr;
 use std::time::{Duration, Instant};
 
-use crate::swarm::{allocate_v4_v6, PackedIpv4Peers, PackedIpv6Peers, Rng};
-use crate::types::{
+use super::counters::{ExpireResult, PeerRemoval, PeerUpsert, TrackerCounters};
+use super::swarm::{allocate_v4_v6, PackedIpv4Peers, PackedIpv6Peers, Rng};
+use super::types::{
     AnnounceEvent, InfoHash, Ipv4PeerKey, Ipv6PeerKey, PeerContact, PeerId, PeerState, TorrentStats,
 };
 
@@ -59,6 +60,7 @@ pub struct Tracker {
     next_expire_at: Instant,
     swarms: BTreeMap<InfoHash, Swarm>,
     client_counts: Vec<(u8, u64)>,
+    counters: TrackerCounters,
 }
 
 #[derive(Debug, Default)]
@@ -97,6 +99,7 @@ impl Tracker {
             next_expire_at: started_at,
             swarms: BTreeMap::new(),
             client_counts: Vec::new(),
+            counters: TrackerCounters::default(),
         }
     }
 
@@ -109,46 +112,58 @@ impl Tracker {
         let numwant = input.numwant;
         let new_tag = input.client_tag;
 
+        // Detect new torrent before borrowing swarms.
+        let is_new_torrent = !self.swarms.contains_key(&info_hash);
+
         // All swarm operations happen in this block; borrow released before client_counts access
         let (output, pending_decr, pending_incr) = {
             let swarm = self.swarms.entry(info_hash).or_insert_with(Swarm::default);
+
+            if is_new_torrent {
+                self.counters.add_torrent();
+            }
 
             let mut decr: Vec<u8> = Vec::new();
             let mut incr: Option<u8> = None;
 
             match input.event {
                 AnnounceEvent::Stopped => {
-                    if let Some(tag) = swarm.remove_peer_tag(endpoint) {
-                        decr.push(tag);
+                    if let Some(removal) = swarm.remove_peer_tag(endpoint) {
+                        decr.push(removal.tag);
+                        self.counters.apply_removal(&removal);
+                        if swarm.is_empty() {
+                            // Swarm stays in BTreeMap; will be removed by expire.
+                            // No torrent counter change here.
+                        }
                     }
                 }
                 AnnounceEvent::Completed => {
-                    let old_peer = swarm.upsert_peer(endpoint, input.into_peer_state(now_secs));
-                    let was_complete = old_peer.as_ref().map_or(false, |p| p.is_complete());
-                    if !was_complete {
+                    let upsert = swarm.upsert_peer(endpoint, input.into_peer_state(now_secs));
+                    if !upsert.was_complete {
                         swarm.downloaded = swarm.downloaded.saturating_add(1);
+                        self.counters.add_downloaded();
                     }
-                    let old_tag = old_peer.as_ref().map(|p| p.client_tag);
-                    if let Some(tag) = old_tag {
+                    if let Some(tag) = upsert.old_tag {
                         if tag != new_tag {
                             decr.push(tag);
                         }
                     }
-                    if old_tag != Some(new_tag) {
+                    if upsert.old_tag != Some(new_tag) {
                         incr = Some(new_tag);
                     }
+                    self.counters.apply_upsert(&upsert);
                 }
                 AnnounceEvent::Started | AnnounceEvent::Empty => {
-                    let old_peer = swarm.upsert_peer(endpoint, input.into_peer_state(now_secs));
-                    let old_tag = old_peer.as_ref().map(|p| p.client_tag);
-                    if let Some(tag) = old_tag {
+                    let upsert = swarm.upsert_peer(endpoint, input.into_peer_state(now_secs));
+                    if let Some(tag) = upsert.old_tag {
                         if tag != new_tag {
                             decr.push(tag);
                         }
                     }
-                    if old_tag != Some(new_tag) {
+                    if upsert.old_tag != Some(new_tag) {
                         incr = Some(new_tag);
                     }
+                    self.counters.apply_upsert(&upsert);
                 }
             }
 
@@ -183,6 +198,9 @@ impl Tracker {
         if let Some(tag) = pending_incr {
             self.incr_client(tag);
         }
+
+        #[cfg(debug_assertions)]
+        self.verify_counters();
 
         output
     }
@@ -307,24 +325,36 @@ impl Tracker {
     }
 
     pub fn snapshot(&self) -> TrackerSnapshot {
-        let mut totals = TrackerTotals::default();
-        for (_info_hash, swarm) in &self.swarms {
-            let stats = swarm.stats();
-            totals.torrents += 1;
-            totals.seeders += stats.complete;
-            totals.leechers += stats.incomplete;
-            totals.peers += swarm.len();
-            totals.downloaded = totals.downloaded.saturating_add(stats.downloaded as u64);
-        }
-
-        let clients = self.client_distribution().to_vec();
-
+        let c = &self.counters;
         TrackerSnapshot {
             interval: self.interval.as_secs(),
             peer_timeout: self.peer_timeout.as_secs(),
-            totals,
-            clients,
+            totals: TrackerTotals {
+                torrents: c.torrents,
+                peers: c.peers,
+                seeders: c.seeders,
+                leechers: c.peers.saturating_sub(c.seeders),
+                downloaded: c.downloaded,
+            },
+            clients: self.client_distribution().to_vec(),
         }
+    }
+
+    /// Verify incremental counters match a full traversal (debug builds only).
+    #[cfg(debug_assertions)]
+    fn verify_counters(&self) {
+        let mut torrents = 0usize;
+        let mut peers = 0usize;
+        let mut seeders = 0usize;
+        let mut downloaded = 0u64;
+        for (_, swarm) in &self.swarms {
+            let stats = swarm.stats();
+            torrents += 1;
+            peers += swarm.len();
+            seeders += stats.complete;
+            downloaded += stats.downloaded as u64;
+        }
+        self.counters.verify(torrents, peers, seeders, downloaded);
     }
 
     pub fn client_distribution(&self) -> &[(u8, u64)] {
@@ -361,14 +391,41 @@ impl Tracker {
         let now_secs = self.elapsed_secs(now);
         let timeout_secs = saturating_u32_secs(self.peer_timeout);
         let mut all_expired_tags: Vec<u8> = Vec::new();
+        let mut total_expired_peers: usize = 0;
+        let mut total_expired_complete: usize = 0;
+        let mut removed_swarms: usize = 0;
+        let mut removed_downloaded: u64 = 0;
+
         self.swarms.retain(|_, swarm| {
-            let expired = swarm.expire(now_secs, timeout_secs);
-            all_expired_tags.extend(expired);
-            !swarm.is_empty()
+            let result = swarm.expire(now_secs, timeout_secs);
+            all_expired_tags.extend(result.tags);
+            total_expired_peers += result.removed_peers;
+            total_expired_complete += result.removed_complete;
+            if swarm.is_empty() {
+                removed_swarms += 1;
+                removed_downloaded += swarm.downloaded as u64;
+                false
+            } else {
+                true
+            }
         });
+
+        self.counters.apply_expire(
+            &ExpireResult {
+                tags: Vec::new(),
+                removed_peers: total_expired_peers,
+                removed_complete: total_expired_complete,
+            },
+            removed_swarms,
+            removed_downloaded,
+        );
+
         for tag in all_expired_tags {
             self.decr_client(tag);
         }
+
+        #[cfg(debug_assertions)]
+        self.verify_counters();
     }
 
     fn expire_sweep_interval(&self) -> Duration {
@@ -430,25 +487,43 @@ fn jitter_seed(info_hash: InfoHash, peer_id: PeerId, now_secs: u32) -> u64 {
 }
 
 impl Swarm {
-    fn upsert_peer(&mut self, endpoint: PeerEndpoint, peer: PeerState) -> Option<PeerState> {
-        let is_complete = peer.is_complete();
+    fn upsert_peer(&mut self, endpoint: PeerEndpoint, peer: PeerState) -> PeerUpsert {
+        let now_complete = peer.is_complete();
         let old = match endpoint {
             PeerEndpoint::V4(key) => self.ipv4_peers.insert(key, peer),
             PeerEndpoint::V6(key) => self.ipv6_peers.insert(key, peer),
         };
 
-        if let Some(ref old_peer) = old {
-            self.remove_from_counters(old_peer);
+        match old {
+            Some(old_peer) => {
+                let was_complete = old_peer.is_complete();
+                let old_tag = old_peer.client_tag;
+                self.remove_from_counters(&old_peer);
+                if now_complete {
+                    self.complete = self.complete.saturating_add(1);
+                }
+                PeerUpsert {
+                    is_new_peer: false,
+                    was_complete,
+                    now_complete,
+                    old_tag: Some(old_tag),
+                }
+            }
+            None => {
+                if now_complete {
+                    self.complete = self.complete.saturating_add(1);
+                }
+                PeerUpsert {
+                    is_new_peer: true,
+                    was_complete: false,
+                    now_complete,
+                    old_tag: None,
+                }
+            }
         }
-
-        if is_complete {
-            self.complete = self.complete.saturating_add(1);
-        }
-
-        old
     }
 
-    fn remove_peer_tag(&mut self, endpoint: PeerEndpoint) -> Option<u8> {
+    fn remove_peer_tag(&mut self, endpoint: PeerEndpoint) -> Option<PeerRemoval> {
         let removed = match endpoint {
             PeerEndpoint::V4(key) => self.ipv4_peers.remove(&key),
             PeerEndpoint::V6(key) => self.ipv6_peers.remove(&key),
@@ -456,17 +531,22 @@ impl Swarm {
 
         removed.map(|peer| {
             self.remove_from_counters(&peer);
-            peer.client_tag
+            PeerRemoval {
+                tag: peer.client_tag,
+                was_complete: peer.is_complete(),
+            }
         })
     }
 
-    fn expire(&mut self, now_secs: u32, timeout_secs: u32) -> Vec<u8> {
+    fn expire(&mut self, now_secs: u32, timeout_secs: u32) -> ExpireResult {
         let mut expired_complete: usize = 0;
+        let mut expired_count: usize = 0;
         let mut expired_tags: Vec<u8> = Vec::new();
 
         self.ipv4_peers.retain(|_, peer| {
             let keep = now_secs.saturating_sub(peer.last_seen_secs) <= timeout_secs;
             if !keep {
+                expired_count += 1;
                 if peer.is_complete() {
                     expired_complete += 1;
                 }
@@ -478,6 +558,7 @@ impl Swarm {
         self.ipv6_peers.retain(|_, peer| {
             let keep = now_secs.saturating_sub(peer.last_seen_secs) <= timeout_secs;
             if !keep {
+                expired_count += 1;
                 if peer.is_complete() {
                     expired_complete += 1;
                 }
@@ -491,7 +572,11 @@ impl Swarm {
         self.ipv4_peers.shrink_if_idle();
         self.ipv6_peers.shrink_if_idle();
 
-        expired_tags
+        ExpireResult {
+            tags: expired_tags,
+            removed_peers: expired_count,
+            removed_complete: expired_complete,
+        }
     }
 
     fn remove_from_counters(&mut self, peer: &PeerState) {
@@ -580,7 +665,7 @@ mod tests {
     use std::time::{Duration, Instant};
 
     use super::{AnnounceInput, Tracker};
-    use crate::types::{AnnounceEvent, InfoHash, PeerId};
+    use super::super::types::{AnnounceEvent, InfoHash, PeerId};
 
     fn hash(byte: u8) -> InfoHash {
         InfoHash([byte; 20])

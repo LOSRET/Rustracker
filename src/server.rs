@@ -11,11 +11,14 @@ use axum::Router;
 use tokio::sync::RwLock;
 use tokio::time::MissedTickBehavior;
 
-use crate::blacklist;
-use crate::handlers;
-use crate::tracker::{AnnounceInput, Top100All, Tracker, TrackerSnapshot};
-use crate::trends::{self, TrendStore};
-use crate::types::InfoHash;
+use crate::core::tracker::{AnnounceInput, Top100All, Tracker, TrackerSnapshot};
+use crate::core::types::InfoHash;
+
+mod blacklist;
+pub(crate) mod handlers;
+mod trends;
+
+use trends::TrendStore;
 
 pub const DEFAULT_TRACKER_SHARDS: usize = 64;
 const EXPIRE_MAINTENANCE_INTERVAL: Duration = Duration::from_secs(1);
@@ -220,14 +223,14 @@ impl TrackerPool {
         info_hash: InfoHash,
         input: AnnounceInput,
         now: Instant,
-    ) -> crate::tracker::AnnounceOutput {
+    ) -> crate::core::tracker::AnnounceOutput {
         self.shard(info_hash).write().await.announce(input, now)
     }
 
     pub(crate) async fn scrape(
         &self,
         info_hashes: &[InfoHash],
-    ) -> HashMap<InfoHash, crate::types::TorrentStats> {
+    ) -> HashMap<InfoHash, crate::core::types::TorrentStats> {
         let mut stats = HashMap::with_capacity(info_hashes.len());
         let mut by_shard = HashMap::<usize, Vec<InfoHash>>::new();
 

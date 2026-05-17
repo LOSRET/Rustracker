@@ -15,24 +15,24 @@ use axum::Json;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::bencode;
-use crate::client_id;
-use crate::protocol::{
+use crate::core::tracker::AnnounceInput;
+use crate::core::types::InfoHash;
+use crate::protocol::announce::{
     announce_response, parse_announce_query, parse_scrape_query, peer_ip, scrape_response,
 };
-use crate::server::AppState;
-use crate::tracker::AnnounceInput;
-use crate::trends::{self, ClientsResponse, StatsResponse};
-use crate::types::InfoHash;
+use crate::protocol::bencode;
+use crate::protocol::client_id;
+use super::AppState;
+use super::trends::{self, ClientsResponse, StatsResponse};
 
 // ── Web UI ───────────────────────────────────────────────────────────────────
 
 #[cfg(feature = "dashboard")]
-pub(crate) const INDEX_HTML: &str = include_str!("../assets/index.html");
+pub(crate) const INDEX_HTML: &str = include_str!("../../assets/index.html");
 #[cfg(feature = "dashboard")]
-pub(crate) const STYLE_CSS: &str = include_str!("../assets/style.css");
+pub(crate) const STYLE_CSS: &str = include_str!("../../assets/style.css");
 #[cfg(feature = "dashboard")]
-pub(crate) const APP_JS: &str = include_str!("../assets/app.js");
+pub(crate) const APP_JS: &str = include_str!("../../assets/app.js");
 
 #[cfg(feature = "dashboard")]
 pub(crate) fn make_versioned_index() -> String {

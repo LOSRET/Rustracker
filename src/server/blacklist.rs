@@ -6,7 +6,7 @@
 use std::collections::HashSet;
 use std::path::Path;
 
-use crate::types::InfoHash;
+use crate::core::types::InfoHash;
 
 /// Parse a blacklist file. Each non-empty, non-comment line is a 40-char hex info_hash.
 pub(crate) fn load_blacklist(path: &Path) -> anyhow::Result<HashSet<InfoHash>> {
