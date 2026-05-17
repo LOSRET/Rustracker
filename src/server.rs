@@ -11,7 +11,7 @@ use axum::Router;
 use tokio::sync::RwLock;
 use tokio::time::MissedTickBehavior;
 
-use crate::core::topk::Top100All;
+use crate::core::topk::{self, Top100All};
 use crate::core::tracker::{AnnounceInput, Tracker, TrackerSnapshot};
 use crate::core::types::InfoHash;
 
@@ -20,6 +20,19 @@ pub(crate) mod handlers;
 mod trends;
 
 use trends::TrendStore;
+
+fn load_trends(trends_file: &Option<PathBuf>) -> TrendStore {
+    let top_clients_file = trends_file
+        .as_ref()
+        .map(|p| p.parent().unwrap_or(Path::new(".")).join("top_clients.jsonl"));
+    trends_file
+        .as_ref()
+        .map(|p| trends::load_trends_from_file(p, top_clients_file.as_ref()))
+        .transpose()
+        .ok()
+        .flatten()
+        .unwrap_or_default()
+}
 
 pub const DEFAULT_TRACKER_SHARDS: usize = 64;
 const EXPIRE_MAINTENANCE_INTERVAL: Duration = Duration::from_secs(1);
@@ -41,21 +54,9 @@ pub(crate) struct TrackerPool {
 
 impl AppState {
     pub fn new(tracker: Tracker, trends_file: Option<PathBuf>) -> Self {
-        let top_clients_file = trends_file.as_ref().map(|p| {
-            p.parent()
-                .unwrap_or(Path::new("."))
-                .join("top_clients.jsonl")
-        });
-        let loaded = trends_file
-            .as_ref()
-            .map(|p| trends::load_trends_from_file(p, top_clients_file.as_ref()))
-            .transpose()
-            .ok()
-            .flatten()
-            .unwrap_or_default();
         Self {
             tracker: Arc::new(TrackerPool::single(tracker)),
-            trends: Arc::new(RwLock::new(loaded)),
+            trends: Arc::new(RwLock::new(load_trends(&trends_file))),
             blacklist: Arc::new(RwLock::new(Arc::new(HashSet::new()))),
             #[cfg(feature = "dashboard")]
             versioned_index: handlers::make_versioned_index(),
@@ -84,22 +85,9 @@ impl AppState {
             })
             .unwrap_or_default();
 
-        let top_clients_file = trends_file.as_ref().map(|p| {
-            p.parent()
-                .unwrap_or(Path::new("."))
-                .join("top_clients.jsonl")
-        });
-        let loaded = trends_file
-            .as_ref()
-            .map(|p| trends::load_trends_from_file(p, top_clients_file.as_ref()))
-            .transpose()
-            .ok()
-            .flatten()
-            .unwrap_or_default();
-
         let state = Self {
             tracker: Arc::new(TrackerPool::new(interval, peer_timeout, shards)),
-            trends: Arc::new(RwLock::new(loaded)),
+            trends: Arc::new(RwLock::new(load_trends(&trends_file))),
             blacklist: Arc::new(RwLock::new(Arc::new(initial))),
             #[cfg(feature = "dashboard")]
             versioned_index: handlers::make_versioned_index(),
@@ -263,39 +251,32 @@ impl TrackerPool {
             };
         }
 
-        let mut hp: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>> =
-            BinaryHeap::with_capacity(limit);
-        let mut hs: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>> =
-            BinaryHeap::with_capacity(limit);
-        let mut hl: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>> =
-            BinaryHeap::with_capacity(limit);
-        let mut hd: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>> =
-            BinaryHeap::with_capacity(limit);
+        let mut heaps: [BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>>; 4] =
+            std::array::from_fn(|_| BinaryHeap::with_capacity(limit));
+        let mut mins: [u64; 4] = [0; 4];
 
         for shard in &self.shards {
             let all = shard.read().await.top_torrents_all(limit);
             for (info_hash, seeders, leechers, downloaded) in all.peers {
-                let key = (seeders + leechers) as u64;
-                shard_heap_push(&mut hp, limit, key, info_hash, seeders, leechers, downloaded);
+                topk::try_heap_insert(&mut heaps[0], &mut mins[0], limit, (seeders + leechers) as u64, info_hash, seeders, leechers, downloaded);
             }
             for (info_hash, seeders, leechers, downloaded) in all.seeders {
-                let key = seeders as u64;
-                shard_heap_push(&mut hs, limit, key, info_hash, seeders, leechers, downloaded);
+                topk::try_heap_insert(&mut heaps[1], &mut mins[1], limit, seeders as u64, info_hash, seeders, leechers, downloaded);
             }
             for (info_hash, seeders, leechers, downloaded) in all.leechers {
-                let key = leechers as u64;
-                shard_heap_push(&mut hl, limit, key, info_hash, seeders, leechers, downloaded);
+                topk::try_heap_insert(&mut heaps[2], &mut mins[2], limit, leechers as u64, info_hash, seeders, leechers, downloaded);
             }
             for (info_hash, seeders, leechers, downloaded) in all.downloaded {
-                shard_heap_push(&mut hd, limit, downloaded, info_hash, seeders, leechers, downloaded);
+                topk::try_heap_insert(&mut heaps[3], &mut mins[3], limit, downloaded, info_hash, seeders, leechers, downloaded);
             }
         }
 
+        let [hp, hs, hl, hd] = heaps;
         Top100All {
-            peers: drain_and_sort(hp, 0),
-            seeders: drain_and_sort(hs, 1),
-            leechers: drain_and_sort(hl, 2),
-            downloaded: drain_and_sort(hd, 3),
+            peers: topk::drain_heap_by(hp, 0),
+            seeders: topk::drain_heap_by(hs, 1),
+            leechers: topk::drain_heap_by(hl, 2),
+            downloaded: topk::drain_heap_by(hd, 3),
         }
     }
 
@@ -350,46 +331,6 @@ impl TrackerPool {
             }
         }
     }
-}
-
-/// Push into a min-heap, keeping at most `limit` entries.
-fn shard_heap_push(
-    heap: &mut BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>>,
-    limit: usize,
-    key: u64,
-    info_hash: InfoHash,
-    seeders: usize,
-    leechers: usize,
-    downloaded: u64,
-) {
-    if heap.len() < limit {
-        heap.push(Reverse((key, info_hash, seeders, leechers, downloaded)));
-    } else if let Some(top) = heap.peek() {
-        if key > top.0.0 {
-            heap.pop();
-            heap.push(Reverse((key, info_hash, seeders, leechers, downloaded)));
-        }
-    }
-}
-
-/// Drain a min-heap and sort by the given field (0=peers, 1=seeders, 2=leechers).
-fn drain_and_sort(
-    heap: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>>,
-    sort_field: u8,
-) -> Vec<(InfoHash, usize, usize, u64)> {
-    let mut result: Vec<_> = heap
-        .into_iter()
-        .map(|Reverse((_, info_hash, seeders, leechers, downloaded))| {
-            (info_hash, seeders, leechers, downloaded)
-        })
-        .collect();
-    match sort_field {
-        1 => result.sort_by(|a, b| b.1.cmp(&a.1)),
-        2 => result.sort_by(|a, b| b.2.cmp(&a.2)),
-        3 => result.sort_by(|a, b| b.3.cmp(&a.3)),
-        _ => result.sort_by(|a, b| (b.1 + b.2).cmp(&(a.1 + a.2))),
-    }
-    result
 }
 
 fn file_mtime(path: &Path) -> SystemTime {
