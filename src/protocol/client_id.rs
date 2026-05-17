@@ -126,7 +126,7 @@ pub fn client_name(tag: u8) -> &'static str {
         WEBTORRENT => "WebTorrent",
         DANPLAY => "DanDanPlay",
         KTORRENT => "KTorrent",
-        RTORRENT => "Retriever",
+        RTORRENT => "rTorrent",
         ARES => "Ares",
         SHAREAZA => "Shareaza",
         TORRENT_STORM => "TorrentStorm",

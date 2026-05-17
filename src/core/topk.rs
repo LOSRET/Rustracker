@@ -72,7 +72,7 @@ pub(crate) fn top_torrents_all(swarms: &BTreeMap<InfoHash, Swarm>, limit: usize)
     }
 }
 
-fn try_heap_insert(
+pub(crate) fn try_heap_insert(
     heap: &mut BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>>,
     min_key: &mut u64,
     limit: usize,
@@ -102,7 +102,7 @@ fn try_heap_insert(
     }
 }
 
-fn drain_heap_by(
+pub(crate) fn drain_heap_by(
     heap: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>>,
     sort_field: u8, // 0 = peers (1+2), 1 = seeders, 2 = leechers, 3 = downloaded
 ) -> Vec<(InfoHash, usize, usize, u64)> {
