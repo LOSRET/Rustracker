@@ -262,7 +262,8 @@ rustracker/
 │   ├── core/                      # Core tracker engine (no I/O dependency)
 │   │   ├── types.rs               # Core types: InfoHash, PeerId, PeerState, TorrentStats
 │   │   ├── tracker.rs             # Tracker, AnnounceInput/Output, TrackerSnapshot
-│   │   ├── swarm.rs               # Per-torrent peer set with packed binary storage
+│   │   ├── swarm.rs               # Per-torrent peer set, packed binary storage, PeerEndpoint
+│   │   ├── topk.rs                # 4-way Top-K ranking (peers/seeders/leechers/downloaded)
 │   │   └── counters.rs            # Incremental counters for O(1) snapshots
 │   │
 │   ├── protocol.rs                # BT protocol module declaration

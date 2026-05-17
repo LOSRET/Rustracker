@@ -262,7 +262,8 @@ rustracker/
 │   ├── core/                      # 核心追踪引擎（无 I/O 依赖）
 │   │   ├── types.rs               # 核心类型：InfoHash、PeerId、PeerState、TorrentStats
 │   │   ├── tracker.rs             # Tracker、AnnounceInput/Output、TrackerSnapshot
-│   │   ├── swarm.rs               # 每种子 Peer 集合，紧凑二进制存储
+│   │   ├── swarm.rs               # 每种子 Peer 集合，紧凑二进制存储、PeerEndpoint
+│   │   ├── topk.rs                # 四维 Top-K 排名（peers/seeders/leechers/downloaded）
 │   │   └── counters.rs            # 增量计数器，O(1) 快照
 │   │
 │   ├── protocol.rs                # BT 协议模块声明

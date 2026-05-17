@@ -1,13 +1,10 @@
-use std::cmp::Reverse;
-use std::collections::{BinaryHeap, BTreeMap};
-use std::net::IpAddr;
+use std::collections::{BTreeMap, HashMap};
 use std::time::{Duration, Instant};
 
-use super::counters::{ExpireResult, PeerRemoval, PeerUpsert, TrackerCounters};
-use super::swarm::{allocate_v4_v6, PackedIpv4Peers, PackedIpv6Peers, Rng};
-use super::types::{
-    AnnounceEvent, InfoHash, Ipv4PeerKey, Ipv6PeerKey, PeerContact, PeerId, PeerState, TorrentStats,
-};
+use super::counters::{ExpireResult, TrackerCounters};
+use super::swarm::{PeerEndpoint, Swarm};
+use super::topk::{self, Top100All};
+use super::types::{AnnounceEvent, InfoHash, PeerContact, PeerId, PeerState, TorrentStats};
 
 const INTERVAL_JITTER_PERCENT: u64 = 10;
 const EXPIRE_SWEEP_INTERVAL: Duration = Duration::from_secs(30);
@@ -61,29 +58,6 @@ pub struct Tracker {
     swarms: BTreeMap<InfoHash, Swarm>,
     client_counts: Vec<(u8, u64)>,
     counters: TrackerCounters,
-}
-
-#[derive(Debug, Default)]
-pub(crate) struct Swarm {
-    pub(crate) ipv4_peers: PackedIpv4Peers,
-    pub(crate) ipv6_peers: PackedIpv6Peers,
-    pub(crate) complete: u32,
-    pub(crate) downloaded: u32,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum PeerEndpoint {
-    V4(Ipv4PeerKey),
-    V6(Ipv6PeerKey),
-}
-
-/// One-pass Top-K for all four rankings (peers, seeders, leechers, downloaded).
-/// Four min-heaps share a single iteration over the swarm table.
-pub(crate) struct Top100All {
-    pub peers: Vec<(InfoHash, usize, usize, u64)>,
-    pub seeders: Vec<(InfoHash, usize, usize, u64)>,
-    pub leechers: Vec<(InfoHash, usize, usize, u64)>,
-    pub downloaded: Vec<(InfoHash, usize, usize, u64)>,
 }
 
 impl Tracker {
@@ -205,7 +179,7 @@ impl Tracker {
         output
     }
 
-    pub fn scrape(&self, info_hashes: &[InfoHash]) -> std::collections::HashMap<InfoHash, TorrentStats> {
+    pub fn scrape(&self, info_hashes: &[InfoHash]) -> HashMap<InfoHash, TorrentStats> {
         info_hashes
             .iter()
             .copied()
@@ -221,107 +195,7 @@ impl Tracker {
     }
 
     pub(crate) fn top_torrents_all(&self, limit: usize) -> Top100All {
-        if limit == 0 {
-            return Top100All {
-                peers: Vec::new(),
-                seeders: Vec::new(),
-                leechers: Vec::new(),
-                downloaded: Vec::new(),
-            };
-        }
-
-        let mut heap_p: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>> =
-            BinaryHeap::with_capacity(limit);
-        let mut heap_s: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>> =
-            BinaryHeap::with_capacity(limit);
-        let mut heap_l: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>> =
-            BinaryHeap::with_capacity(limit);
-        let mut heap_d: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>> =
-            BinaryHeap::with_capacity(limit);
-        let mut min_p: u64 = 0;
-        let mut min_s: u64 = 0;
-        let mut min_l: u64 = 0;
-        let mut min_d: u64 = 0;
-
-        for (info_hash, swarm) in &self.swarms {
-            let stats = swarm.stats();
-            let peers = (stats.complete + stats.incomplete) as u64;
-            let seeders = stats.complete as u64;
-            let leechers = stats.incomplete as u64;
-            let downloaded = stats.downloaded as u64;
-
-            // Fast path: all four heaps are full and this torrent is
-            // below every threshold — skip without constructing entries.
-            if heap_p.len() >= limit && peers <= min_p
-                && heap_s.len() >= limit && seeders <= min_s
-                && heap_l.len() >= limit && leechers <= min_l
-                && heap_d.len() >= limit && downloaded <= min_d
-            {
-                continue;
-            }
-
-            let dl = stats.downloaded as u64;
-            Self::try_heap_insert(&mut heap_p, &mut min_p, limit, peers, *info_hash, stats.complete, stats.incomplete, dl);
-            Self::try_heap_insert(&mut heap_s, &mut min_s, limit, seeders, *info_hash, stats.complete, stats.incomplete, dl);
-            Self::try_heap_insert(&mut heap_l, &mut min_l, limit, leechers, *info_hash, stats.complete, stats.incomplete, dl);
-            Self::try_heap_insert(&mut heap_d, &mut min_d, limit, downloaded, *info_hash, stats.complete, stats.incomplete, dl);
-        }
-
-        Top100All {
-            peers: Self::drain_heap_by(heap_p, 0),
-            seeders: Self::drain_heap_by(heap_s, 1),
-            leechers: Self::drain_heap_by(heap_l, 2),
-            downloaded: Self::drain_heap_by(heap_d, 3),
-        }
-    }
-
-    fn try_heap_insert(
-        heap: &mut BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>>,
-        min_key: &mut u64,
-        limit: usize,
-        key: u64,
-        info_hash: InfoHash,
-        complete: usize,
-        incomplete: usize,
-        downloaded: u64,
-    ) {
-        if heap.len() >= limit && key <= *min_key {
-            return;
-        }
-        let entry = Reverse((key, info_hash, complete, incomplete, downloaded));
-        if heap.len() < limit {
-            heap.push(entry);
-            if heap.len() == limit {
-                if let Some(peek) = heap.peek() {
-                    *min_key = peek.0.0;
-                }
-            }
-        } else {
-            heap.pop();
-            heap.push(entry);
-            if let Some(peek) = heap.peek() {
-                *min_key = peek.0.0;
-            }
-        }
-    }
-
-    fn drain_heap_by(
-        heap: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>>,
-        sort_field: u8, // 0 = peers (1+2), 1 = seeders, 2 = leechers
-    ) -> Vec<(InfoHash, usize, usize, u64)> {
-        let mut result: Vec<_> = heap
-            .into_iter()
-            .map(|Reverse((_, info_hash, seeders, leechers, downloaded))| {
-                (info_hash, seeders, leechers, downloaded)
-            })
-            .collect();
-        match sort_field {
-            1 => result.sort_by(|a, b| b.1.cmp(&a.1)),
-            2 => result.sort_by(|a, b| b.2.cmp(&a.2)),
-            3 => result.sort_by(|a, b| b.3.cmp(&a.3)),
-            _ => result.sort_by(|a, b| (b.1 + b.2).cmp(&(a.1 + a.2))),
-        }
-        result
+        topk::top_torrents_all(&self.swarms, limit)
     }
 
     pub fn snapshot(&self) -> TrackerSnapshot {
@@ -449,15 +323,6 @@ impl AnnounceInput {
     }
 }
 
-impl PeerEndpoint {
-    fn new(ip: IpAddr, port: u16) -> Self {
-        match ip {
-            IpAddr::V4(ip) => Self::V4(Ipv4PeerKey::new(ip, port)),
-            IpAddr::V6(ip) => Self::V6(Ipv6PeerKey::new(ip, port)),
-        }
-    }
-}
-
 fn saturating_u32_secs(duration: Duration) -> u32 {
     duration.as_secs().min(u32::MAX as u64) as u32
 }
@@ -485,179 +350,6 @@ fn jitter_seed(info_hash: InfoHash, peer_id: PeerId, now_secs: u32) -> u64 {
 
     seed
 }
-
-impl Swarm {
-    fn upsert_peer(&mut self, endpoint: PeerEndpoint, peer: PeerState) -> PeerUpsert {
-        let now_complete = peer.is_complete();
-        let old = match endpoint {
-            PeerEndpoint::V4(key) => self.ipv4_peers.insert(key, peer),
-            PeerEndpoint::V6(key) => self.ipv6_peers.insert(key, peer),
-        };
-
-        match old {
-            Some(old_peer) => {
-                let was_complete = old_peer.is_complete();
-                let old_tag = old_peer.client_tag;
-                self.remove_from_counters(&old_peer);
-                if now_complete {
-                    self.complete = self.complete.saturating_add(1);
-                }
-                PeerUpsert {
-                    is_new_peer: false,
-                    was_complete,
-                    now_complete,
-                    old_tag: Some(old_tag),
-                }
-            }
-            None => {
-                if now_complete {
-                    self.complete = self.complete.saturating_add(1);
-                }
-                PeerUpsert {
-                    is_new_peer: true,
-                    was_complete: false,
-                    now_complete,
-                    old_tag: None,
-                }
-            }
-        }
-    }
-
-    fn remove_peer_tag(&mut self, endpoint: PeerEndpoint) -> Option<PeerRemoval> {
-        let removed = match endpoint {
-            PeerEndpoint::V4(key) => self.ipv4_peers.remove(&key),
-            PeerEndpoint::V6(key) => self.ipv6_peers.remove(&key),
-        };
-
-        removed.map(|peer| {
-            self.remove_from_counters(&peer);
-            PeerRemoval {
-                tag: peer.client_tag,
-                was_complete: peer.is_complete(),
-            }
-        })
-    }
-
-    fn expire(&mut self, now_secs: u32, timeout_secs: u32) -> ExpireResult {
-        let mut expired_complete: usize = 0;
-        let mut expired_count: usize = 0;
-        let mut expired_tags: Vec<u8> = Vec::new();
-
-        self.ipv4_peers.retain(|_, peer| {
-            let keep = now_secs.saturating_sub(peer.last_seen_secs) <= timeout_secs;
-            if !keep {
-                expired_count += 1;
-                if peer.is_complete() {
-                    expired_complete += 1;
-                }
-                expired_tags.push(peer.client_tag);
-            }
-            keep
-        });
-
-        self.ipv6_peers.retain(|_, peer| {
-            let keep = now_secs.saturating_sub(peer.last_seen_secs) <= timeout_secs;
-            if !keep {
-                expired_count += 1;
-                if peer.is_complete() {
-                    expired_complete += 1;
-                }
-                expired_tags.push(peer.client_tag);
-            }
-            keep
-        });
-
-        self.complete = self.complete.saturating_sub(expired_complete as u32);
-
-        self.ipv4_peers.shrink_if_idle();
-        self.ipv6_peers.shrink_if_idle();
-
-        ExpireResult {
-            tags: expired_tags,
-            removed_peers: expired_count,
-            removed_complete: expired_complete,
-        }
-    }
-
-    fn remove_from_counters(&mut self, peer: &PeerState) {
-        if peer.is_complete() {
-            self.complete = self.complete.saturating_sub(1);
-        }
-    }
-
-    fn stats(&self) -> TorrentStats {
-        let complete = self.complete as usize;
-        TorrentStats {
-            complete,
-            downloaded: self.downloaded,
-            incomplete: self.len().saturating_sub(complete),
-        }
-    }
-
-    fn len(&self) -> usize {
-        self.ipv4_peers.len() + self.ipv6_peers.len()
-    }
-
-    fn is_empty(&self) -> bool {
-        self.ipv4_peers.is_empty() && self.ipv6_peers.is_empty()
-    }
-
-    fn contacts_excluding(
-        &self,
-        requesting_endpoint: PeerEndpoint,
-        limit: usize,
-        rng_seed: u64,
-    ) -> Vec<PeerContact> {
-        if limit == 0 {
-            return Vec::new();
-        }
-
-        let total = self.len();
-        if total == 0 {
-            return Vec::new();
-        }
-
-        let v4_exclude = match requesting_endpoint {
-            PeerEndpoint::V4(key) => Some(key),
-            _ => None,
-        };
-        let v6_exclude = match requesting_endpoint {
-            PeerEndpoint::V6(key) => Some(key),
-            _ => None,
-        };
-
-        // Short circuit: return all peers except self when swarm is small
-        let available = total - 1;
-        if available <= limit {
-            let mut contacts = Vec::with_capacity(available);
-            self.ipv4_peers
-                .append_contacts(v4_exclude.as_ref(), &mut contacts);
-            self.ipv6_peers
-                .append_contacts(v6_exclude.as_ref(), &mut contacts);
-            return contacts;
-        }
-
-        // Allocate between v4 and v6 proportionally (at least 1/4 each if available)
-        // Request one extra per pool that contains the excluded peer, so the
-        // final result still has `limit` entries after exclusion.
-        let extra = v4_exclude.is_some() as usize + v6_exclude.is_some() as usize;
-        let (v4_amount, v6_amount) =
-            allocate_v4_v6(self.ipv4_peers.len(), self.ipv6_peers.len(), limit + extra);
-
-        let mut rng = Rng::new(rng_seed);
-        let mut contacts = Vec::with_capacity(limit);
-
-        self.ipv4_peers
-            .select_random(v4_amount, &mut rng, v4_exclude.as_ref(), &mut contacts);
-        self.ipv6_peers
-            .select_random(v6_amount, &mut rng, v6_exclude.as_ref(), &mut contacts);
-
-        contacts.truncate(limit);
-        contacts
-    }
-}
-
-
 
 #[cfg(test)]
 mod tests {
