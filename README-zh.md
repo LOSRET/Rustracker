@@ -362,7 +362,7 @@ sudo sh install-linux.sh uninstall
 | `/opt/rustracker/rustracker` | 二进制文件 |
 | `/etc/rustracker.env` | 环境变量配置 |
 | `/etc/rustracker/blacklist.txt` | 种子黑名单 |
-| `/etc/rustracker/trends.jsonl` | 趋势数据 |
+| `/var/lib/rustracker/trends.jsonl` | 趋势数据 |
 | `/etc/systemd/system/rustracker.service` | systemd 服务单元 |
 
 对于监听地址，仅输入端口号（如 `6969`）会被接受并保存为 `0.0.0.0:6969`。

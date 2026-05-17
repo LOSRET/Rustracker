@@ -362,7 +362,7 @@ sudo sh install-linux.sh uninstall
 | `/opt/rustracker/rustracker` | Binary |
 | `/etc/rustracker.env` | Environment config |
 | `/etc/rustracker/blacklist.txt` | Torrent blacklist |
-| `/etc/rustracker/trends.jsonl` | Trend data |
+| `/var/lib/rustracker/trends.jsonl` | Trend data |
 | `/etc/systemd/system/rustracker.service` | systemd unit |
 
 For the listen address, entering only a port (e.g. `6969`) is accepted and saved as `0.0.0.0:6969`.
