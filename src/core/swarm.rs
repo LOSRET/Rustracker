@@ -3,7 +3,7 @@
 //! IPv4 peers are stored in 12-byte entries; IPv6 in 24-byte entries.
 //! Selection uses fixed-point even-spacing (OpenTracker style).
 
-use crate::types::{Ipv4PeerKey, Ipv6PeerKey, PeerContact, PeerState};
+use super::types::{Ipv4PeerKey, Ipv6PeerKey, PeerContact, PeerState};
 
 pub(crate) const FLAG_COMPLETE: u8 = 1;
 pub(crate) const IPV4_ENTRY_LEN: usize = 12;

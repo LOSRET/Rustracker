@@ -256,17 +256,26 @@ rustracker/
 │
 ├── src/                           # Rust 源代码
 │   ├── main.rs                    # 入口：CLI 解析、Tokio 运行时、优雅关闭
-│   ├── lib.rs                     # 库根：重新导出所有模块
-│   ├── server.rs                  # Axum HTTP 服务器、路由、AppState、静态资源缓存
-│   ├── handlers.rs                # HTTP 处理器：announce、scrape、healthz、面板、API
-│   ├── tracker.rs                 # TrackerPool — 64 分片并发 Tracker（RwLock<BTreeMap>）
-│   ├── swarm.rs                   # Swarm — 每种子的 Peer 集合，紧凑二进制存储
-│   ├── protocol.rs                # BEP 3 协议：Bencode 响应构建、紧凑 Peer 编码
-│   ├── bencode.rs                 # 轻量 Bencode 编码器（零外部依赖）
-│   ├── types.rs                   # 核心类型：InfoHash、PeerId、PeerAddr
-│   ├── client_id.rs               # 102 种客户端 Peer ID 识别（编译时查找表）
-│   ├── blacklist.rs               # 种子黑名单，5 秒热重载文件监视
-│   └── trends.rs                  # 趋势数据采集、7 天 JSONL 持久化、历史 API
+│   ├── lib.rs                     # 库根：重新导出 core、protocol、server 模块
+│   │
+│   ├── core.rs                    # 核心追踪引擎模块声明
+│   ├── core/                      # 核心追踪引擎（无 I/O 依赖）
+│   │   ├── types.rs               # 核心类型：InfoHash、PeerId、PeerState、TorrentStats
+│   │   ├── tracker.rs             # Tracker、AnnounceInput/Output、TrackerSnapshot
+│   │   ├── swarm.rs               # 每种子 Peer 集合，紧凑二进制存储
+│   │   └── counters.rs            # 增量计数器，O(1) 快照
+│   │
+│   ├── protocol.rs                # BT 协议模块声明
+│   ├── protocol/                  # BitTorrent 协议编解码（无网络依赖）
+│   │   ├── bencode.rs             # 轻量 Bencode 编码器（零外部依赖）
+│   │   ├── announce.rs            # BEP 3 announce/scrape 查询解析与响应构建
+│   │   └── client_id.rs           # 102 种客户端 Peer ID 识别（编译时查找表）
+│   │
+│   ├── server.rs                  # HTTP 服务层模块声明
+│   └── server/                    # HTTP 服务层（axum + tokio）
+│       ├── handlers.rs            # HTTP 处理器：announce、scrape、healthz、面板、API
+│       ├── blacklist.rs           # 种子黑名单，5 秒热重载文件监视
+│       └── trends.rs              # 趋势数据采集、7 天 JSONL 持久化、历史 API
 │
 ├── assets/                        # Web 监控面板静态文件
 │   ├── index.html                 # 面板 HTML（生产版，内联 CSS/JS）
@@ -290,19 +299,18 @@ rustracker/
 
 **源码模块概览：**
 
-| 模块 | 职责 |
-|------|------|
-| `main.rs` | CLI 参数解析（`clap`）、异步运行时初始化、信号处理 |
-| `server.rs` | Axum 路由、共享 `AppState`、1 小时静态资源缓存头 |
-| `handlers.rs` | `/announce`、`/scrape`、`/healthz`、`/api/*`、`/` 请求处理 |
-| `tracker.rs` | 64 分片 `TrackerPool` — 每分片 `RwLock<BTreeMap<InfoHash, Swarm>>` |
-| `swarm.rs` | 每种子 Peer 集合 — IPv4 每 peer 6 字节、IPv6 每 peer 18 字节紧凑存储 |
-| `protocol.rs` | BEP 3 规范 Bencode 响应构建、紧凑 Peer 编码 |
-| `bencode.rs` | 最小化 Bencode 序列化器 — 无外部 crate 依赖 |
-| `types.rs` | `InfoHash`（20 字节）、`PeerId`（20 字节）、`PeerAddr`（IP + 端口） |
-| `client_id.rs` | 编译时 256×256 查找表，匹配 `-XX####-` Azureus 风格 Peer ID 前缀 |
-| `blacklist.rs` | `HashSet<InfoHash>` 通过 5 秒轮询实现热重载 |
-| `trends.rs` | 内存环形缓冲 + 可选 JSONL 持久化，7 天保留 |
+| 层级 | 模块 | 职责 |
+|------|------|------|
+| `core` | `types.rs` | `InfoHash`（20 字节）、`PeerId`（20 字节）、`PeerState`、`TorrentStats` |
+| `core` | `tracker.rs` | 64 分片 `TrackerPool` — 每分片 `RwLock<BTreeMap<InfoHash, Swarm>>` |
+| `core` | `swarm.rs` | 每种子 Peer 集合 — IPv4 每 peer 6 字节、IPv6 每 peer 18 字节紧凑存储 |
+| `core` | `counters.rs` | 增量计数器，O(1) 快照（无需全量遍历） |
+| `protocol` | `bencode.rs` | 最小化 Bencode 序列化器 — 无外部 crate 依赖 |
+| `protocol` | `announce.rs` | BEP 3 规范 Bencode 响应构建、紧凑 Peer 编码 |
+| `protocol` | `client_id.rs` | 编译时 256×256 查找表，匹配 `-XX####-` Azureus 风格 Peer ID 前缀 |
+| `server` | `handlers.rs` | `/announce`、`/scrape`、`/healthz`、`/api/*`、`/` 请求处理 |
+| `server` | `blacklist.rs` | `HashSet<InfoHash>` 通过 5 秒轮询实现热重载 |
+| `server` | `trends.rs` | 内存环形缓冲 + 可选 JSONL 持久化，7 天保留 |
 
 ## 客户端识别
 

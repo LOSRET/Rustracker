@@ -256,17 +256,26 @@ rustracker/
 │
 ├── src/                           # Rust source code
 │   ├── main.rs                    # Entry point: CLI parsing, Tokio runtime, graceful shutdown
-│   ├── lib.rs                     # Library root: re-exports all modules
-│   ├── server.rs                  # Axum HTTP server, routing, AppState, static asset caching
-│   ├── handlers.rs                # HTTP handlers: announce, scrape, healthz, dashboard, APIs
-│   ├── tracker.rs                 # TrackerPool — 64-shard concurrent tracker (RwLock<BTreeMap>)
-│   ├── swarm.rs                   # Swarm — per-torrent peer set with packed binary storage
-│   ├── protocol.rs                # BEP 3 protocol: bencode response construction, compact encoding
-│   ├── bencode.rs                 # Lightweight bencode encoder (zero external dependency)
-│   ├── types.rs                   # Core types: InfoHash, PeerId, PeerAddr
-│   ├── client_id.rs               # 102-client peer ID identification (compile-time lookup table)
-│   ├── blacklist.rs               # Torrent blacklist with 5-sec hot-reload file watcher
-│   └── trends.rs                  # Trend data collection, 7-day JSONL persistence, history API
+│   ├── lib.rs                     # Library root: re-exports core, protocol, server modules
+│   │
+│   ├── core.rs                    # Core tracker engine module declaration
+│   ├── core/                      # Core tracker engine (no I/O dependency)
+│   │   ├── types.rs               # Core types: InfoHash, PeerId, PeerState, TorrentStats
+│   │   ├── tracker.rs             # Tracker, AnnounceInput/Output, TrackerSnapshot
+│   │   ├── swarm.rs               # Per-torrent peer set with packed binary storage
+│   │   └── counters.rs            # Incremental counters for O(1) snapshots
+│   │
+│   ├── protocol.rs                # BT protocol module declaration
+│   ├── protocol/                  # BitTorrent protocol encoding (no network dependency)
+│   │   ├── bencode.rs             # Lightweight bencode encoder (zero external dependency)
+│   │   ├── announce.rs            # BEP 3 announce/scrape query parsing, response building
+│   │   └── client_id.rs           # 102-client peer ID identification (compile-time lookup)
+│   │
+│   ├── server.rs                  # HTTP server module declaration
+│   └── server/                    # HTTP server layer (axum + tokio)
+│       ├── handlers.rs            # HTTP handlers: announce, scrape, healthz, dashboard, APIs
+│       ├── blacklist.rs           # Torrent blacklist with 5-sec hot-reload file watcher
+│       └── trends.rs              # Trend data collection, 7-day JSONL persistence, history API
 │
 ├── assets/                        # Web dashboard static files
 │   ├── index.html                 # Dashboard HTML (production, inlined CSS/JS)
@@ -290,19 +299,18 @@ rustracker/
 
 **Source module overview:**
 
-| Module | Responsibility |
-|--------|---------------|
-| `main.rs` | CLI argument parsing (`clap`), async runtime setup, signal handling |
-| `server.rs` | Axum router, shared `AppState`, 1-hour static asset cache headers |
-| `handlers.rs` | Request handlers for `/announce`, `/scrape`, `/healthz`, `/api/*`, `/` |
-| `tracker.rs` | 64-shard `TrackerPool` — per-shard `RwLock<BTreeMap<InfoHash, Swarm>>` |
-| `swarm.rs` | Per-torrent peer collection — packed binary IPv4 (6B) / IPv6 (18B) per peer |
-| `protocol.rs` | BEP 3 compliant bencode response builder, compact peer encoding |
-| `bencode.rs` | Minimal bencode serializer — no external crate dependency |
-| `types.rs` | `InfoHash` (20 bytes), `PeerId` (20 bytes), `PeerAddr` (IP + port) |
-| `client_id.rs` | Compile-time 256×256 lookup table for `-XX####-` Azureus peer ID prefixes |
-| `blacklist.rs` | `HashSet<InfoHash>` hot-reload via 5-second file polling |
-| `trends.rs` | In-memory ring buffer + optional JSONL persistence, 7-day retention |
+| Layer | Module | Responsibility |
+|-------|--------|---------------|
+| `core` | `types.rs` | `InfoHash` (20 bytes), `PeerId` (20 bytes), `PeerState`, `TorrentStats` |
+| `core` | `tracker.rs` | 64-shard `TrackerPool` — per-shard `RwLock<BTreeMap<InfoHash, Swarm>>` |
+| `core` | `swarm.rs` | Per-torrent peer collection — packed binary IPv4 (6B) / IPv6 (18B) per peer |
+| `core` | `counters.rs` | Incremental counters for O(1) snapshots (no full traversal) |
+| `protocol` | `bencode.rs` | Minimal bencode serializer — no external crate dependency |
+| `protocol` | `announce.rs` | BEP 3 compliant bencode response builder, compact peer encoding |
+| `protocol` | `client_id.rs` | Compile-time 256×256 lookup table for `-XX####-` Azureus peer ID prefixes |
+| `server` | `handlers.rs` | Request handlers for `/announce`, `/scrape`, `/healthz`, `/api/*`, `/` |
+| `server` | `blacklist.rs` | `HashSet<InfoHash>` hot-reload via 5-second file polling |
+| `server` | `trends.rs` | In-memory ring buffer + optional JSONL persistence, 7-day retention |
 
 ## Client Identification
 
