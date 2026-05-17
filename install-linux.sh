@@ -10,7 +10,7 @@ DEFAULT_LISTEN="0.0.0.0:8080"
 DEFAULT_INTERVAL="1800"
 DEFAULT_TIMEOUT="3000"
 BLACKLIST_PATH="/etc/rustracker/blacklist.txt"
-TRENDS_FILE_PATH="/etc/rustracker/trends.jsonl"
+TRENDS_FILE_PATH="/var/lib/rustracker/trends.jsonl"
 
 load_existing_config() {
     LISTEN_DEFAULT=$DEFAULT_LISTEN
