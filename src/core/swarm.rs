@@ -3,7 +3,10 @@
 //! IPv4 peers are stored in 12-byte entries; IPv6 in 24-byte entries.
 //! Selection uses fixed-point even-spacing (OpenTracker style).
 
-use super::types::{Ipv4PeerKey, Ipv6PeerKey, PeerContact, PeerState};
+use std::net::IpAddr;
+
+use super::counters::{ExpireResult, PeerRemoval, PeerUpsert};
+use super::types::{Ipv4PeerKey, Ipv6PeerKey, PeerContact, PeerState, TorrentStats};
 
 pub(crate) const FLAG_COMPLETE: u8 = 1;
 pub(crate) const IPV4_ENTRY_LEN: usize = 12;
@@ -435,4 +438,202 @@ pub(crate) fn allocate_v4_v6(total_v4: usize, total_v6: usize, amount: usize) ->
     }
 
     (v4, v6)
+}
+
+// ── Peer endpoint ────────────────────────────────────────────────────────────
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum PeerEndpoint {
+    V4(Ipv4PeerKey),
+    V6(Ipv6PeerKey),
+}
+
+impl PeerEndpoint {
+    pub(crate) fn new(ip: IpAddr, port: u16) -> Self {
+        match ip {
+            IpAddr::V4(ip) => Self::V4(Ipv4PeerKey::new(ip, port)),
+            IpAddr::V6(ip) => Self::V6(Ipv6PeerKey::new(ip, port)),
+        }
+    }
+}
+
+// ── Swarm ────────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Default)]
+pub(crate) struct Swarm {
+    pub(crate) ipv4_peers: PackedIpv4Peers,
+    pub(crate) ipv6_peers: PackedIpv6Peers,
+    pub(crate) complete: u32,
+    pub(crate) downloaded: u32,
+}
+
+impl Swarm {
+    pub(crate) fn upsert_peer(&mut self, endpoint: PeerEndpoint, peer: PeerState) -> PeerUpsert {
+        let now_complete = peer.is_complete();
+        let old = match endpoint {
+            PeerEndpoint::V4(key) => self.ipv4_peers.insert(key, peer),
+            PeerEndpoint::V6(key) => self.ipv6_peers.insert(key, peer),
+        };
+
+        match old {
+            Some(old_peer) => {
+                let was_complete = old_peer.is_complete();
+                let old_tag = old_peer.client_tag;
+                self.remove_from_counters(&old_peer);
+                if now_complete {
+                    self.complete = self.complete.saturating_add(1);
+                }
+                PeerUpsert {
+                    is_new_peer: false,
+                    was_complete,
+                    now_complete,
+                    old_tag: Some(old_tag),
+                }
+            }
+            None => {
+                if now_complete {
+                    self.complete = self.complete.saturating_add(1);
+                }
+                PeerUpsert {
+                    is_new_peer: true,
+                    was_complete: false,
+                    now_complete,
+                    old_tag: None,
+                }
+            }
+        }
+    }
+
+    pub(crate) fn remove_peer_tag(&mut self, endpoint: PeerEndpoint) -> Option<PeerRemoval> {
+        let removed = match endpoint {
+            PeerEndpoint::V4(key) => self.ipv4_peers.remove(&key),
+            PeerEndpoint::V6(key) => self.ipv6_peers.remove(&key),
+        };
+
+        removed.map(|peer| {
+            self.remove_from_counters(&peer);
+            PeerRemoval {
+                tag: peer.client_tag,
+                was_complete: peer.is_complete(),
+            }
+        })
+    }
+
+    pub(crate) fn expire(&mut self, now_secs: u32, timeout_secs: u32) -> ExpireResult {
+        let mut expired_complete: usize = 0;
+        let mut expired_count: usize = 0;
+        let mut expired_tags: Vec<u8> = Vec::new();
+
+        self.ipv4_peers.retain(|_, peer| {
+            let keep = now_secs.saturating_sub(peer.last_seen_secs) <= timeout_secs;
+            if !keep {
+                expired_count += 1;
+                if peer.is_complete() {
+                    expired_complete += 1;
+                }
+                expired_tags.push(peer.client_tag);
+            }
+            keep
+        });
+
+        self.ipv6_peers.retain(|_, peer| {
+            let keep = now_secs.saturating_sub(peer.last_seen_secs) <= timeout_secs;
+            if !keep {
+                expired_count += 1;
+                if peer.is_complete() {
+                    expired_complete += 1;
+                }
+                expired_tags.push(peer.client_tag);
+            }
+            keep
+        });
+
+        self.complete = self.complete.saturating_sub(expired_complete as u32);
+
+        self.ipv4_peers.shrink_if_idle();
+        self.ipv6_peers.shrink_if_idle();
+
+        ExpireResult {
+            tags: expired_tags,
+            removed_peers: expired_count,
+            removed_complete: expired_complete,
+        }
+    }
+
+    fn remove_from_counters(&mut self, peer: &PeerState) {
+        if peer.is_complete() {
+            self.complete = self.complete.saturating_sub(1);
+        }
+    }
+
+    pub(crate) fn stats(&self) -> TorrentStats {
+        let complete = self.complete as usize;
+        TorrentStats {
+            complete,
+            downloaded: self.downloaded,
+            incomplete: self.len().saturating_sub(complete),
+        }
+    }
+
+    pub(crate) fn len(&self) -> usize {
+        self.ipv4_peers.len() + self.ipv6_peers.len()
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.ipv4_peers.is_empty() && self.ipv6_peers.is_empty()
+    }
+
+    pub(crate) fn contacts_excluding(
+        &self,
+        requesting_endpoint: PeerEndpoint,
+        limit: usize,
+        rng_seed: u64,
+    ) -> Vec<PeerContact> {
+        if limit == 0 {
+            return Vec::new();
+        }
+
+        let total = self.len();
+        if total == 0 {
+            return Vec::new();
+        }
+
+        let v4_exclude = match requesting_endpoint {
+            PeerEndpoint::V4(key) => Some(key),
+            _ => None,
+        };
+        let v6_exclude = match requesting_endpoint {
+            PeerEndpoint::V6(key) => Some(key),
+            _ => None,
+        };
+
+        // Short circuit: return all peers except self when swarm is small
+        let available = total - 1;
+        if available <= limit {
+            let mut contacts = Vec::with_capacity(available);
+            self.ipv4_peers
+                .append_contacts(v4_exclude.as_ref(), &mut contacts);
+            self.ipv6_peers
+                .append_contacts(v6_exclude.as_ref(), &mut contacts);
+            return contacts;
+        }
+
+        // Allocate between v4 and v6 proportionally (at least 1/4 each if available)
+        // Request one extra per pool that contains the excluded peer, so the
+        // final result still has `limit` entries after exclusion.
+        let extra = v4_exclude.is_some() as usize + v6_exclude.is_some() as usize;
+        let (v4_amount, v6_amount) =
+            allocate_v4_v6(self.ipv4_peers.len(), self.ipv6_peers.len(), limit + extra);
+
+        let mut rng = Rng::new(rng_seed);
+        let mut contacts = Vec::with_capacity(limit);
+
+        self.ipv4_peers
+            .select_random(v4_amount, &mut rng, v4_exclude.as_ref(), &mut contacts);
+        self.ipv6_peers
+            .select_random(v6_amount, &mut rng, v6_exclude.as_ref(), &mut contacts);
+
+        contacts.truncate(limit);
+        contacts
+    }
 }
