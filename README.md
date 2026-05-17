@@ -8,7 +8,7 @@
 
 A lightweight, high-performance HTTP BitTorrent tracker with a real-time dashboard, written in Rust.
 
-> **Note:** This project is developed using Vibe Coding and may have some instability. If you have no special requirements, it is recommended to use other mature BT tracker solutions instead.
+> **Note:** This project is developed using Vibe Coding. If you have no special requirements, it is recommended to use other mature BT tracker solutions instead.
 
 ## Highlights
 
