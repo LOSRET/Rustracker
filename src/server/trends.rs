@@ -25,6 +25,10 @@ pub(crate) struct StatsResponse {
     pub seeders: usize,
     pub leechers: usize,
     pub completed: u64,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct TrendsResponse {
     pub history: Vec<TrendPointResponse>,
 }
 
@@ -75,10 +79,7 @@ pub(crate) struct TrendStore {
 }
 
 impl StatsResponse {
-    pub(crate) fn from_snapshot(
-        snapshot: TrackerSnapshot,
-        history: Vec<TrendPointResponse>,
-    ) -> Self {
+    pub(crate) fn from_snapshot(snapshot: TrackerSnapshot) -> Self {
         Self {
             interval: snapshot.interval,
             peer_timeout: snapshot.peer_timeout,
@@ -87,7 +88,6 @@ impl StatsResponse {
             seeders: snapshot.totals.seeders,
             leechers: snapshot.totals.leechers,
             completed: snapshot.totals.downloaded,
-            history,
         }
     }
 }
