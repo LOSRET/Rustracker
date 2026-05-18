@@ -144,7 +144,20 @@ GET /api/stats
   "peers": 128,
   "seeders": 85,
   "leechers": 43,
-  "completed": 310,
+  "completed": 310
+}
+```
+
+### 趋势历史
+
+```
+GET /api/trends
+```
+
+返回 JSON，包含历史趋势数据（7 天保留，10 分钟采样）：
+
+```json
+{
   "history": [
     {"timestamp": 1715800000, "torrents": 40, "peers": 120, "seeders": 80, "leechers": 40}
   ]
@@ -162,14 +175,23 @@ GET /api/clients
 ### Top 100 种子
 
 ```
-GET /api/top100?sort=peers
+GET /api/top100?limit=100
 ```
 
-| 查询参数 | 可选值 | 默认值 |
-|---------|--------|--------|
-| `sort` | `peers`、`seeders`、`leechers`、`downloaded` | `peers` |
+| 查询参数 | 说明 | 默认值 | 最大值 |
+|---------|------|--------|--------|
+| `limit` | 每个排名返回的条目数 | `100` | `500` |
 
-返回 JSON，按指定指标排列的 Top 100 活跃种子。
+返回 JSON，包含四种排序的排名：
+
+```json
+{
+  "peers": [{"info_hash": "...", "seeders": 10, "leechers": 5, "peers": 15, "downloaded": 100}],
+  "seeders": [...],
+  "leechers": [...],
+  "downloaded": [...]
+}
+```
 
 ## Web 监控面板
 
