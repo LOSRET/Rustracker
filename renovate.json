@@ -7,11 +7,11 @@
       "automerge": true
     },
     {
-      "matchPackagePatterns": ["^tokio"],
+      "matchPackageNames": ["/^tokio/"],
       "groupName": "tokio"
     },
     {
-      "matchPackagePatterns": ["^axum"],
+      "matchPackageNames": ["/^axum/"],
       "groupName": "axum"
     }
   ],
