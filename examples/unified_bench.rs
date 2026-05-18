@@ -1,4 +1,4 @@
-﻿//! Unified benchmark: concurrent HTTP requests
+﻿﻿//! Unified benchmark: concurrent HTTP requests
 //!
 //! Sends concurrent requests through axum router to measure true throughput.
 //! Tracks RPS, RSS, CPU, and per-request latency.
@@ -110,10 +110,11 @@ impl Rng {
 // ─── Main ────────────────────────────────────────────────────────
 
 const CONCURRENCY: usize = 100;
+const MAX_PEERS_PER_TORRENT: usize = 100_000;
+const NEW_TORRENT_PROB: usize = 2500;
 
 #[tokio::main]
 async fn main() {
-    let max_torrents: usize = 1_000_000;
     let max_peers: usize = 10_000_000;
     let total_requests: usize = 5_000_000;
 
@@ -125,6 +126,8 @@ async fn main() {
     let mut rng = Rng::new(0xdead_beef_cafe);
     let mut next_peer_idx: usize = 0;
     let mut active_peers: Vec<(usize, u16)> = Vec::new();
+    let mut torrent_peer_counts: Vec<usize> = Vec::new();
+    let mut num_torrents: usize = 0;
     let mut request_count: usize = 0;
     let mut new_join_count: usize = 0;
     let mut reannounce_count: usize = 0;
@@ -132,7 +135,7 @@ async fn main() {
     let sample_interval = total_requests / 100;
     let mut next_sample = sample_interval;
 
-    println!("request,peers,new_joins,reannounces,rps,rss_mb,cpu_pct,avg_us,p50_us,p99_us,max_us");
+    println!("request,torrents,peers,new_joins,reannounces,rps,rss_mb,cpu_pct,avg_us,p50_us,p99_us,max_us");
     let bench_start = Instant::now();
     let baseline_rss = mem::rss_bytes();
     let mut prev_cpu = CpuTimes::read();
@@ -159,7 +162,20 @@ async fn main() {
         };
 
         let (uri, torrent_idx, port) = if is_new {
-            let ti = next_peer_idx % max_torrents;
+            let ti = loop {
+                if active_peers.is_empty() || rng.next_usize(10000) < NEW_TORRENT_PROB {
+                    let ti = num_torrents;
+                    num_torrents += 1;
+                    torrent_peer_counts.push(0);
+                    break ti;
+                }
+                let idx = rng.next_usize(active_peers.len());
+                let (candidate_ti, _) = active_peers[idx];
+                if torrent_peer_counts[candidate_ti] < MAX_PEERS_PER_TORRENT {
+                    break candidate_ti;
+                }
+            };
+            torrent_peer_counts[ti] += 1;
             let p = (6881 + next_peer_idx % 60000) as u16;
             let left = if rng.next_usize(3)==0 {0} else {1_000_000_000};
             (announce_uri(make_info_hash(ti), make_peer_id(next_peer_idx), p, left), ti, p)
@@ -208,11 +224,11 @@ async fn main() {
             let (avg, p50, p99, max_lat) = latency.stats();
             latency.clear();
 
-            println!("{},{},{},{},{:.0},{},{:.1},{},{},{},{}",
-                request_count, active_peers.len(), new_join_count, reannounce_count,
+            println!("{},{},{},{},{},{:.0},{},{:.1},{},{},{},{}",
+                request_count, num_torrents, active_peers.len(), new_join_count, reannounce_count,
                 rps, fmt_mb(rss), cpu_pct, avg as u64, p50, p99, max_lat);
-            eprintln!("  req={:>8}  peers={:>10}  rps={:>10.0}  new={:>8}  re={:>8}  rss={:>8}  cpu={:.1}%  lat: avg={} p50={} p99={} max={}",
-                request_count, active_peers.len(), rps, new_join_count, reannounce_count,
+            eprintln!("  req={:>8}  torrents={:>8}  peers={:>10}  rps={:>10.0}  new={:>8}  re={:>8}  rss={:>8}  cpu={:.1}%  lat: avg={} p50={} p99={} max={}",
+                request_count, num_torrents, active_peers.len(), rps, new_join_count, reannounce_count,
                 fmt_mb(rss), cpu_pct, fmt_us(avg as u64), fmt_us(p50), fmt_us(p99), fmt_us(max_lat));
             next_sample += sample_interval;
         }
@@ -225,8 +241,8 @@ async fn main() {
     }
 
     let total_time = bench_start.elapsed().as_secs_f64();
-    eprintln!("\nDone. {} req in {:.1}s = {:.0} rps | peers={} (new={}, re={}) | rss={} | concurrency={}",
+    eprintln!("\nDone. {} req in {:.1}s = {:.0} rps | torrents={} peers={} (new={}, re={}) | rss={} | concurrency={}",
         request_count, total_time, request_count as f64 / total_time,
-        active_peers.len(), new_join_count, reannounce_count,
+        num_torrents, active_peers.len(), new_join_count, reannounce_count,
         fmt_mb(mem::rss_bytes().saturating_sub(baseline_rss)), CONCURRENCY);
 }
