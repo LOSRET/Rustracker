@@ -83,7 +83,7 @@ jobs:
         run: mv target/${{ matrix.target }}/release/${{ matrix.binary }} target/${{ matrix.target }}/release/${{ matrix.artifact }}
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
           path: target/${{ matrix.target }}/release/${{ matrix.artifact }}
@@ -99,19 +99,19 @@ jobs:
           fetch-depth: 0
 
       - name: Download Linux binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: rustracker-linux
           path: release/
 
       - name: Download Linux nodashboard binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: rustracker-linux-nodashboard
           path: release/
 
       - name: Download Windows binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: rustracker.exe
           path: release/
