@@ -7,12 +7,16 @@
       "automerge": true
     },
     {
-      "matchPackagePatterns": ["^tokio"],
-      "groupName": "tokio"
+      "groupName": "tokio",
+      "matchPackageNames": [
+        "/^tokio/"
+      ]
     },
     {
-      "matchPackagePatterns": ["^axum"],
-      "groupName": "axum"
+      "groupName": "axum",
+      "matchPackageNames": [
+        "/^axum/"
+      ]
     }
   ],
   "schedule": ["every weekday before 9am"]
