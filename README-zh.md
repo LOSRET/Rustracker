@@ -59,7 +59,7 @@ cargo run --release -- --listen 127.0.0.1:8080
 从 [GitHub Releases](https://github.com/LOSRET/rustracker/releases) 下载最新版本：
 - `rustracker.exe` — Windows x86_64
 - `rustracker-linux` — Linux x86_64
-- `rustracker-linux-vX.Y.Z.tar.gz` — Linux 归档包（含安装脚本）
+- `rustracker-linux.tar.gz` — Linux 归档包（含安装脚本）
 
 ## 命令行参数
 
@@ -107,6 +107,7 @@ GET /announce?info_hash=<20字节>&peer_id=<20字节>&port=6881&uploaded=0&downl
 | `event` | 否 | `started`、`completed`、`stopped` 或留空 |
 | `compact` | 否 | `1` 使用紧凑编码（默认），`0` 使用字典编码 |
 | `numwant` | 否 | 返回的 peer 数量（默认 100，最大 400） |
+| `ip` | 否 | 覆盖 peer IP 地址（用于反向代理场景） |
 
 响应（Bencode 编码）：
 
@@ -170,7 +171,18 @@ GET /api/trends
 GET /api/clients
 ```
 
-返回 JSON，包含 Top 15 客户端类型及其历史 peer 数量。
+返回 JSON，包含 Top 15 客户端类型及其历史 peer 数量：
+
+```json
+{
+  "timestamp": 1715800000,
+  "tags": [1, 2, 3],
+  "clients": ["qBittorrent", "Transmission", "µTorrent"],
+  "history": [
+    {"timestamp": 1715800000, "tags": [1, 2, 3], "counts": [50, 30, 20]}
+  ]
+}
+```
 
 ### Top 100 种子
 
@@ -391,7 +403,7 @@ sudo sh install-linux.sh uninstall
 
 ## 负载测试
 
-两个内置的压测示例：
+内置的压测示例：
 
 ### 简单负载测试
 
@@ -422,6 +434,22 @@ cargo run --release --example load_test -- \
 ```
 
 特性：Zipf 分布模拟真实种子热度、peer 生命周期事件（started/completed/stopped）、40% 做种比例、延迟百分位统计（p50/p95/p99）。
+
+### RPS 基准测试
+
+```bash
+cargo run --release --example rps_bench
+```
+
+单任务混合流量基准，模拟真实 tracker 生命周期（初期以新 peer 为主，后期以重新通告为主）。报告累计 RPS、窗口 RPS 和 RSS。
+
+### 统一基准测试
+
+```bash
+cargo run --release --example unified_bench
+```
+
+并发 HTTP 基准，追踪 RPS、RSS、CPU 使用率和每请求延迟（avg/p50/p99/max）。
 
 ## 开发指南
 
