@@ -1,4 +1,4 @@
-﻿﻿//! Unified benchmark: concurrent HTTP requests
+﻿//! Unified benchmark: concurrent HTTP requests
 //!
 //! Sends concurrent requests through axum router to measure true throughput.
 //! Tracks RPS, RSS, CPU, and per-request latency.
