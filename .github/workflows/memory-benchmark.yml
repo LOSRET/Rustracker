@@ -29,5 +29,5 @@ jobs:
             max_ms=$(awk "BEGIN{printf \"%.1f\", $maxlat/1000}")
             echo "| $(printf "%'d" $req) | $(printf "%'d" $torrents) | $(printf "%'d" $peers) | $(printf "%'d" $new) | $(printf "%'d" $re) | $(printf "%'.0f" $rps) | $(printf "%'.0f" $win_rps) | ${rss} MB | ${cpu}% | ${avg_ms} ms | ${p50_ms} ms | ${p99_ms} ms | ${max_ms} ms |" >> $GITHUB_STEP_SUMMARY
           done
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with: { name: benchmark, path: bench.csv }
