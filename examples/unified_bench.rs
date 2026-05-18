@@ -135,11 +135,13 @@ async fn main() {
     let sample_interval = total_requests / 100;
     let mut next_sample = sample_interval;
 
-    println!("request,torrents,peers,new_joins,reannounces,rps,rss_mb,cpu_pct,avg_us,p50_us,p99_us,max_us");
+    println!("request,torrents,peers,new_joins,reannounces,rps,window_rps,rss_mb,cpu_pct,avg_us,p50_us,p99_us,max_us");
     let bench_start = Instant::now();
     let baseline_rss = mem::rss_bytes();
     let mut prev_cpu = CpuTimes::read();
-    let mut latency = LatencyTracker::new(10_000);
+    let mut latency = LatencyTracker::new(sample_interval);
+    let mut last_sample_elapsed = 0.0;
+    let mut last_sample_count = 0usize;
 
     let mut join_set = tokio::task::JoinSet::<(bool, usize, u16, u64)>::new();
     // (is_new, torrent_idx, port, latency_us)
@@ -199,8 +201,12 @@ async fn main() {
             (is_new, torrent_idx, port, lat)
         });
 
-        // Collect completed tasks to update state
-        while join_set.len() >= CONCURRENCY {
+        // Drain all readily-completed tasks (non-blocking), then block if at capacity
+        while let Some(Ok((is_new, ti, p, lat))) = join_set.try_join_next() {
+            latency.record(lat);
+            if is_new { active_peers.push((ti, p)); }
+        }
+        if join_set.len() >= CONCURRENCY {
             if let Some(Ok((is_new, ti, p, lat))) = join_set.join_next().await {
                 latency.record(lat);
                 if is_new { active_peers.push((ti, p)); }
@@ -216,7 +222,12 @@ async fn main() {
             }
 
             let elapsed = bench_start.elapsed().as_secs_f64();
-            let rps = request_count as f64 / elapsed;
+            let cum_rps = request_count as f64 / elapsed;
+            let window_rps = if last_sample_elapsed > 0.0 {
+                (request_count - last_sample_count) as f64 / (elapsed - last_sample_elapsed)
+            } else { cum_rps };
+            last_sample_elapsed = elapsed;
+            last_sample_count = request_count;
             let rss = mem::rss_bytes().saturating_sub(baseline_rss);
             let cpu_pct = if let (Some(prev), Some(curr)) = (prev_cpu, CpuTimes::read()) {
                 let pct = cpu_usage_pct(&prev, &curr); prev_cpu = Some(curr); pct
@@ -224,11 +235,11 @@ async fn main() {
             let (avg, p50, p99, max_lat) = latency.stats();
             latency.clear();
 
-            println!("{},{},{},{},{},{:.0},{},{:.1},{},{},{},{}",
+            println!("{},{},{},{},{},{:.0},{:.0},{},{:.1},{},{},{},{}",
                 request_count, num_torrents, active_peers.len(), new_join_count, reannounce_count,
-                rps, fmt_mb(rss), cpu_pct, avg as u64, p50, p99, max_lat);
-            eprintln!("  req={:>8}  torrents={:>8}  peers={:>10}  rps={:>10.0}  new={:>8}  re={:>8}  rss={:>8}  cpu={:.1}%  lat: avg={} p50={} p99={} max={}",
-                request_count, num_torrents, active_peers.len(), rps, new_join_count, reannounce_count,
+                cum_rps, window_rps, fmt_mb(rss), cpu_pct, avg as u64, p50, p99, max_lat);
+            eprintln!("  req={:>8}  torrents={:>8}  peers={:>10}  rps={:>10.0}  win={:>10.0}  new={:>8}  re={:>8}  rss={:>8}  cpu={:.1}%  lat: avg={} p50={} p99={} max={}",
+                request_count, num_torrents, active_peers.len(), cum_rps, window_rps, new_join_count, reannounce_count,
                 fmt_mb(rss), cpu_pct, fmt_us(avg as u64), fmt_us(p50), fmt_us(p99), fmt_us(max_lat));
             next_sample += sample_interval;
         }
