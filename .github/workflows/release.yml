@@ -19,13 +19,13 @@ jobs:
 
       - id: get_version
         name: Get current version
-        run: echo "version=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')" >> $GITHUB_OUTPUT
+        run: echo "version=$(sed -n 's/^version\s*=\s*"\([^"]*\)"/\1/p' Cargo.toml | head -1)" >> $GITHUB_OUTPUT
 
       - id: check
         name: Check if version changed
         run: |
           git show HEAD~1:Cargo.toml > old_Cargo.toml 2>/dev/null || true
-          old_version=$(grep '^version' old_Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/' || echo "")
+          old_version=$(sed -n 's/^version\s*=\s*"\([^"]*\)"/\1/p' old_Cargo.toml | head -1 || echo "")
           new_version=${{ steps.get_version.outputs.version }}
           rm -f old_Cargo.toml
           if [ "$old_version" != "$new_version" ]; then
@@ -66,6 +66,10 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}-${{ matrix.cargo_flags }}
+
       - name: Build (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: RUSTFLAGS="-C target-cpu=x86-64-v2" cargo build --release --target ${{ matrix.target }} ${{ matrix.cargo_flags }}
@@ -91,6 +95,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Download Linux binary
         uses: actions/download-artifact@v4
@@ -123,26 +129,22 @@ jobs:
       - name: Get changelog
         id: changelog
         run: |
-          # 找到上一次修改 Cargo.toml 中 version 的 commit
-          prev_commit=$(git log --all --oneline -- Cargo.toml | sed -n '2p' | cut -d' ' -f1)
-          if [ -z "$prev_commit" ]; then
-            # 没有找到之前的版本 commit，获取所有 commit
-            changelog=$(git log --pretty=format:"- %s" --no-merges)
+          version="${{ needs.check-version.outputs.version }}"
+          prev_tag=$(git tag --sort=-v:refname | grep -v "v${version}" | head -1 || true)
+          if [ -n "$prev_tag" ]; then
+            changelog=$(git log ${prev_tag}..HEAD --pretty=format:"- %s" --no-merges)
           else
-            # 获取两个版本 commit 之间的所有修改（排除版本更新 commit）
-            changelog=$(git log ${prev_commit}..HEAD~1 --pretty=format:"- %s" --no-merges)
+            changelog=$(git log --pretty=format:"- %s" --no-merges)
           fi
-          # 如果没有内容，显示通用说明
           if [ -z "$changelog" ]; then
             changelog="- 代码优化和修复"
           fi
-          # 多行内容写入环境变量
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
           echo "$changelog" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.check-version.outputs.version }}
           name: v${{ needs.check-version.outputs.version }}

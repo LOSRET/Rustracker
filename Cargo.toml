@@ -8,6 +8,7 @@ license = "MIT"
 [features]
 default = ["dashboard"]
 dashboard = []
+personal-contact = []
 
 [dependencies]
 anyhow = "1.0"

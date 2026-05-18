@@ -28,7 +28,7 @@ use super::trends::{self, ClientsResponse, StatsResponse, TrendsResponse};
 // ── Web UI ───────────────────────────────────────────────────────────────────
 
 #[cfg(feature = "dashboard")]
-pub(crate) const INDEX_HTML: &str = include_str!("../../assets/index.html");
+pub(crate) const INDEX_HTML: &str = include_str!(concat!(env!("OUT_DIR"), "/index.html"));
 #[cfg(feature = "dashboard")]
 pub(crate) const STYLE_CSS: &str = include_str!("../../assets/style.css");
 #[cfg(feature = "dashboard")]
