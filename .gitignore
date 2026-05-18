@@ -32,14 +32,11 @@ Thumbs.db
 # Copilot Skills（本地使用）
 .github/skills/
 
-# 排除未使用的示例文件（保留 unified_bench.rs）
-examples/announce_load.rs
-examples/load_test.rs
+# 排除未使用的示例文件
 examples/memory_ci_compare.rs
 examples/memory_staircase_test.rs
 examples/memory_tracker_bench.rs
 examples/memory_tracker_btree.rs
-examples/rps_bench.rs
 
 # 排除未使用的测试文件
 tests/
