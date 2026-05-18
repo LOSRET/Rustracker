@@ -23,7 +23,7 @@ use crate::protocol::announce::{
 use crate::protocol::bencode;
 use crate::protocol::client_id;
 use super::AppState;
-use super::trends::{self, ClientsResponse, StatsResponse};
+use super::trends::{self, ClientsResponse, StatsResponse, TrendsResponse};
 
 // ── Web UI ───────────────────────────────────────────────────────────────────
 
@@ -94,9 +94,14 @@ pub(crate) async fn app_js() -> Response<Body> {
 
 pub(crate) async fn stats(State(state): State<AppState>) -> Json<StatsResponse> {
     let snapshot = state.tracker.snapshot().await;
+    Json(StatsResponse::from_snapshot(snapshot))
+}
+
+pub(crate) async fn trends(State(state): State<AppState>) -> Json<TrendsResponse> {
+    let snapshot = state.tracker.snapshot().await;
     let now = trends::unix_timestamp();
     let history = state.trends.write().await.record(now, &snapshot);
-    Json(StatsResponse::from_snapshot(snapshot, history))
+    Json(TrendsResponse { history })
 }
 
 pub(crate) async fn clients(State(state): State<AppState>) -> Json<ClientsResponse> {

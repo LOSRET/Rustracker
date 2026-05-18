@@ -125,6 +125,41 @@ async fn stats_api_returns_json_totals() {
     assert!(body
         .windows(b"\"completed\":1".len())
         .any(|w| w == b"\"completed\":1"));
+    assert!(!body
+        .windows(b"\"history\"".len())
+        .any(|w| w == b"\"history\""));
+    assert!(body
+        .windows(b"\"peer_timeout\"".len())
+        .any(|w| w == b"\"peer_timeout\""));
+}
+
+#[tokio::test]
+async fn trends_api_returns_history() {
+    let app = app();
+    let seeder_announce_uri = "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-abcdefgh1234&port=6881&left=0&event=started&compact=1";
+
+    app.clone()
+        .oneshot(
+            Request::builder()
+                .uri(seeder_announce_uri)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/trends")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.into_body().collect().await.unwrap().to_bytes();
     assert!(body
         .windows(b"\"history\"".len())
         .any(|w| w == b"\"history\""));
@@ -133,9 +168,6 @@ async fn stats_api_returns_json_totals() {
     assert!(body
         .windows(b"\"timestamp\"".len())
         .any(|w| w == b"\"timestamp\""));
-    assert!(body
-        .windows(b"\"peer_timeout\"".len())
-        .any(|w| w == b"\"peer_timeout\""));
 }
 
 #[tokio::test]

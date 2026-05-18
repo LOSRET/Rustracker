@@ -174,6 +174,7 @@ impl AppState {
 pub fn router(state: AppState) -> Router {
     let r = Router::new()
         .route("/api/stats", get(handlers::stats))
+        .route("/api/trends", get(handlers::trends))
         .route("/api/clients", get(handlers::clients))
         .route("/api/top100", get(handlers::top100))
         .route("/announce", get(handlers::announce))

@@ -1,4 +1,4 @@
-        const state = { data: null, clientData: null, range: "24h", lang: navigator.language.startsWith("zh") ? "zh" : "en", page: "dashboard", top100Data: null, top100Sort: "peers" };
+        const state = { data: null, trendsData: null, clientData: null, range: "24h", lang: navigator.language.startsWith("zh") ? "zh" : "en", page: "dashboard", top100Data: null, top100Sort: "peers" };
         const $ = (id) => document.getElementById(id);
         const chart = echarts.init($("trendChart"), null, { renderer: "canvas" });
         const clientChart = echarts.init($("clientChart"), null, { renderer: "canvas" });
@@ -133,11 +133,11 @@
 
         async function loadCharts() {
             try {
-                const [statsRes, clientsRes] = await Promise.all([
-                    fetch("/api/stats", { cache: "no-store" }),
+                const [trendsRes, clientsRes] = await Promise.all([
+                    fetch("/api/trends", { cache: "no-store" }),
                     fetch("/api/clients", { cache: "no-store" })
                 ]);
-                if (statsRes.ok) state.data = await statsRes.json();
+                if (trendsRes.ok) state.trendsData = await trendsRes.json();
                 if (clientsRes.ok) state.clientData = await clientsRes.json();
                 renderChart();
                 renderClientChart();
@@ -159,7 +159,7 @@
         }
 
         function filterHistory() {
-            const history = state.data?.history || [];
+            const history = state.trendsData?.history || [];
             if (!history.length) return history;
             const ranges = { "24h": 86400, "3d": 259200, "7d": 604800 };
             const secs = ranges[state.range] || 86400;
@@ -406,6 +406,7 @@
         $("langSelect").value = state.lang;
         setLang(state.lang);
         loadStats();
+        loadCharts();
         window.addEventListener("resize", () => { chart.resize(); clientChart.resize(); });
         setInterval(loadMetrics, 5000);
         setInterval(loadCharts, 600000);
