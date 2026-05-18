@@ -59,7 +59,7 @@ Open `http://127.0.0.1:8080` in your browser to see the dashboard.
 Download the latest release from [GitHub Releases](https://github.com/LOSRET/rustracker/releases):
 - `rustracker.exe` — Windows x86_64
 - `rustracker-linux` — Linux x86_64
-- `rustracker-linux-vX.Y.Z.tar.gz` — Linux archive with installer
+- `rustracker-linux.tar.gz` — Linux archive with installer
 
 ## CLI Reference
 
@@ -107,6 +107,7 @@ GET /announce?info_hash=<20-byte>&peer_id=<20-byte>&port=6881&uploaded=0&downloa
 | `event` | No | `started`, `completed`, `stopped`, or empty |
 | `compact` | No | `1` for compact encoding (default), `0` for dictionary |
 | `numwant` | No | Number of peers to return (default 100, max 400) |
+| `ip` | No | Override peer IP address (for reverse proxy setups) |
 
 Response (bencoded):
 
@@ -170,7 +171,18 @@ Returns JSON with historical trend data (7-day retention, 10-min sampling):
 GET /api/clients
 ```
 
-Returns JSON with the top 15 client types and their historical peer counts.
+Returns JSON with the top 15 client types and their historical peer counts:
+
+```json
+{
+  "timestamp": 1715800000,
+  "tags": [1, 2, 3],
+  "clients": ["qBittorrent", "Transmission", "µTorrent"],
+  "history": [
+    {"timestamp": 1715800000, "tags": [1, 2, 3], "counts": [50, 30, 20]}
+  ]
+}
+```
 
 ### Top 100 Torrents
 
@@ -391,7 +403,7 @@ For the listen address, entering only a port (e.g. `6969`) is accepted and saved
 
 ## Load Testing
 
-Two built-in examples for benchmarking:
+Built-in examples for benchmarking:
 
 ### Simple Load Test
 
@@ -422,6 +434,22 @@ cargo run --release --example load_test -- \
 ```
 
 Features: Zipf distribution for realistic torrent popularity, peer lifecycle events (started/completed/stopped), 40% seeder ratio, latency percentiles (p50/p95/p99).
+
+### RPS Benchmark
+
+```bash
+cargo run --release --example rps_bench
+```
+
+Single-task mixed traffic benchmark simulating a real tracker lifecycle (mostly new peers early, mostly re-announces later). Reports cumulative RPS, per-window RPS, and RSS.
+
+### Unified Benchmark
+
+```bash
+cargo run --release --example unified_bench
+```
+
+Concurrent HTTP benchmark tracking RPS, RSS, CPU usage, and per-request latency (avg/p50/p99/max).
 
 ## Development
 
