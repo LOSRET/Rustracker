@@ -144,7 +144,20 @@ Returns JSON:
   "peers": 128,
   "seeders": 85,
   "leechers": 43,
-  "completed": 310,
+  "completed": 310
+}
+```
+
+### Trend History
+
+```
+GET /api/trends
+```
+
+Returns JSON with historical trend data (7-day retention, 10-min sampling):
+
+```json
+{
   "history": [
     {"timestamp": 1715800000, "torrents": 40, "peers": 120, "seeders": 80, "leechers": 40}
   ]
@@ -162,14 +175,23 @@ Returns JSON with the top 15 client types and their historical peer counts.
 ### Top 100 Torrents
 
 ```
-GET /api/top100?sort=peers
+GET /api/top100?limit=100
 ```
 
-| Query | Values | Default |
-|-------|--------|---------|
-| `sort` | `peers`, `seeders`, `leechers`, `downloaded` | `peers` |
+| Query | Description | Default | Max |
+|-------|-------------|---------|-----|
+| `limit` | Number of entries per ranking | `100` | `500` |
 
-Returns JSON with the top 100 active torrents ranked by the requested metric.
+Returns JSON with four sorted rankings:
+
+```json
+{
+  "peers": [{"info_hash": "...", "seeders": 10, "leechers": 5, "peers": 15, "downloaded": 100}],
+  "seeders": [...],
+  "leechers": [...],
+  "downloaded": [...]
+}
+```
 
 ## Web Dashboard
 
