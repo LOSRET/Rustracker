@@ -128,6 +128,12 @@ Three-layer design with clear separation of concerns:
 
 Integration tests in `tests/tracker_http.rs` use `axum::Router::oneshot()` with `tower::ServiceExt` — no real TCP server needed. Tests create `AppState::new()` or `AppState::sharded()` directly.
 
+Helper functions: `app()` creates a single-tracker router, `sharded_app()` creates a 16-shard router, `request_with_connect_info()` attaches a mock `SocketAddr` (required because handlers extract client IP from connect info).
+
+## CI/CD
+
+GitHub Actions release workflow (`.github/workflows/release.yml`) triggers on pushes to `main` that modify `Cargo.toml`. It compares the version field — if changed, builds Linux/Windows binaries and creates a GitHub Release with the new version tag. Bump `version` in `Cargo.toml` to trigger a release.
+
 ## CLI Configuration
 
 All flags support env var fallback (prefixed `RUSTRACKER_`). CLI takes precedence over env vars.
