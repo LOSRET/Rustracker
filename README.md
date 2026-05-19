@@ -42,7 +42,7 @@ A lightweight, high-performance HTTP BitTorrent tracker with a real-time dashboa
 
 ### Prerequisites
 
-- [Rust](https://www.rust-lang.org/tools/install) 1.74+ (edition 2021)
+- [Rust](https://www.rust-lang.org/tools/install) 1.85+ (edition 2021)
 
 ### Build & Run
 

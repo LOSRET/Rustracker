@@ -42,7 +42,7 @@
 
 ### 前置要求
 
-- [Rust](https://www.rust-lang.org/tools/install) 1.74+（edition 2021）
+- [Rust](https://www.rust-lang.org/tools/install) 1.85+（edition 2021）
 
 ### 从源码构建并运行
 
