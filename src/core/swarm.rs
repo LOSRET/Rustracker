@@ -78,7 +78,7 @@ impl PackedIpv4Peers {
     ) {
         for index in 0..self.len() {
             let key = self.key_at(index);
-            if exclude.map_or(true, |ex| &key != ex) {
+            if exclude != Some(&key) {
                 contacts.push(key.contact());
             }
         }
@@ -124,7 +124,7 @@ impl PackedIpv4Peers {
             pos = (pos + advance) % total;
 
             let key = self.key_at(pos);
-            if exclude.map_or(true, |ex| &key != ex) {
+            if exclude != Some(&key) {
                 contacts.push(key.contact());
             }
         }
@@ -248,7 +248,7 @@ impl PackedIpv6Peers {
     ) {
         for index in 0..self.len() {
             let key = self.key_at(index);
-            if exclude.map_or(true, |ex| &key != ex) {
+            if exclude != Some(&key) {
                 contacts.push(key.contact());
             }
         }
@@ -294,7 +294,7 @@ impl PackedIpv6Peers {
             pos = (pos + advance) % total;
 
             let key = self.key_at(pos);
-            if exclude.map_or(true, |ex| &key != ex) {
+            if exclude != Some(&key) {
                 contacts.push(key.contact());
             }
         }

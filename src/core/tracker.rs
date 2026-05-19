@@ -91,7 +91,7 @@ impl Tracker {
 
         // All swarm operations happen in this block; borrow released before client_counts access
         let (output, pending_decr, pending_incr) = {
-            let swarm = self.swarms.entry(info_hash).or_insert_with(Swarm::default);
+            let swarm = self.swarms.entry(info_hash).or_default();
 
             if is_new_torrent {
                 self.counters.add_torrent();
@@ -221,7 +221,7 @@ impl Tracker {
         let mut peers = 0usize;
         let mut seeders = 0usize;
         let mut downloaded = 0u64;
-        for (_, swarm) in &self.swarms {
+        for swarm in self.swarms.values() {
             let stats = swarm.stats();
             torrents += 1;
             peers += swarm.len();
