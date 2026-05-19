@@ -25,6 +25,8 @@ pub(crate) struct StatsResponse {
     pub seeders: usize,
     pub leechers: usize,
     pub completed: u64,
+    pub version: &'static str,
+    pub uptime_secs: u64,
 }
 
 #[derive(Debug, Serialize)]
@@ -79,7 +81,7 @@ pub(crate) struct TrendStore {
 }
 
 impl StatsResponse {
-    pub(crate) fn from_snapshot(snapshot: TrackerSnapshot) -> Self {
+    pub(crate) fn from_snapshot(snapshot: TrackerSnapshot, uptime_secs: u64) -> Self {
         Self {
             interval: snapshot.interval,
             peer_timeout: snapshot.peer_timeout,
@@ -88,6 +90,8 @@ impl StatsResponse {
             seeders: snapshot.totals.seeders,
             leechers: snapshot.totals.leechers,
             completed: snapshot.totals.downloaded,
+            version: env!("CARGO_PKG_VERSION"),
+            uptime_secs,
         }
     }
 }

@@ -94,7 +94,8 @@ pub(crate) async fn app_js() -> Response<Body> {
 
 pub(crate) async fn stats(State(state): State<AppState>) -> Json<StatsResponse> {
     let snapshot = state.tracker.snapshot().await;
-    Json(StatsResponse::from_snapshot(snapshot))
+    let uptime_secs = state.started_at.elapsed().as_secs();
+    Json(StatsResponse::from_snapshot(snapshot, uptime_secs))
 }
 
 pub(crate) async fn trends(State(state): State<AppState>) -> Json<TrendsResponse> {

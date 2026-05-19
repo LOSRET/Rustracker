@@ -1,4 +1,4 @@
-# rustracker Code Wiki
+# Rustracker Code Wiki
 
 > 版本：0.2.6 | 语言：Rust 2021 Edition | 许可证：MIT
 
@@ -28,7 +28,7 @@
 
 ## 1. 项目概述
 
-**rustracker** 是一个用 Rust 编写的轻量级、高性能 HTTP BitTorrent Tracker。它实现了 BEP 3 规范的 `announce` 和 `scrape` 端点，同时内置实时 Web 监控面板，支持 102 种 BitTorrent 客户端识别、种子黑名单热重载、趋势数据持久化等运维特性。
+**Rustracker** 是一个用 Rust 编写的轻量级、高性能 HTTP BitTorrent Tracker。它实现了 BEP 3 规范的 `announce` 和 `scrape` 端点，同时内置实时 Web 监控面板，支持 102 种 BitTorrent 客户端识别、种子黑名单热重载、趋势数据持久化等运维特性。
 
 核心设计目标：
 - **高吞吐**：64 分片并发 Tracker 池，每分片独立 `RwLock`，最小化锁争用
@@ -960,4 +960,4 @@ Announce 处理器优先读取 `CF-Connecting-IP` 请求头获取客户端真实
 
 ---
 
-> 本文档基于 rustracker v0.2.5 源码自动分析生成。
+> 本文档基于 Rustracker v0.2.5 源码自动分析生成。

@@ -113,7 +113,7 @@ EOF
 write_service() {
     cat > "$SERVICE_PATH" <<EOF
 [Unit]
-Description=rustracker BitTorrent tracker
+Description=Rustracker BitTorrent tracker
 After=network-online.target
 Wants=network-online.target
 

@@ -127,6 +127,15 @@
             }
         }
 
+        function formatUptime(secs) {
+            const d = Math.floor(secs / 86400);
+            const h = Math.floor((secs % 86400) / 3600);
+            const m = Math.floor((secs % 3600) / 60);
+            if (d > 0) return `${d}d ${h}h ${m}m`;
+            if (h > 0) return `${h}h ${m}m`;
+            return `${m}m`;
+        }
+
         function render() {
             const data = state.data || {};
             $("metricPeers").textContent = number(data.peers);
@@ -135,6 +144,8 @@
             $("metricTorrents").textContent = number(data.torrents);
             $("metricCompleted").textContent = number(data.completed);
             $("configText").textContent = tf("config_fmt");
+            $("footerVersion").textContent = data.version || "-";
+            $("footerUptime").textContent = data.uptime_secs != null ? `Uptime: ${formatUptime(data.uptime_secs)}` : "-";
             renderChart();
             renderClientChart();
         }

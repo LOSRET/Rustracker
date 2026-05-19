@@ -213,6 +213,28 @@
             text-decoration: none;
         }
 
+        .footer {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 24px;
+            padding: 16px 0;
+            color: var(--muted);
+            font-size: 12px;
+            border-top: 1px solid var(--line);
+            margin-top: 8px;
+        }
+
+        .footer a {
+            color: var(--blue);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
         .chart-head {
             display: flex;
             align-items: baseline;

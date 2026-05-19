@@ -46,6 +46,7 @@ pub struct AppState {
     pub(crate) tracker: Arc<TrackerPool>,
     pub(crate) trends: Arc<RwLock<TrendStore>>,
     pub(crate) blacklist: Arc<RwLock<Arc<HashSet<InfoHash>>>>,
+    pub(crate) started_at: Instant,
     #[cfg(feature = "dashboard")]
     pub(crate) versioned_index: String,
 }
@@ -60,6 +61,7 @@ impl AppState {
             tracker: Arc::new(TrackerPool::single(tracker)),
             trends: Arc::new(RwLock::new(load_trends(&trends_file))),
             blacklist: Arc::new(RwLock::new(Arc::new(HashSet::new()))),
+            started_at: Instant::now(),
             #[cfg(feature = "dashboard")]
             versioned_index: handlers::make_versioned_index(),
         }
@@ -91,6 +93,7 @@ impl AppState {
             tracker: Arc::new(TrackerPool::new(interval, peer_timeout, shards)),
             trends: Arc::new(RwLock::new(load_trends(&trends_file))),
             blacklist: Arc::new(RwLock::new(Arc::new(initial))),
+            started_at: Instant::now(),
             #[cfg(feature = "dashboard")]
             versioned_index: handlers::make_versioned_index(),
         };
