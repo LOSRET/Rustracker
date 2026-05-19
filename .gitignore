@@ -44,3 +44,6 @@ tests/
 # Trae IDE
 .trae/
 skills-lock.json
+
+# Claude Code
+.claude/
