@@ -12,6 +12,7 @@ jobs:
     outputs:
       version: ${{ steps.get_version.outputs.version }}
       changed: ${{ steps.check.outputs.changed }}
+      old_version: ${{ steps.check.outputs.old_version }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -30,6 +31,7 @@ jobs:
           rm -f old_Cargo.toml
           if [ "$old_version" != "$new_version" ]; then
             echo "changed=true" >> $GITHUB_OUTPUT
+            echo "old_version=$old_version" >> $GITHUB_OUTPUT
             echo "Version changed: $old_version -> $new_version"
           else
             echo "changed=false" >> $GITHUB_OUTPUT
@@ -130,8 +132,13 @@ jobs:
         id: changelog
         run: |
           version="${{ needs.check-version.outputs.version }}"
-          prev_tag=$(git tag --sort=-v:refname | grep -v "v${version}" | head -1 || true)
-          if [ -n "$prev_tag" ]; then
+          old_version="${{ needs.check-version.outputs.old_version }}"
+          if [ -n "$old_version" ]; then
+            prev_tag="v${old_version}"
+          else
+            prev_tag=$(git tag --sort=-v:refname | head -1 || true)
+          fi
+          if [ -n "$prev_tag" ] && git rev-parse "$prev_tag" >/dev/null 2>&1; then
             changelog=$(git log ${prev_tag}..HEAD --pretty=format:"- %s" --no-merges)
           else
             changelog=$(git log --pretty=format:"- %s" --no-merges)
