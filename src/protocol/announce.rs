@@ -109,14 +109,18 @@ pub fn parse_announce_query(raw_query: &str) -> Result<AnnounceQuery, ProtocolEr
 }
 
 pub fn parse_scrape_query(raw_query: &str) -> Result<ScrapeQuery, ProtocolError> {
-    let mut info_hashes = Vec::new();
-
-    for pair in raw_query.split('&').filter(|s| !s.is_empty()) {
-        let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
-        if key == "info_hash" {
-            info_hashes.push(parse_info_hash_value(value)?);
-        }
-    }
+    let info_hashes: Vec<_> = raw_query
+        .split('&')
+        .filter(|s| !s.is_empty())
+        .filter_map(|pair| {
+            let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
+            if key == "info_hash" {
+                Some(parse_info_hash_value(value))
+            } else {
+                None
+            }
+        })
+        .collect::<Result<Vec<_>, _>>()?;
 
     if info_hashes.is_empty() {
         return Err(ProtocolError::Missing("info_hash"));
