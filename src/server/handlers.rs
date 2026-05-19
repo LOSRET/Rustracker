@@ -178,7 +178,7 @@ pub(crate) async fn announce(
     State(state): State<AppState>,
     OriginalUri(uri): OriginalUri,
     headers: HeaderMap,
-    connect_info: Option<ConnectInfo<SocketAddr>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
 ) -> Response<Body> {
     let query = uri.query().unwrap_or_default();
     let parsed = match parse_announce_query(query) {
@@ -203,7 +203,7 @@ pub(crate) async fn announce(
         peer_id: parsed.peer_id,
         ip: peer_ip(
             cloudflare_connecting_ip(&headers).or(parsed.ip),
-            connect_info.map(|ConnectInfo(addr)| addr),
+            Some(addr),
         ),
         port: parsed.port,
         uploaded: parsed.uploaded,
