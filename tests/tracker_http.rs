@@ -1,6 +1,8 @@
+use std::net::SocketAddr;
 use std::time::Duration;
 
 use axum::body::Body;
+use axum::extract::connect_info::MockConnectInfo;
 use axum::http::{Request, StatusCode};
 use http_body_util::BodyExt;
 use rustracker::server::{router, AppState};
@@ -13,6 +15,13 @@ fn app() -> axum::Router {
         Duration::from_secs(1800),
         Duration::from_secs(3000),
     ), None))
+}
+
+fn request_with_connect_info(uri: &str) -> Request<Body> {
+    let mut req = Request::builder().uri(uri).body(Body::empty()).unwrap();
+    req.extensions_mut()
+        .insert(MockConnectInfo(SocketAddr::from(([127, 0, 0, 1], 6881))));
+    req
 }
 
 fn sharded_app() -> axum::Router {
@@ -71,30 +80,15 @@ async fn stats_api_returns_json_totals() {
     let completed_announce_uri = "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-bcdefghi1234&port=6882&left=0&event=completed&compact=1";
 
     app.clone()
-        .oneshot(
-            Request::builder()
-                .uri(seeder_announce_uri)
-                .body(Body::empty())
-                .unwrap(),
-        )
+        .oneshot(request_with_connect_info(seeder_announce_uri))
         .await
         .unwrap();
     app.clone()
-        .oneshot(
-            Request::builder()
-                .uri(leecher_announce_uri)
-                .body(Body::empty())
-                .unwrap(),
-        )
+        .oneshot(request_with_connect_info(leecher_announce_uri))
         .await
         .unwrap();
     app.clone()
-        .oneshot(
-            Request::builder()
-                .uri(completed_announce_uri)
-                .body(Body::empty())
-                .unwrap(),
-        )
+        .oneshot(request_with_connect_info(completed_announce_uri))
         .await
         .unwrap();
 
@@ -139,12 +133,7 @@ async fn trends_api_returns_history() {
     let seeder_announce_uri = "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-abcdefgh1234&port=6881&left=0&event=started&compact=1";
 
     app.clone()
-        .oneshot(
-            Request::builder()
-                .uri(seeder_announce_uri)
-                .body(Body::empty())
-                .unwrap(),
-        )
+        .oneshot(request_with_connect_info(seeder_announce_uri))
         .await
         .unwrap();
 
@@ -185,7 +174,7 @@ async fn handles_concurrent_announces_across_shards() {
                 6881 + u16::from(index),
             );
 
-            app.oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
+            app.oneshot(request_with_connect_info(&uri))
                 .await
                 .unwrap()
                 .status()
@@ -220,12 +209,7 @@ async fn announce_then_scrape_reports_peer() {
 
     let response = app
         .clone()
-        .oneshot(
-            Request::builder()
-                .uri(announce_uri)
-                .body(Body::empty())
-                .unwrap(),
-        )
+        .oneshot(request_with_connect_info(announce_uri))
         .await
         .unwrap();
 
@@ -260,22 +244,12 @@ async fn compact_announce_includes_ipv6_peers6() {
     let requester = "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-requester123&port=6882&left=128&event=started&compact=1&ip=127.0.0.1";
 
     app.clone()
-        .oneshot(
-            Request::builder()
-                .uri(ipv6_peer)
-                .body(Body::empty())
-                .unwrap(),
-        )
+        .oneshot(request_with_connect_info(ipv6_peer))
         .await
         .unwrap();
 
     let response = app
-        .oneshot(
-            Request::builder()
-                .uri(requester)
-                .body(Body::empty())
-                .unwrap(),
-        )
+        .oneshot(request_with_connect_info(requester))
         .await
         .unwrap();
 
@@ -292,24 +266,18 @@ async fn announce_uses_cloudflare_connecting_ip() {
     let cloudflare_peer = "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-cloudflare01&port=6881&left=0&event=started&compact=1";
     let requester = "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-requester123&port=6882&left=128&event=started&compact=1&ip=127.0.0.1";
 
-    app.clone()
-        .oneshot(
-            Request::builder()
-                .uri(cloudflare_peer)
-                .header("CF-Connecting-IP", "203.0.113.7")
-                .body(Body::empty())
-                .unwrap(),
-        )
-        .await
+    let mut cf_req = Request::builder()
+        .uri(cloudflare_peer)
+        .header("CF-Connecting-IP", "203.0.113.7")
+        .body(Body::empty())
         .unwrap();
+    cf_req
+        .extensions_mut()
+        .insert(MockConnectInfo(SocketAddr::from(([127, 0, 0, 1], 6881))));
+    app.clone().oneshot(cf_req).await.unwrap();
 
     let response = app
-        .oneshot(
-            Request::builder()
-                .uri(requester)
-                .body(Body::empty())
-                .unwrap(),
-        )
+        .oneshot(request_with_connect_info(requester))
         .await
         .unwrap();
 
@@ -323,12 +291,9 @@ async fn announce_uses_cloudflare_connecting_ip() {
 #[tokio::test]
 async fn invalid_announce_returns_bencoded_failure() {
     let response = app()
-        .oneshot(
-            Request::builder()
-                .uri("/announce?info_hash=short&peer_id=short&port=6881")
-                .body(Body::empty())
-                .unwrap(),
-        )
+        .oneshot(request_with_connect_info(
+            "/announce?info_hash=short&peer_id=short&port=6881",
+        ))
         .await
         .unwrap();
 
@@ -363,12 +328,9 @@ fn blacklisted_app() -> (axum::Router, std::path::PathBuf) {
 async fn blacklisted_announce_returns_403() {
     let (app, _tmp) = blacklisted_app();
     let response = app
-        .oneshot(
-            Request::builder()
-                .uri("/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-abcdefgh1234&port=6881&left=0&event=started&compact=1")
-                .body(Body::empty())
-                .unwrap(),
-        )
+        .oneshot(request_with_connect_info(
+            "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-abcdefgh1234&port=6881&left=0&event=started&compact=1",
+        ))
         .await
         .unwrap();
 
@@ -383,12 +345,9 @@ async fn blacklisted_announce_returns_403() {
 async fn non_blacklisted_announce_works() {
     let (app, _tmp) = blacklisted_app();
     let response = app
-        .oneshot(
-            Request::builder()
-                .uri("/announce?info_hash=bbbbbbbbbbbbbbbbbbbb&peer_id=-RT0001-abcdefgh1234&port=6881&left=0&event=started&compact=1")
-                .body(Body::empty())
-                .unwrap(),
-        )
+        .oneshot(request_with_connect_info(
+            "/announce?info_hash=bbbbbbbbbbbbbbbbbbbb&peer_id=-RT0001-abcdefgh1234&port=6881&left=0&event=started&compact=1",
+        ))
         .await
         .unwrap();
 
@@ -401,12 +360,9 @@ async fn scrape_excludes_blacklisted_torrents() {
 
     // Seed a non-blacklisted torrent first
     app.clone()
-        .oneshot(
-            Request::builder()
-                .uri("/announce?info_hash=bbbbbbbbbbbbbbbbbbbb&peer_id=-RT0001-abcdefgh1234&port=6881&left=0&event=started&compact=1")
-                .body(Body::empty())
-                .unwrap(),
-        )
+        .oneshot(request_with_connect_info(
+            "/announce?info_hash=bbbbbbbbbbbbbbbbbbbb&peer_id=-RT0001-abcdefgh1234&port=6881&left=0&event=started&compact=1",
+        ))
         .await
         .unwrap();
 
