@@ -202,7 +202,7 @@ pub(crate) async fn announce(
         info_hash: parsed.info_hash,
         peer_id: parsed.peer_id,
         ip: peer_ip(
-            cloudflare_connecting_ip(&headers).or(parsed.ip),
+            cloudflare_connecting_ip(&headers),
             Some(addr),
         ),
         port: parsed.port,
@@ -261,8 +261,19 @@ pub(crate) fn bencoded_response(status: StatusCode, body: Vec<u8>) -> Response<B
 }
 
 pub(crate) fn cloudflare_connecting_ip(headers: &HeaderMap) -> Option<std::net::IpAddr> {
+    // CF-Connecting-IP: Cloudflare
+    // X-Real-IP: nginx
+    // X-Forwarded-For: generic proxy (take first IP)
     headers
         .get("cf-connecting-ip")
+        .or_else(|| headers.get("x-real-ip"))
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.parse().ok())
+        .or_else(|| {
+            headers
+                .get("x-forwarded-for")
+                .and_then(|value| value.to_str().ok())
+                .and_then(|value| value.split(',').next())
+                .and_then(|first| first.trim().parse().ok())
+        })
 }

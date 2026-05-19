@@ -2,6 +2,9 @@
 //! leechers, downloaded). Four min-heaps share a single iteration over
 //! the swarm table for efficiency.
 
+#![allow(clippy::type_complexity)]
+#![allow(clippy::too_many_arguments)]
+
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, BTreeMap};
 
