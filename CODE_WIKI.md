@@ -1,6 +1,6 @@
 # rustracker Code Wiki
 
-> 版本：0.2.5 | 语言：Rust 2021 Edition | 许可证：MIT
+> 版本：0.2.6 | 语言：Rust 2021 Edition | 许可证：MIT
 
 ---
 
@@ -117,12 +117,20 @@ rustracker/
 │
 ├── assets/                             # Web 监控面板静态文件
 │   ├── index.html                      # 生产版 HTML（内联 CSS/JS）
-│   ├── index-build.html                # 开发版 HTML（外部引用）
 │   ├── style.css                       # 面板样式
-│   └── app.js                          # 面板逻辑：ECharts 图表、i18n、API 调用
+│   ├── app.js                          # 面板逻辑：ECharts 图表、i18n、API 调用
+│   ├── contact.html                    # 联系信息 HTML（personal-contact feature 注入）
+│   └── translate.svg                   # 翻译图标
 │
 ├── examples/                           # 性能测试与基准工具
-│   └── unified_bench.rs                # 统一基准测试套件
+│   ├── announce_load.rs                # Announce 负载测试
+│   ├── load_test.rs                    # 通用负载测试
+│   ├── memory_ci_compare.rs            # CI 内存对比测试
+│   ├── memory_staircase_test.rs        # 内存阶梯测试
+│   ├── memory_tracker_bench.rs         # Tracker 内存基准测试
+│   ├── memory_tracker_btree.rs         # BTree 内存基准测试
+│   ├── rps_bench.rs                    # RPS 基准测试
+│   └── unified_bench.rs               # 统一基准测试套件
 │
 ├── tests/                              # 集成测试
 │   └── tracker_http.rs                 # HTTP 端点集成测试
@@ -755,13 +763,13 @@ AppState (Clone, 共享引用)
 | 依赖 | 版本 | 用途 |
 |------|------|------|
 | `anyhow` | 1.0 | 错误处理 |
-| `axum` | 0.7 (features: tokio, http1) | HTTP 框架 |
+| `axum` | 0.8 (features: tokio, http1) | HTTP 框架 |
 | `clap` | 4.5 (features: derive, env) | CLI 参数解析 |
 | `http-body-util` | 0.1 | HTTP Body 工具 |
 | `percent-encoding` | 2.3 | URL 百分比编码解码 |
 | `serde` | 1.0 (features: derive) | 序列化框架 |
 | `serde_json` | 1.0 | JSON 序列化 |
-| `thiserror` | 1.0 | 派生错误类型 |
+| `thiserror` | 2.0 | 派生错误类型 |
 | `tokio` | 1.38 (features: macros, net, rt-multi-thread, signal, time) | 异步运行时 |
 | `tower` | 0.5 | 服务抽象层 |
 | `tracing` | 0.1 | 结构化日志 |
@@ -772,8 +780,8 @@ AppState (Clone, 共享引用)
 | 依赖 | 版本 | 用途 |
 |------|------|------|
 | `hyper` | 1.4 | HTTP 库（测试用） |
-| `rand` | 0.9 | 随机数（测试/基准用） |
-| `reqwest` | 0.12 (features: json, rustls-tls) | HTTP 客户端（测试用） |
+| `rand` | 0.10 | 随机数（测试/基准用） |
+| `reqwest` | 0.13 (features: json, rustls) | HTTP 客户端（测试用） |
 | `serde_json` | 1.0 | JSON 序列化（测试用） |
 
 ---
@@ -782,7 +790,7 @@ AppState (Clone, 共享引用)
 
 ### 11.1 环境要求
 
-- Rust 1.74+（Edition 2021）
+- Rust 1.85+（Edition 2021）
 
 ### 11.2 构建命令
 
@@ -893,6 +901,7 @@ cargo run --release --example unified_bench
 | Feature | 默认 | 说明 |
 |---------|------|------|
 | `dashboard` | 启用 | 嵌入 Web 监控面板（HTML/CSS/JS） |
+| `personal-contact` | 禁用 | 向 Dashboard HTML 注入联系信息（`contact.html`） |
 
 禁用 `dashboard`：
 - 编译时排除 `/`、`/style.css`、`/app.js` 路由
