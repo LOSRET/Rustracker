@@ -1,5 +1,7 @@
         const state = { data: null, trendsData: null, clientData: null, range: "24h", lang: navigator.language.startsWith("zh") ? "zh" : "en", page: "dashboard", top100Data: null, top100Sort: "peers" };
         const $ = (id) => document.getElementById(id);
+        const escapeHtml = (s) => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+        const localeFor = () => state.lang === "zh" ? "zh-CN" : "en-US";
         const chart = echarts.init($("trendChart"), null, { renderer: "canvas" });
         const clientChart = echarts.init($("clientChart"), null, { renderer: "canvas" });
 
@@ -85,6 +87,7 @@
             setMeta("meta[name='twitter:title']", "content", seo.seo_title);
             setMeta("meta[name='twitter:description']", "content", seo.seo_desc);
             if (state.data) render();
+            if (state.top100Data) renderTop100();
         }
 
         function number(value) {
@@ -97,37 +100,15 @@
             $("navState").textContent = error ? t("error") : t("running");
         }
 
-        async function loadStats() {
-            try {
-                const [statsRes, clientsRes] = await Promise.all([
-                    fetch("/api/stats", { cache: "no-store" }),
-                    fetch("/api/clients", { cache: "no-store" })
-                ]);
-                if (!statsRes.ok) throw new Error(`HTTP ${statsRes.status}`);
-                state.data = await statsRes.json();
-                if (clientsRes.ok) state.clientData = await clientsRes.json();
-                render();
-                setStatus(`${t("last_update")} ${new Date().toLocaleTimeString(state.lang === "zh" ? "zh-CN" : "en-US")}`);
-            } catch (error) {
-                setStatus(`${t("read_error")}: ${error.message}`, true);
-            }
-        }
-
-        async function loadMetrics() {
+        async function loadDashboard() {
             try {
                 const statsRes = await fetch("/api/stats", { cache: "no-store" });
                 if (!statsRes.ok) throw new Error(`HTTP ${statsRes.status}`);
                 state.data = await statsRes.json();
-                const data = state.data || {};
-                $("metricPeers").textContent = number(data.peers);
-                $("metricSeeders").textContent = number(data.seeders);
-                $("metricLeechers").textContent = number(data.leechers);
-                $("metricTorrents").textContent = number(data.torrents);
-                $("metricCompleted").textContent = number(data.completed);
-                $("configText").textContent = tf("config_fmt");
-                setStatus(`${t("last_update")} ${new Date().toLocaleTimeString(state.lang === "zh" ? "zh-CN" : "en-US")}`);
+                render();
+                setStatus(`${t("last_update")} ${new Date().toLocaleTimeString(localeFor())}`);
             } catch (error) {
-                setStatus(`${t("read_error")}: ${error.message}`, true);
+                setStatus(`${t("read_error")}: ${escapeHtml(error.message)}`, true);
             }
         }
 
@@ -169,7 +150,7 @@
 
         function renderChart() {
             const history = filterHistory();
-            const labels = history.map((item) => new Date(item.timestamp * 1000).toLocaleString("zh-CN", {
+            const labels = history.map((item) => new Date(item.timestamp * 1000).toLocaleString(localeFor(), {
                 month: "2-digit",
                 day: "2-digit",
                 hour: "2-digit",
@@ -279,7 +260,7 @@
             const secs = ranges[state.range] || 86400;
             const cutoff = Math.floor(Date.now() / 1000) - secs;
             const filtered = history.filter((item) => item.timestamp >= cutoff);
-            const labels = filtered.map((item) => new Date(item.timestamp * 1000).toLocaleString("zh-CN", {
+            const labels = filtered.map((item) => new Date(item.timestamp * 1000).toLocaleString(localeFor(), {
                 month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false
             }));
             const series = names.map((name, i) => ({
@@ -320,8 +301,7 @@
             $("rangeGroup").querySelectorAll(".range-btn").forEach((b) => b.classList.remove("active"));
             btn.classList.add("active");
             state.range = btn.dataset.range;
-            renderChart();
-            renderClientChart();
+            loadCharts();
         });
 
         $("langSelect").addEventListener("change", (e) => setLang(e.target.value));
@@ -331,7 +311,6 @@
             const url = $("configText").textContent;
             if (!url || url === "-") return;
             navigator.clipboard.writeText(url).then(() => {
-                const tip = $("configText").getAttribute("data-tooltip") || t("copied");
                 $("configText").setAttribute("data-tooltip", t("copied"));
                 $("configText").classList.add("copied");
                 setTimeout(() => $("configText").classList.remove("copied"), 1200);
@@ -364,10 +343,10 @@
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 state.top100Data = await res.json();
                 renderTop100();
-                $("top100Status").textContent = `${t("last_update")} ${new Date().toLocaleTimeString(state.lang === "zh" ? "zh-CN" : "en-US")}`;
+                $("top100Status").textContent = `${t("last_update")} ${new Date().toLocaleTimeString(localeFor())}`;
             } catch (error) {
                 const body = $("top100Body");
-                body.innerHTML = `<tr><td colspan="6" class="top100-empty">${t("top100_error")}: ${error.message}</td></tr>`;
+                body.innerHTML = `<tr><td colspan="6" class="top100-empty">${escapeHtml(t("top100_error") + ": " + error.message)}</td></tr>`;
                 $("top100Status").textContent = t("top100_error");
             } finally {
                 $("top100Refresh").disabled = false;
@@ -382,16 +361,17 @@
                 body.innerHTML = `<tr><td colspan="6" class="top100-empty">${t("top100_empty")}</td></tr>`;
                 return;
             }
-            body.innerHTML = torrents.map((item, i) => `
-                <tr>
+            body.innerHTML = torrents.map((item, i) => {
+                const h = escapeHtml(item.info_hash);
+                return `<tr>
                     <td class="col-rank">${i + 1}</td>
-                    <td class="col-hash" title="${item.info_hash}"><code>${item.info_hash}</code></td>
+                    <td class="col-hash" title="${h}"><code>${h}</code></td>
                     <td class="col-num">${number(item.peers)}</td>
                     <td class="col-num text-green">${number(item.seeders)}</td>
                     <td class="col-num text-amber">${number(item.leechers)}</td>
                     <td class="col-num text-violet">${number(item.downloaded)}</td>
-                </tr>
-            `).join("");
+                </tr>`;
+            }).join("");
         }
 
         $("sortGroup").addEventListener("click", (e) => {
@@ -405,10 +385,11 @@
 
         $("langSelect").value = state.lang;
         setLang(state.lang);
-        loadStats();
+        loadDashboard();
         loadCharts();
-        window.addEventListener("resize", () => { chart.resize(); clientChart.resize(); });
-        setInterval(loadMetrics, 5000);
+        let _resizeTimer;
+        window.addEventListener("resize", () => { clearTimeout(_resizeTimer); _resizeTimer = setTimeout(() => { chart.resize(); clientChart.resize(); }, 150); });
+        setInterval(loadDashboard, 5000);
         setInterval(loadCharts, 600000);
 
         /* ===== Mobile sidebar toggle ===== */
