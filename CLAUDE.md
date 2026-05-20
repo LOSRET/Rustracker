@@ -70,6 +70,8 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 Rustracker is a lightweight, high-performance HTTP BitTorrent tracker written in Rust. It implements BEP 3 compliant `announce` and `scrape` endpoints, serves a real-time web dashboard on the same port, and identifies 102 BitTorrent clients from peer ID prefixes.
 
+**Requirements:** Rust 1.85+ (edition 2021)
+
 ## Build & Development Commands
 
 ```bash
@@ -94,14 +96,30 @@ cargo build --release --target x86_64-unknown-linux-musl
 # Logging
 RUST_LOG=debug cargo run --release
 RUST_LOG=rustracker=trace cargo run --release
+
+# Validation (run before committing)
+cargo fmt --check                          # style check
+cargo clippy --all-targets --all-features  # lints
 ```
 
 ## Load Testing / Benchmarks
 
 ```bash
+# Simple load test (total, concurrency, torrents)
 cargo run --release --example announce_load -- 2000 200 100
+
+# Advanced load test with Zipf distribution
 cargo run --release --example load_test -- --duration 60 --concurrency 500 --torrents 1000 --peers 50000
+
+# RPS benchmark (single-task mixed traffic)
 cargo run --release --example rps_bench
+
+# Unified benchmark (RPS, RSS, CPU, latency)
+cargo run --release --example unified_bench
+
+# Memory benchmarks
+cargo run --release --example memory_tracker_bench
+cargo run --release --example memory_ci_compare
 ```
 
 ## Architecture
@@ -124,11 +142,40 @@ Three-layer design with clear separation of concerns:
 - **build.rs**: Embeds `assets/index.html` into the binary at compile time; supports `personal-contact` feature to inject contact HTML
 - **Features**: `dashboard` (default) enables web UI routes; `personal-contact` injects contact info into the HTML
 
+## Project Structure
+
+```
+src/
+├── main.rs              # Entry point: CLI parsing, Tokio runtime, graceful shutdown
+├── lib.rs               # Library root: re-exports core, protocol, server modules
+├── core/                # Pure tracker engine (no I/O)
+│   ├── types.rs         # Core types: InfoHash, PeerId, PeerState, TorrentStats
+│   ├── tracker.rs       # 64-shard TrackerPool with per-shard RwLock
+│   ├── swarm.rs         # Per-torrent peer set, packed binary storage
+│   ├── topk.rs          # 4-way Top-K ranking
+│   └── counters.rs      # Incremental counters for O(1) snapshots
+├── protocol/            # BitTorrent protocol encoding (no network dependency)
+│   ├── bencode.rs       # Lightweight bencode encoder
+│   ├── announce.rs      # BEP 3 announce/scrape query parsing
+│   └── client_id.rs     # 102-client peer ID identification
+└── server/              # HTTP server layer (axum + tokio)
+    ├── handlers.rs      # HTTP handlers for all endpoints
+    ├── blacklist.rs     # Torrent blacklist with 5-sec hot-reload
+    └── trends.rs        # Trend data collection and JSONL persistence
+```
+
 ## Testing Pattern
 
 Integration tests in `tests/tracker_http.rs` use `axum::Router::oneshot()` with `tower::ServiceExt` — no real TCP server needed. Tests create `AppState::new()` or `AppState::sharded()` directly.
 
 Helper functions: `app()` creates a single-tracker router, `sharded_app()` creates a 16-shard router, `request_with_connect_info()` attaches a mock `SocketAddr` (required because handlers extract client IP from connect info).
+
+**Running tests:**
+```bash
+cargo test                    # all tests
+cargo test <test_name>        # single test
+cargo test --doc              # doctests only
+```
 
 ## CI/CD
 
@@ -137,3 +184,14 @@ GitHub Actions release workflow (`.github/workflows/release.yml`) triggers on pu
 ## CLI Configuration
 
 All flags support env var fallback (prefixed `RUSTRACKER_`). CLI takes precedence over env vars.
+
+## Key API Endpoints
+
+- `GET /announce` — BEP 3 announce endpoint (peer registration)
+- `GET /scrape` — BEP 3 scrape endpoint (torrent statistics)
+- `GET /healthz` — Health check (returns `200 OK` with body `ok`)
+- `GET /api/stats` — JSON statistics (peers, seeders, leechers, torrents, completed)
+- `GET /api/trends` — Historical trend data (7-day retention, 10-min sampling)
+- `GET /api/clients` — Client distribution (top 15 clients by peer count)
+- `GET /api/top100` — Top 100 torrents by peers/seeders/leechers/downloaded
+- `GET /` — Web dashboard (requires `dashboard` feature)
