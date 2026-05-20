@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  benchmark:
+  unified-benchmark:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -31,3 +31,70 @@ jobs:
           done
       - uses: actions/upload-artifact@v7
         with: { name: benchmark, path: bench.csv }
+
+  allocator-compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build (system allocator)
+        run: cargo build --release --example memory_tracker_bench
+      - name: Build (jemalloc)
+        run: cargo build --release --example memory_jemalloc_bench
+      - name: Run system allocator
+        run: cargo run --release --example memory_tracker_bench 2>sys.log | tee sys.csv
+      - name: Run jemalloc
+        run: cargo run --release --example memory_jemalloc_bench 2>jem.log | tee jem.csv
+      - name: Show logs
+        run: |
+          echo "=== system allocator ===" && cat sys.log
+          echo "=== jemalloc ===" && cat jem.log
+      - name: Summary
+        run: |
+          echo "# Allocator Comparison: system vs jemalloc" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Final RSS" >> $GITHUB_STEP_SUMMARY
+          echo "| Allocator | Final RSS | Torrents | Peers | Seeders | Leechers |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---:|---:|---:|---:|" >> $GITHUB_STEP_SUMMARY
+
+          sys_rss=$(grep "done" sys.log | grep -oP 'rss=\K[0-9.]+')
+          sys_t=$(grep "done" sys.log | grep -oP 'torrents=\K[0-9]+')
+          sys_p=$(grep "done" sys.log | grep -oP 'peers=\K[0-9]+')
+          sys_s=$(grep "done" sys.log | grep -oP 'seeders=\K[0-9]+')
+          sys_l=$(grep "done" sys.log | grep -oP 'leechers=\K[0-9]+')
+
+          jem_rss=$(grep "done" jem.log | grep -oP 'rss=\K[0-9.]+')
+          jem_t=$(grep "done" jem.log | grep -oP 'torrents=\K[0-9]+')
+          jem_p=$(grep "done" jem.log | grep -oP 'peers=\K[0-9]+')
+          jem_s=$(grep "done" jem.log | grep -oP 'seeders=\K[0-9]+')
+          jem_l=$(grep "done" jem.log | grep -oP 'leechers=\K[0-9]+')
+
+          echo "| system | ${sys_rss} MB | ${sys_t} | ${sys_p} | ${sys_s} | ${sys_l} |" >> $GITHUB_STEP_SUMMARY
+          echo "| jemalloc | ${jem_rss} MB | ${jem_t} | ${jem_p} | ${jem_s} | ${jem_l} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -n "$sys_rss" ] && [ -n "$jem_rss" ]; then
+            diff=$(awk "BEGIN{printf \"%.1f\", $jem_rss - $sys_rss}")
+            pct=$(awk "BEGIN{printf \"%.1f\", ($jem_rss - $sys_rss) / $sys_rss * 100}")
+            echo "**RSS delta (jemalloc − system): ${diff} MB (${pct}%)**" >> $GITHUB_STEP_SUMMARY
+
+            # Peak comparison from CSV
+            sys_peak=$(tail -n +2 sys.csv | awk -F',' '{print $4}' | sort -rn | head -1)
+            jem_peak=$(tail -n +2 jem.csv | awk -F',' '{print $4}' | sort -rn | head -1)
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "## Peak RSS (max sample from CSV)" >> $GITHUB_STEP_SUMMARY
+            echo "| Allocator | Peak RSS |" >> $GITHUB_STEP_SUMMARY
+            echo "|---|---:|" >> $GITHUB_STEP_SUMMARY
+            echo "| system | ${sys_peak} MB |" >> $GITHUB_STEP_SUMMARY
+            echo "| jemalloc | ${jem_peak} MB |" >> $GITHUB_STEP_SUMMARY
+          fi
+      - uses: actions/upload-artifact@v7
+        with:
+          name: allocator-compare-data
+          path: |
+            sys.csv
+            sys.log
+            jem.csv
+            jem.log
