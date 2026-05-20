@@ -44,17 +44,18 @@ jobs:
       - name: Build (jemalloc)
         run: cargo build --release --example memory_jemalloc_bench
       - name: Run system allocator
-        run: cargo run --release --example memory_tracker_bench 2>sys.log | tee sys.csv
+        run: /usr/bin/time -v -o sys.time cargo run --release --example memory_tracker_bench 2>sys.log | tee sys.csv
       - name: Run jemalloc
-        run: cargo run --release --example memory_jemalloc_bench 2>jem.log | tee jem.csv
+        run: /usr/bin/time -v -o jem.time cargo run --release --example memory_jemalloc_bench 2>jem.log | tee jem.csv
       - name: Show logs
         run: |
           echo "=== system allocator ===" && cat sys.log
+          echo "=== system time ===" && cat sys.time
           echo "=== jemalloc ===" && cat jem.log
+          echo "=== jemalloc time ===" && cat jem.time
       - name: Summary
         run: |
-          # Build side-by-side per-sample CSV: torrents,peers,system_rss,jemalloc_rss,delta
-          # tail skips CSV header, cut extracts torrents_done + rss_mb columns, paste joins them
+          # Build side-by-side per-sample CSV: torrents,peers,system_rss,jemalloc_rss
           paste -d',' \
             <(tail -n +2 sys.csv | awk -F',' '{print $2","$3","$4}') \
             <(tail -n +2 jem.csv | awk -F',' '{print $4}') \
@@ -63,6 +64,45 @@ jobs:
           echo "# Allocator Comparison: system vs jemalloc" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
+          # ── CPU / time ──
+          sys_user=$(grep "User time" sys.time | grep -oP '[0-9.]+')
+          sys_sys=$(grep "System time" sys.time | grep -oP '[0-9.]+')
+          sys_elapsed=$(grep "Elapsed" sys.time | awk '{print $NF}')
+          sys_cpu=$(grep "Percent of CPU" sys.time | grep -oP '[0-9]+' | head -1)
+
+          jem_user=$(grep "User time" jem.time | grep -oP '[0-9.]+')
+          jem_sys=$(grep "System time" jem.time | grep -oP '[0-9.]+')
+          jem_elapsed=$(grep "Elapsed" jem.time | awk '{print $NF}')
+          jem_cpu=$(grep "Percent of CPU" jem.time | grep -oP '[0-9]+' | head -1)
+
+          echo "## CPU & Time" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | system | jemalloc | Delta |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---:|---:|---:|" >> $GITHUB_STEP_SUMMARY
+
+          if [ -n "$sys_elapsed" ] && [ -n "$jem_elapsed" ]; then
+            echo "| Elapsed | ${sys_elapsed} | ${jem_elapsed} | |" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ -n "$sys_user" ] && [ -n "$jem_user" ]; then
+            ud=$(awk "BEGIN{printf \"%.1f\", $jem_user - $sys_user}")
+            echo "| User CPU | ${sys_user}s | ${jem_user}s | ${ud}s |" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ -n "$sys_sys" ] && [ -n "$jem_sys" ]; then
+            sd=$(awk "BEGIN{printf \"%.1f\", $jem_sys - $sys_sys}")
+            echo "| Sys CPU | ${sys_sys}s | ${jem_sys}s | ${sd}s |" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ -n "$sys_user" ] && [ -n "$sys_sys" ] && [ -n "$jem_user" ] && [ -n "$jem_sys" ]; then
+            sys_total=$(awk "BEGIN{printf \"%.1f\", $sys_user + $sys_sys}")
+            jem_total=$(awk "BEGIN{printf \"%.1f\", $jem_user + $jem_sys}")
+            td=$(awk "BEGIN{printf \"%.1f\", $jem_total - $sys_total}")
+            echo "| Total CPU | ${sys_total}s | ${jem_total}s | ${td}s |" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ -n "$sys_cpu" ] && [ -n "$jem_cpu" ]; then
+            echo "| CPU % | ${sys_cpu}% | ${jem_cpu}% | |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # ── RSS growth curve ──
           echo "## RSS Growth Curve (per sample)" >> $GITHUB_STEP_SUMMARY
           echo "| Torrents | Peers | system RSS | jemalloc RSS | Delta | Delta % |" >> $GITHUB_STEP_SUMMARY
           echo "|---:|---:|---:|---:|---:|---:|" >> $GITHUB_STEP_SUMMARY
@@ -75,7 +115,7 @@ jobs:
 
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          # Final aggregate
+          # ── Final aggregate ──
           sys_final=$(grep "done" sys.log | grep -oP 'rss=\K[0-9.]+')
           jem_final=$(grep "done" jem.log | grep -oP 'rss=\K[0-9.]+')
           sys_peak=$(tail -n +2 sys.csv | awk -F',' '{print $4}' | sort -rn | head -1)
@@ -99,6 +139,8 @@ jobs:
           path: |
             sys.csv
             sys.log
+            sys.time
             jem.csv
             jem.log
+            jem.time
             compare.csv
