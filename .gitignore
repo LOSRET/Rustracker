@@ -35,7 +35,6 @@ Thumbs.db
 # 排除未使用的示例文件
 examples/memory_ci_compare.rs
 examples/memory_staircase_test.rs
-examples/memory_tracker_bench.rs
 examples/memory_tracker_btree.rs
 
 # 排除未使用的测试文件
