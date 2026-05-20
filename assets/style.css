@@ -185,7 +185,7 @@
             background: var(--panel);
             border: 1px solid var(--line);
             padding: 18px;
-            margin-bottom: 20px;
+            margin-bottom: 12px;
         }
 
         .disclaimer h2 {
@@ -221,7 +221,7 @@
             padding: 16px 0;
             color: var(--muted);
             font-size: 12px;
-            margin-top: 8px;
+            margin-top: 4px;
         }
 
         .footer a {
