@@ -53,42 +53,45 @@ jobs:
           echo "=== jemalloc ===" && cat jem.log
       - name: Summary
         run: |
+          # Build side-by-side per-sample CSV: torrents,peers,system_rss,jemalloc_rss,delta
+          # tail skips CSV header, cut extracts torrents_done + rss_mb columns, paste joins them
+          paste -d',' \
+            <(tail -n +2 sys.csv | awk -F',' '{print $2","$3","$4}') \
+            <(tail -n +2 jem.csv | awk -F',' '{print $4}') \
+            > compare.csv
+
           echo "# Allocator Comparison: system vs jemalloc" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Final RSS" >> $GITHUB_STEP_SUMMARY
-          echo "| Allocator | Final RSS | Torrents | Peers | Seeders | Leechers |" >> $GITHUB_STEP_SUMMARY
-          echo "|---|---:|---:|---:|---:|" >> $GITHUB_STEP_SUMMARY
 
-          sys_rss=$(grep "done" sys.log | grep -oP 'rss=\K[0-9.]+')
-          sys_t=$(grep "done" sys.log | grep -oP 'torrents=\K[0-9]+')
-          sys_p=$(grep "done" sys.log | grep -oP 'peers=\K[0-9]+')
-          sys_s=$(grep "done" sys.log | grep -oP 'seeders=\K[0-9]+')
-          sys_l=$(grep "done" sys.log | grep -oP 'leechers=\K[0-9]+')
+          echo "## RSS Growth Curve (per sample)" >> $GITHUB_STEP_SUMMARY
+          echo "| Torrents | Peers | system RSS | jemalloc RSS | Delta | Delta % |" >> $GITHUB_STEP_SUMMARY
+          echo "|---:|---:|---:|---:|---:|---:|" >> $GITHUB_STEP_SUMMARY
 
-          jem_rss=$(grep "done" jem.log | grep -oP 'rss=\K[0-9.]+')
-          jem_t=$(grep "done" jem.log | grep -oP 'torrents=\K[0-9]+')
-          jem_p=$(grep "done" jem.log | grep -oP 'peers=\K[0-9]+')
-          jem_s=$(grep "done" jem.log | grep -oP 'seeders=\K[0-9]+')
-          jem_l=$(grep "done" jem.log | grep -oP 'leechers=\K[0-9]+')
+          while IFS=',' read torrents peers sys_rss jem_rss; do
+            delta=$(awk "BEGIN{printf \"%.1f\", $jem_rss - $sys_rss}")
+            pct=$(awk "BEGIN{printf \"%.1f\", ($jem_rss - $sys_rss) / $sys_rss * 100}")
+            echo "| $(printf "%'d" $torrents) | $(printf "%'d" $peers) | ${sys_rss} MB | ${jem_rss} MB | ${delta} MB | ${pct}% |" >> $GITHUB_STEP_SUMMARY
+          done < compare.csv
 
-          echo "| system | ${sys_rss} MB | ${sys_t} | ${sys_p} | ${sys_s} | ${sys_l} |" >> $GITHUB_STEP_SUMMARY
-          echo "| jemalloc | ${jem_rss} MB | ${jem_t} | ${jem_p} | ${jem_s} | ${jem_l} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          if [ -n "$sys_rss" ] && [ -n "$jem_rss" ]; then
-            diff=$(awk "BEGIN{printf \"%.1f\", $jem_rss - $sys_rss}")
-            pct=$(awk "BEGIN{printf \"%.1f\", ($jem_rss - $sys_rss) / $sys_rss * 100}")
-            echo "**RSS delta (jemalloc − system): ${diff} MB (${pct}%)**" >> $GITHUB_STEP_SUMMARY
+          # Final aggregate
+          sys_final=$(grep "done" sys.log | grep -oP 'rss=\K[0-9.]+')
+          jem_final=$(grep "done" jem.log | grep -oP 'rss=\K[0-9.]+')
+          sys_peak=$(tail -n +2 sys.csv | awk -F',' '{print $4}' | sort -rn | head -1)
+          jem_peak=$(tail -n +2 jem.csv | awk -F',' '{print $4}' | sort -rn | head -1)
 
-            # Peak comparison from CSV
-            sys_peak=$(tail -n +2 sys.csv | awk -F',' '{print $4}' | sort -rn | head -1)
-            jem_peak=$(tail -n +2 jem.csv | awk -F',' '{print $4}' | sort -rn | head -1)
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "## Peak RSS (max sample from CSV)" >> $GITHUB_STEP_SUMMARY
-            echo "| Allocator | Peak RSS |" >> $GITHUB_STEP_SUMMARY
-            echo "|---|---:|" >> $GITHUB_STEP_SUMMARY
-            echo "| system | ${sys_peak} MB |" >> $GITHUB_STEP_SUMMARY
-            echo "| jemalloc | ${jem_peak} MB |" >> $GITHUB_STEP_SUMMARY
+          echo "## Summary" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | system | jemalloc | Delta |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---:|---:|---:|" >> $GITHUB_STEP_SUMMARY
+
+          if [ -n "$sys_final" ] && [ -n "$jem_final" ]; then
+            fd=$(awk "BEGIN{printf \"%.1f\", $jem_final - $sys_final}")
+            echo "| Final RSS | ${sys_final} MB | ${jem_final} MB | ${fd} MB |" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ -n "$sys_peak" ] && [ -n "$jem_peak" ]; then
+            pd=$(awk "BEGIN{printf \"%.1f\", $jem_peak - $sys_peak}")
+            echo "| Peak RSS | ${sys_peak} MB | ${jem_peak} MB | ${pd} MB |" >> $GITHUB_STEP_SUMMARY
           fi
       - uses: actions/upload-artifact@v7
         with:
@@ -98,3 +101,4 @@ jobs:
             sys.log
             jem.csv
             jem.log
+            compare.csv
