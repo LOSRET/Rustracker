@@ -6,9 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-2021--edition-orange.svg)](https://www.rust-lang.org)
 
-A lightweight, high-performance HTTP BitTorrent tracker with a real-time dashboard, written in Rust.
-
-> **Note:** This project is developed using Vibe Coding. If you have no special requirements, it is recommended to use other mature BT tracker solutions instead.
+A lightweight, high-performance HTTP BitTorrent tracker with a real-time dashboard, written in Rust, developed using the Vibe Coding approach.
 
 ## Highlights
 
