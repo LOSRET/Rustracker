@@ -27,13 +27,18 @@ fn load_trends(trends_file: &Option<PathBuf>) -> TrendStore {
     let top_clients_file = trends_file
         .as_ref()
         .map(|p| p.parent().unwrap_or(Path::new(".")).join("top_clients.jsonl"));
-    trends_file
+    match trends_file
         .as_ref()
         .map(|p| trends::load_trends_from_file(p, top_clients_file.as_ref()))
         .transpose()
-        .ok()
-        .flatten()
-        .unwrap_or_default()
+    {
+        Ok(Some(store)) => store,
+        Ok(None) => TrendStore::default(),
+        Err(err) => {
+            tracing::warn!("failed to load trend data: {err}");
+            TrendStore::default()
+        }
+    }
 }
 
 pub const DEFAULT_TRACKER_SHARDS: usize = 64;

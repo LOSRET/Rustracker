@@ -332,7 +332,13 @@ pub(crate) fn load_trends_from_file(
 
     let points: Vec<TrendPointResponse> = content
         .lines()
-        .filter_map(|line| serde_json::from_str(line).ok())
+        .filter_map(|line| match serde_json::from_str(line) {
+            Ok(p) => Some(p),
+            Err(err) => {
+                tracing::debug!("skipping malformed trend line: {err}");
+                None
+            }
+        })
         .filter(|p: &TrendPointResponse| p.timestamp >= min_ts)
         .collect();
 
@@ -342,7 +348,13 @@ pub(crate) fn load_trends_from_file(
             client_points = cc
                 .lines()
                 .filter_map(|line| {
-                    let v: serde_json::Value = serde_json::from_str(line).ok()?;
+                    let v: serde_json::Value = match serde_json::from_str(line) {
+                        Ok(v) => v,
+                        Err(err) => {
+                            tracing::debug!("skipping malformed client trend line: {err}");
+                            return None;
+                        }
+                    };
                     let ts = v["timestamp"].as_u64()?;
                     let clients = v["clients"].as_array()?;
                     let dist: Vec<(u8, u32)> = clients
