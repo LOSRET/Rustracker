@@ -139,30 +139,8 @@ Three-layer design with clear separation of concerns:
 - **Sharding**: 64 shards chosen via `DefaultHasher(info_hash) % 64` to minimize lock contention
 - **Peer storage**: Packed binary, no heap allocation per peer — stored inline in `Vec<u8>`
 - **Background tasks**: Peer expiry sweeps every 1s, trend sampling every 10min, blacklist file watch every 5s
-- **build.rs**: Embeds `assets/index.html` into the binary at compile time; supports `personal-contact` feature to inject contact HTML
-- **Features**: `dashboard` (default) enables web UI routes; `personal-contact` injects contact info into the HTML
-
-## Project Structure
-
-```
-src/
-├── main.rs              # Entry point: CLI parsing, Tokio runtime, graceful shutdown
-├── lib.rs               # Library root: re-exports core, protocol, server modules
-├── core/                # Pure tracker engine (no I/O)
-│   ├── types.rs         # Core types: InfoHash, PeerId, PeerState, TorrentStats
-│   ├── tracker.rs       # 64-shard TrackerPool with per-shard RwLock
-│   ├── swarm.rs         # Per-torrent peer set, packed binary storage
-│   ├── topk.rs          # 4-way Top-K ranking
-│   └── counters.rs      # Incremental counters for O(1) snapshots
-├── protocol/            # BitTorrent protocol encoding (no network dependency)
-│   ├── bencode.rs       # Lightweight bencode encoder
-│   ├── announce.rs      # BEP 3 announce/scrape query parsing
-│   └── client_id.rs     # 102-client peer ID identification
-└── server/              # HTTP server layer (axum + tokio)
-    ├── handlers.rs      # HTTP handlers for all endpoints
-    ├── blacklist.rs     # Torrent blacklist with 5-sec hot-reload
-    └── trends.rs        # Trend data collection and JSONL persistence
-```
+- **build.rs**: Reads `assets/index.html` and injects `assets/contact.html` content at the `<!-- CONTACT -->` placeholder when `personal-contact` feature is enabled; outputs the result to `$OUT_DIR/index.html`
+- **Features**: `dashboard` (default) enables web UI routes and embeds the HTML at compile time; `personal-contact` injects contact info into the HTML
 
 ## Testing Pattern
 
@@ -179,7 +157,7 @@ cargo test --doc              # doctests only
 
 ## CI/CD
 
-GitHub Actions release workflow (`.github/workflows/release.yml`) triggers on pushes to `main` that modify `Cargo.toml`. It compares the version field — if changed, builds Linux/Windows binaries and creates a GitHub Release with the new version tag. Bump `version` in `Cargo.toml` to trigger a release.
+GitHub Actions release workflow (`.github/workflows/release.yml`) triggers on pushes to `main` that modify `Cargo.toml`. It compares the version field between the push commit and its parent — if changed, builds Linux/Windows binaries and creates a GitHub Release with the new version tag. Bump `version` in `Cargo.toml` to trigger a release.
 
 ## CLI Configuration
 

@@ -322,6 +322,7 @@ rustracker/
 │   ├── rps_bench.rs               # Requests-per-second benchmark
 │   ├── unified_bench.rs           # Unified benchmark suite
 │   ├── memory_tracker_bench.rs    # Memory usage benchmark
+│   ├── memory_jemalloc_bench.rs   # Memory benchmark with jemalloc allocator
 │   ├── memory_tracker_btree.rs    # BTree memory layout analysis
 │   ├── memory_staircase_test.rs   # Memory staircase growth test
 │   └── memory_ci_compare.rs       # CI memory regression comparison
@@ -448,6 +449,25 @@ cargo run --release --example unified_bench
 ```
 
 Concurrent HTTP benchmark tracking RPS, RSS, CPU usage, and per-request latency (avg/p50/p99/max).
+
+### Memory Benchmarks
+
+```bash
+# System allocator memory usage
+cargo run --release --example memory_tracker_bench
+
+# Jemalloc allocator comparison (Linux only)
+cargo run --release --example memory_jemalloc_bench
+
+# BTree memory layout analysis
+cargo run --release --example memory_tracker_btree
+
+# Memory staircase growth test
+cargo run --release --example memory_staircase_test
+
+# CI memory regression comparison
+cargo run --release --example memory_ci_compare
+```
 
 ## Development
 

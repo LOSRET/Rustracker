@@ -322,6 +322,7 @@ rustracker/
 │   ├── rps_bench.rs               # 每秒请求数基准
 │   ├── unified_bench.rs           # 统一基准测试套件
 │   ├── memory_tracker_bench.rs    # 内存占用基准
+│   ├── memory_jemalloc_bench.rs   # jemalloc 分配器内存基准
 │   ├── memory_tracker_btree.rs    # BTree 内存布局分析
 │   ├── memory_staircase_test.rs   # 内存阶梯增长测试
 │   └── memory_ci_compare.rs       # CI 内存回归对比
@@ -448,6 +449,25 @@ cargo run --release --example unified_bench
 ```
 
 并发 HTTP 基准，追踪 RPS、RSS、CPU 使用率和每请求延迟（avg/p50/p99/max）。
+
+### 内存基准
+
+```bash
+# 系统分配器内存占用
+cargo run --release --example memory_tracker_bench
+
+# jemalloc 分配器对比（仅 Linux）
+cargo run --release --example memory_jemalloc_bench
+
+# BTree 内存布局分析
+cargo run --release --example memory_tracker_btree
+
+# 内存阶梯增长测试
+cargo run --release --example memory_staircase_test
+
+# CI 内存回归对比
+cargo run --release --example memory_ci_compare
+```
 
 ## 开发指南
 
