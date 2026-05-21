@@ -312,7 +312,8 @@
             $("rangeGroup").querySelectorAll(".range-btn").forEach((b) => b.classList.remove("active"));
             btn.classList.add("active");
             state.range = btn.dataset.range;
-            loadCharts();
+            renderChart();
+            renderClientChart();
         });
 
         $("langSelect").addEventListener("change", (e) => setLang(e.target.value));
