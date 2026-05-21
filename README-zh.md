@@ -68,6 +68,7 @@ cargo run --release -- --listen 127.0.0.1:8080
 | `--peer-timeout-secs` | `RUSTRACKER_PEER_TIMEOUT_SECS` | `3000` | Peer 过期超时（秒） |
 | `--blacklist` | `RUSTRACKER_BLACKLIST` | — | 种子黑名单文件路径 |
 | `--trends-file` | `RUSTRACKER_TRENDS_FILE` | — | 趋势数据 JSONL 持久化路径 |
+| `--admin-token` | `RUSTRACKER_ADMIN_TOKEN` | — | 管理接口所需的 Bearer Token |
 
 每个参数均可通过环境变量或命令行参数设置，命令行优先。
 
@@ -227,10 +228,23 @@ e09b1c0c4b174ef2b25c8de662941777fb3f2d7a
 
 通过 `--blacklist blacklist.txt` 或 `RUSTRACKER_BLACKLIST` 传入路径。
 
-- 被黑名单中的种子在 `announce` 时会被拒绝（HTTP 403）
+- 被黑名单中的种子在 `announce` 时会返回 bencode 失败响应
 - `scrape` 结果会静默排除黑名单中的种子
 - 文件每 5 秒检测一次变更——编辑保存后无需重启
 - 无效行会以警告形式记录并跳过
+
+### 管理接口
+
+同时配置 `RUSTRACKER_BLACKLIST` 和 `RUSTRACKER_ADMIN_TOKEN` 后，可以通过带鉴权的管理接口添加黑名单：
+
+```bash
+curl -X POST http://127.0.0.1:8080/api/blacklist \
+  -H "Authorization: Bearer $RUSTRACKER_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"info_hash":"0123456789abcdef0123456789abcdef01234567"}'
+```
+
+接口会先把 40 字符十六进制 `info_hash` 追加写入黑名单文件，再更新内存黑名单。重复添加会返回成功，但 `"added": false`。
 
 ## 趋势数据持久化
 
@@ -377,6 +391,7 @@ sudo sh install-linux.sh
 4. 查看状态
 5. 查看配置
 6. 修改配置（监听地址、通告间隔、超时时间）
+7. 查看自动生成的 Admin Token
 
 非交互式命令：
 
@@ -384,6 +399,7 @@ sudo sh install-linux.sh
 sudo sh install-linux.sh install
 sudo sh install-linux.sh status
 sudo sh install-linux.sh configure
+sudo sh install-linux.sh token
 sudo sh install-linux.sh restart
 sudo sh install-linux.sh uninstall
 ```
@@ -393,7 +409,7 @@ sudo sh install-linux.sh uninstall
 | 路径 | 说明 |
 |------|------|
 | `/opt/rustracker/rustracker` | 二进制文件 |
-| `/etc/rustracker.env` | 环境变量配置 |
+| `/etc/rustracker.env` | 环境变量配置，包含自动生成的 Admin Token |
 | `/etc/rustracker/blacklist.txt` | 种子黑名单 |
 | `/var/lib/rustracker/trends.jsonl` | 趋势数据 |
 | `/etc/systemd/system/rustracker.service` | systemd 服务单元 |

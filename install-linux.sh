@@ -22,6 +22,7 @@ load_existing_config() {
         INTERVAL_DEFAULT=$(grep '^RUSTRACKER_INTERVAL_SECS=' "$ENV_PATH" | tail -n 1 | cut -d= -f2- || true)
         TIMEOUT_DEFAULT=$(grep '^RUSTRACKER_PEER_TIMEOUT_SECS=' "$ENV_PATH" | tail -n 1 | cut -d= -f2- || true)
         TRENDS_DEFAULT=$(grep '^RUSTRACKER_TRENDS_FILE=' "$ENV_PATH" | tail -n 1 | cut -d= -f2- || true)
+        ADMIN_TOKEN_DEFAULT=$(grep '^RUSTRACKER_ADMIN_TOKEN=' "$ENV_PATH" | tail -n 1 | cut -d= -f2- || true)
 
         LISTEN_DEFAULT=${LISTEN_DEFAULT:-$DEFAULT_LISTEN}
         INTERVAL_DEFAULT=${INTERVAL_DEFAULT:-$DEFAULT_INTERVAL}
@@ -29,6 +30,7 @@ load_existing_config() {
         TRENDS_DEFAULT=${TRENDS_DEFAULT:-$TRENDS_FILE_PATH}
     else
         TRENDS_DEFAULT=$TRENDS_FILE_PATH
+        ADMIN_TOKEN_DEFAULT=""
     fi
 }
 
@@ -38,6 +40,14 @@ normalize_listen() {
         *[!0-9]*|'') printf '%s\n' "$1" ;;
         *) printf '0.0.0.0:%s\n' "$1" ;;
     esac
+}
+
+generate_admin_token() {
+    if command -v openssl >/dev/null 2>&1; then
+        openssl rand -hex 32
+    else
+        od -An -N32 -tx1 /dev/urandom | tr -d ' \n'
+    fi
 }
 
 need_root() {
@@ -101,13 +111,17 @@ write_env() {
         none|NONE|None) TRENDS="" ;;
     esac
 
+    ADMIN_TOKEN=${ADMIN_TOKEN_DEFAULT:-$(generate_admin_token)}
+
     cat > "$ENV_PATH" <<EOF
 RUSTRACKER_LISTEN=$LISTEN
 RUSTRACKER_INTERVAL_SECS=$INTERVAL
 RUSTRACKER_PEER_TIMEOUT_SECS=$TIMEOUT
 RUSTRACKER_BLACKLIST=$BLACKLIST_PATH
 RUSTRACKER_TRENDS_FILE=$TRENDS
+RUSTRACKER_ADMIN_TOKEN=$ADMIN_TOKEN
 EOF
+    chmod 0600 "$ENV_PATH"
 }
 
 write_service() {
@@ -226,7 +240,10 @@ show_status() {
 show_config() {
     if [ -f "$ENV_PATH" ]; then
         echo "当前配置："
-        cat "$ENV_PATH"
+        grep -v '^RUSTRACKER_ADMIN_TOKEN=' "$ENV_PATH" || true
+        if grep -q '^RUSTRACKER_ADMIN_TOKEN=' "$ENV_PATH"; then
+            echo "RUSTRACKER_ADMIN_TOKEN=<hidden>"
+        fi
     else
         echo "未找到配置文件：$ENV_PATH"
     fi
@@ -240,6 +257,22 @@ show_config() {
         SIZE=$(du -h "$TRENDS_FILE_PATH" 2>/dev/null | cut -f1)
         echo ""
         echo "趋势数据：$TRENDS_FILE_PATH（$LINES 行，$SIZE）"
+    fi
+}
+
+show_admin_token() {
+    need_root
+
+    if [ ! -f "$ENV_PATH" ]; then
+        echo "未找到配置文件：$ENV_PATH"
+        return
+    fi
+
+    TOKEN=$(grep '^RUSTRACKER_ADMIN_TOKEN=' "$ENV_PATH" | tail -n 1 | cut -d= -f2- || true)
+    if [ -z "$TOKEN" ]; then
+        echo "未配置 RUSTRACKER_ADMIN_TOKEN。"
+    else
+        echo "$TOKEN"
     fi
 }
 
@@ -257,6 +290,7 @@ menu() {
         echo "6) 查看状态"
         echo "7) 查看配置"
         echo "8) 修改配置"
+        echo "9) 查看 Admin Token"
         echo "0) 退出"
         printf "请选择："
         read CHOICE || exit 0
@@ -270,6 +304,7 @@ menu() {
             6) show_status; pause ;;
             7) show_config; pause ;;
             8) configure_app; pause ;;
+            9) show_admin_token; pause ;;
             0) exit 0 ;;
             *) echo "无效选择。"; pause ;;
         esac
@@ -285,9 +320,10 @@ case "${1:-menu}" in
     status) show_status ;;
     config) show_config ;;
     configure) configure_app ;;
+    token) show_admin_token ;;
     menu) menu ;;
     *)
-        echo "用法：sh install-linux.sh [menu|install|uninstall|start|stop|restart|status|config|configure]"
+        echo "用法：sh install-linux.sh [menu|install|uninstall|start|stop|restart|status|config|configure|token]"
         exit 1
         ;;
 esac

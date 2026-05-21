@@ -33,6 +33,10 @@ struct Args {
     /// retained for 7 days. A companion `top_clients.jsonl` is created alongside it.
     #[arg(long, env = "RUSTRACKER_TRENDS_FILE")]
     trends_file: Option<PathBuf>,
+
+    /// Bearer token required for admin API endpoints.
+    #[arg(long, env = "RUSTRACKER_ADMIN_TOKEN")]
+    admin_token: Option<String>,
 }
 
 #[tokio::main]
@@ -51,6 +55,7 @@ async fn main() -> anyhow::Result<()> {
         DEFAULT_TRACKER_SHARDS,
         args.blacklist,
         args.trends_file,
+        args.admin_token,
     ));
     let listener = TcpListener::bind(args.listen)
         .await

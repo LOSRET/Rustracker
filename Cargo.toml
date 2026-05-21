@@ -1,6 +1,6 @@
 [package]
 name = "rustracker"
-version = "0.2.10"
+version = "0.2.11"
 edition = "2021"
 description = "A minimal HTTP BitTorrent tracker written in Rust"
 license = "MIT"
@@ -19,7 +19,7 @@ percent-encoding = "2.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
-tokio = { version = "1.38", features = ["macros", "net", "rt-multi-thread", "signal", "time"] }
+tokio = { version = "1.38", features = ["fs", "io-util", "macros", "net", "rt-multi-thread", "signal", "time"] }
 tower = "0.5"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

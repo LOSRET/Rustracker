@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::Router;
 use tokio::sync::RwLock;
 use tokio::time::MissedTickBehavior;
@@ -51,6 +51,8 @@ pub struct AppState {
     pub(crate) tracker: Arc<TrackerPool>,
     pub(crate) trends: Arc<RwLock<TrendStore>>,
     pub(crate) blacklist: Arc<RwLock<Arc<HashSet<InfoHash>>>>,
+    pub(crate) blacklist_path: Option<PathBuf>,
+    pub(crate) admin_token: Option<String>,
     pub(crate) started_at: Instant,
     #[cfg(feature = "dashboard")]
     pub(crate) versioned_index: String,
@@ -66,6 +68,8 @@ impl AppState {
             tracker: Arc::new(TrackerPool::single(tracker)),
             trends: Arc::new(RwLock::new(load_trends(&trends_file))),
             blacklist: Arc::new(RwLock::new(Arc::new(HashSet::new()))),
+            blacklist_path: None,
+            admin_token: None,
             started_at: Instant::now(),
             #[cfg(feature = "dashboard")]
             versioned_index: handlers::make_versioned_index(),
@@ -73,7 +77,7 @@ impl AppState {
     }
 
     pub fn sharded(interval: Duration, peer_timeout: Duration, shards: usize) -> Self {
-        Self::sharded_with_blacklist_file(interval, peer_timeout, shards, None, None)
+        Self::sharded_with_blacklist_file(interval, peer_timeout, shards, None, None, None)
     }
 
     pub fn sharded_with_blacklist_file(
@@ -82,6 +86,7 @@ impl AppState {
         shards: usize,
         blacklist_path: Option<PathBuf>,
         trends_file: Option<PathBuf>,
+        admin_token: Option<String>,
     ) -> Self {
         let initial = blacklist_path
             .as_deref()
@@ -98,6 +103,8 @@ impl AppState {
             tracker: Arc::new(TrackerPool::new(interval, peer_timeout, shards)),
             trends: Arc::new(RwLock::new(load_trends(&trends_file))),
             blacklist: Arc::new(RwLock::new(Arc::new(initial))),
+            blacklist_path: blacklist_path.clone(),
+            admin_token,
             started_at: Instant::now(),
             #[cfg(feature = "dashboard")]
             versioned_index: handlers::make_versioned_index(),
@@ -187,6 +194,7 @@ pub fn router(state: AppState) -> Router {
         .route("/api/trends", get(handlers::trends))
         .route("/api/clients", get(handlers::clients))
         .route("/api/top100", get(handlers::top100))
+        .route("/api/blacklist", post(handlers::add_blacklist))
         .route("/announce", get(handlers::announce))
         .route("/scrape", get(handlers::scrape))
         .route("/healthz", get(handlers::healthz));

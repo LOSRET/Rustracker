@@ -68,6 +68,7 @@ Download the latest release from [GitHub Releases](https://github.com/LOSRET/Rus
 | `--peer-timeout-secs` | `RUSTRACKER_PEER_TIMEOUT_SECS` | `3000` | Peer expiry timeout (seconds) |
 | `--blacklist` | `RUSTRACKER_BLACKLIST` | — | Path to torrent blacklist file |
 | `--trends-file` | `RUSTRACKER_TRENDS_FILE` | — | Path to persist trend JSONL data |
+| `--admin-token` | `RUSTRACKER_ADMIN_TOKEN` | — | Bearer token required for admin API endpoints |
 
 Every flag can be set via environment variable or command-line argument. Command-line takes precedence.
 
@@ -227,10 +228,23 @@ e09b1c0c4b174ef2b25c8de662941777fb3f2d7a
 
 Pass the path via `--blacklist blacklist.txt` or `RUSTRACKER_BLACKLIST`.
 
-- Announce requests for blacklisted torrents are rejected with HTTP 403
+- Announce requests for blacklisted torrents return a bencoded failure response
 - Scrape results silently exclude blacklisted torrents
 - The file is watched every 5 seconds — edit and save, no restart needed
 - Invalid lines are logged as warnings and skipped
+
+### Admin API
+
+When both `RUSTRACKER_BLACKLIST` and `RUSTRACKER_ADMIN_TOKEN` are configured, you can add entries through the authenticated admin endpoint:
+
+```bash
+curl -X POST http://127.0.0.1:8080/api/blacklist \
+  -H "Authorization: Bearer $RUSTRACKER_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"info_hash":"0123456789abcdef0123456789abcdef01234567"}'
+```
+
+The endpoint appends the 40-character hex `info_hash` to the blacklist file first, then updates the in-memory blacklist. Duplicate entries return success with `"added": false`.
 
 ## Trend Data Persistence
 
@@ -377,6 +391,7 @@ The installer provides a Chinese interactive menu for:
 4. View status
 5. View configuration
 6. Modify configuration (listen address, interval, timeout)
+7. View the generated Admin Token
 
 Non-interactive commands:
 
@@ -384,6 +399,7 @@ Non-interactive commands:
 sudo sh install-linux.sh install
 sudo sh install-linux.sh status
 sudo sh install-linux.sh configure
+sudo sh install-linux.sh token
 sudo sh install-linux.sh restart
 sudo sh install-linux.sh uninstall
 ```
@@ -393,7 +409,7 @@ sudo sh install-linux.sh uninstall
 | Path | Description |
 |------|-------------|
 | `/opt/rustracker/rustracker` | Binary |
-| `/etc/rustracker.env` | Environment config |
+| `/etc/rustracker.env` | Environment config, including the generated Admin Token |
 | `/etc/rustracker/blacklist.txt` | Torrent blacklist |
 | `/var/lib/rustracker/trends.jsonl` | Trend data |
 | `/etc/systemd/system/rustracker.service` | systemd unit |
