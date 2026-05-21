@@ -161,7 +161,7 @@ GitHub Actions release workflow (`.github/workflows/release.yml`) triggers on pu
 
 ## CLI Configuration
 
-All flags support env var fallback (prefixed `RUSTRACKER_`). CLI takes precedence over env vars.
+All flags support env var fallback (prefixed `RUSTRACKER_`). CLI takes precedence over env vars. Important operational flags include `--blacklist` / `RUSTRACKER_BLACKLIST`, `--trends-file` / `RUSTRACKER_TRENDS_FILE`, and `--admin-token` / `RUSTRACKER_ADMIN_TOKEN`.
 
 ## Key API Endpoints
 
@@ -172,4 +172,6 @@ All flags support env var fallback (prefixed `RUSTRACKER_`). CLI takes precedenc
 - `GET /api/trends` — Historical trend data (7-day retention, 10-min sampling)
 - `GET /api/clients` — Client distribution (top 15 clients by peer count)
 - `GET /api/top100` — Top 100 torrents by peers/seeders/leechers/downloaded
+- `GET /api/blacklist?info_hash=<40-char-hex>` — Authenticated read-only blacklist status endpoint; returns `blacklisted: true/false`
+- `POST /api/blacklist` — Authenticated admin endpoint that appends a 40-char hex `info_hash` to the configured blacklist file, then updates the in-memory blacklist; requires `Authorization: Bearer <admin-token>`
 - `GET /` — Web dashboard (requires `dashboard` feature)

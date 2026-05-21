@@ -235,6 +235,15 @@ e09b1c0c4b174ef2b25c8de662941777fb3f2d7a
 
 ### 管理接口
 
+配置 `RUSTRACKER_ADMIN_TOKEN` 后，可以查询某个条目是否已在黑名单中：
+
+```bash
+curl "http://127.0.0.1:8080/api/blacklist?info_hash=0123456789abcdef0123456789abcdef01234567" \
+  -H "Authorization: Bearer $RUSTRACKER_ADMIN_TOKEN"
+```
+
+响应包含 `"blacklisted": true` 或 `"blacklisted": false`，并且不会修改黑名单文件。
+
 同时配置 `RUSTRACKER_BLACKLIST` 和 `RUSTRACKER_ADMIN_TOKEN` 后，可以通过带鉴权的管理接口添加黑名单：
 
 ```bash

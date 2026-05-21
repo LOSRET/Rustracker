@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 
-use axum::routing::{get, post};
+use axum::routing::get;
 use axum::Router;
 use tokio::sync::RwLock;
 use tokio::time::MissedTickBehavior;
@@ -194,7 +194,10 @@ pub fn router(state: AppState) -> Router {
         .route("/api/trends", get(handlers::trends))
         .route("/api/clients", get(handlers::clients))
         .route("/api/top100", get(handlers::top100))
-        .route("/api/blacklist", post(handlers::add_blacklist))
+        .route(
+            "/api/blacklist",
+            get(handlers::blacklist_status).post(handlers::add_blacklist),
+        )
         .route("/announce", get(handlers::announce))
         .route("/scrape", get(handlers::scrape))
         .route("/healthz", get(handlers::healthz));

@@ -235,6 +235,15 @@ Pass the path via `--blacklist blacklist.txt` or `RUSTRACKER_BLACKLIST`.
 
 ### Admin API
 
+When `RUSTRACKER_ADMIN_TOKEN` is configured, you can query whether an entry is already blacklisted:
+
+```bash
+curl "http://127.0.0.1:8080/api/blacklist?info_hash=0123456789abcdef0123456789abcdef01234567" \
+  -H "Authorization: Bearer $RUSTRACKER_ADMIN_TOKEN"
+```
+
+The response includes `"blacklisted": true` or `"blacklisted": false` and does not modify the blacklist file.
+
 When both `RUSTRACKER_BLACKLIST` and `RUSTRACKER_ADMIN_TOKEN` are configured, you can add entries through the authenticated admin endpoint:
 
 ```bash

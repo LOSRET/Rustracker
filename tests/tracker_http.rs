@@ -479,6 +479,87 @@ async fn add_blacklist_rejects_missing_token() {
 }
 
 #[tokio::test]
+async fn blacklist_status_returns_true_when_entry_exists() {
+    let (app, path) = blacklist_app_with_token(Some("secret-token"));
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/api/blacklist?info_hash=6161616161616161616161616161616161616161")
+                .header(header::AUTHORIZATION, "Bearer secret-token")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(parsed["blacklisted"], true);
+    let _ = std::fs::remove_file(&path);
+}
+
+#[tokio::test]
+async fn blacklist_status_returns_false_when_entry_is_missing() {
+    let (app, path) = blacklist_app_with_token(Some("secret-token"));
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/api/blacklist?info_hash=6262626262626262626262626262626262626262")
+                .header(header::AUTHORIZATION, "Bearer secret-token")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(parsed["blacklisted"], false);
+    let _ = std::fs::remove_file(&path);
+}
+
+#[tokio::test]
+async fn blacklist_status_rejects_missing_token() {
+    let (app, path) = blacklist_app_with_token(Some("secret-token"));
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/api/blacklist?info_hash=6161616161616161616161616161616161616161")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    let _ = std::fs::remove_file(&path);
+}
+
+#[tokio::test]
+async fn blacklist_status_rejects_invalid_info_hash() {
+    let (app, path) = blacklist_app_with_token(Some("secret-token"));
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/api/blacklist?info_hash=invalid")
+                .header(header::AUTHORIZATION, "Bearer secret-token")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let _ = std::fs::remove_file(&path);
+}
+
+#[tokio::test]
 async fn add_blacklist_rejects_invalid_info_hash() {
     let (app, path) = blacklist_app_with_token(Some("secret-token"));
     let response = app
