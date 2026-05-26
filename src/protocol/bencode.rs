@@ -1,5 +1,5 @@
 pub fn write_key(buf: &mut Vec<u8>, key: &[u8]) {
-    buf.extend_from_slice(key.len().to_string().as_bytes());
+    write_usize(buf, key.len());
     buf.push(b':');
     buf.extend_from_slice(key);
 }
@@ -7,21 +7,45 @@ pub fn write_key(buf: &mut Vec<u8>, key: &[u8]) {
 pub fn write_int(buf: &mut Vec<u8>, key: &[u8], value: i64) {
     write_key(buf, key);
     buf.push(b'i');
-    buf.extend_from_slice(value.to_string().as_bytes());
+    write_i64(buf, value);
     buf.push(b'e');
 }
 
 pub fn write_bytes(buf: &mut Vec<u8>, key: &[u8], value: &[u8]) {
     write_key(buf, key);
-    buf.extend_from_slice(value.len().to_string().as_bytes());
+    write_usize(buf, value.len());
     buf.push(b':');
     buf.extend_from_slice(value);
 }
 
 pub fn write_int_raw(buf: &mut Vec<u8>, value: i64) {
     buf.push(b'i');
-    buf.extend_from_slice(value.to_string().as_bytes());
+    write_i64(buf, value);
     buf.push(b'e');
+}
+
+fn write_usize(buf: &mut Vec<u8>, n: usize) {
+    let mut digits = [0u8; 20];
+    let mut i = 20;
+    let mut remaining = n;
+    loop {
+        i -= 1;
+        digits[i] = b'0' + (remaining % 10) as u8;
+        remaining /= 10;
+        if remaining == 0 {
+            break;
+        }
+    }
+    buf.extend_from_slice(&digits[i..]);
+}
+
+fn write_i64(buf: &mut Vec<u8>, n: i64) {
+    if n < 0 {
+        buf.push(b'-');
+        write_usize(buf, n.unsigned_abs() as usize);
+    } else {
+        write_usize(buf, n as usize);
+    }
 }
 
 pub fn failure(message: impl AsRef<str>) -> Vec<u8> {
