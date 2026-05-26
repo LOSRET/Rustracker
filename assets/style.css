@@ -142,7 +142,7 @@
 
         .metrics {
             display: grid;
-            grid-template-columns: repeat(5, minmax(140px, 1fr));
+            grid-template-columns: repeat(6, minmax(140px, 1fr));
             gap: 12px;
             margin-bottom: 20px;
         }
@@ -173,6 +173,7 @@
         .metric.leechers { border-top: 4px solid var(--amber); }
         .metric.torrents { border-top: 4px solid var(--blue); }
         .metric.completed { border-top: 4px solid var(--violet); }
+        .metric.rps { border-top: 4px solid var(--red); }
 
         .chart-panel {
             background: var(--panel);

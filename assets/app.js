@@ -143,6 +143,7 @@
             $("metricLeechers").textContent = number(data.leechers);
             $("metricTorrents").textContent = number(data.torrents);
             $("metricCompleted").textContent = number(data.completed);
+            $("metricRps").textContent = number(data.rps);
             $("configText").textContent = tf("config_fmt");
             $("footerVersion").textContent = data.version || "-";
             $("footerUptime").textContent = data.uptime_secs != null ? `Uptime: ${formatUptime(data.uptime_secs)}` : "-";

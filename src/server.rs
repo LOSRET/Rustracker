@@ -5,6 +5,7 @@ use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::cmp::Reverse;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 
@@ -54,6 +55,8 @@ pub struct AppState {
     pub(crate) blacklist_path: Option<PathBuf>,
     pub(crate) admin_token: Option<String>,
     pub(crate) started_at: Instant,
+    pub(crate) rps_counter: Arc<AtomicU64>,
+    pub(crate) current_rps: Arc<AtomicU64>,
     #[cfg(feature = "dashboard")]
     pub(crate) versioned_index: String,
 }
@@ -71,6 +74,8 @@ impl AppState {
             blacklist_path: None,
             admin_token: None,
             started_at: Instant::now(),
+            rps_counter: Arc::new(AtomicU64::new(0)),
+            current_rps: Arc::new(AtomicU64::new(0)),
             #[cfg(feature = "dashboard")]
             versioned_index: handlers::make_versioned_index(),
         }
@@ -106,11 +111,14 @@ impl AppState {
             blacklist_path: blacklist_path.clone(),
             admin_token,
             started_at: Instant::now(),
+            rps_counter: Arc::new(AtomicU64::new(0)),
+            current_rps: Arc::new(AtomicU64::new(0)),
             #[cfg(feature = "dashboard")]
             versioned_index: handlers::make_versioned_index(),
         };
 
         state.spawn_maintenance(trends_file);
+        state.spawn_rps_sampler();
         if let Some(path) = blacklist_path {
             state.spawn_blacklist_watcher(path);
         }
@@ -155,6 +163,22 @@ impl AppState {
                         &snapshot.clients,
                     );
                 }
+            }
+        });
+    }
+
+    fn spawn_rps_sampler(&self) {
+        let rps_counter = self.rps_counter.clone();
+        let current_rps = self.current_rps.clone();
+
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(1));
+            interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
+
+            loop {
+                interval.tick().await;
+                let count = rps_counter.swap(0, Ordering::Relaxed);
+                current_rps.store((count as f64).to_bits(), Ordering::Relaxed);
             }
         });
     }

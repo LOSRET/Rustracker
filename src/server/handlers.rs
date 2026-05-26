@@ -5,6 +5,7 @@
 
 use std::net::SocketAddr;
 use std::path::Path;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -97,7 +98,8 @@ pub(crate) async fn app_js() -> Response<Body> {
 pub(crate) async fn stats(State(state): State<AppState>) -> Json<StatsResponse> {
     let snapshot = state.tracker.snapshot().await;
     let uptime_secs = state.started_at.elapsed().as_secs();
-    Json(StatsResponse::from_snapshot(snapshot, uptime_secs))
+    let rps = f64::from_bits(state.current_rps.load(Ordering::Relaxed));
+    Json(StatsResponse::from_snapshot(snapshot, uptime_secs, rps))
 }
 
 pub(crate) async fn trends(State(state): State<AppState>) -> Json<TrendsResponse> {
@@ -370,6 +372,7 @@ pub(crate) async fn announce(
     headers: HeaderMap,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
 ) -> Response<Body> {
+    state.rps_counter.fetch_add(1, Ordering::Relaxed);
     let query = uri.query().unwrap_or_default();
     let parsed = match parse_announce_query(query) {
         Ok(parsed) => parsed,
@@ -406,6 +409,7 @@ pub(crate) async fn scrape(
     State(state): State<AppState>,
     OriginalUri(uri): OriginalUri,
 ) -> Response<Body> {
+    state.rps_counter.fetch_add(1, Ordering::Relaxed);
     let query = uri.query().unwrap_or_default();
     let parsed = match parse_scrape_query(query) {
         Ok(parsed) => parsed,
