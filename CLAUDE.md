@@ -120,6 +120,9 @@ cargo run --release --example unified_bench
 # Memory benchmarks
 cargo run --release --example memory_tracker_bench
 cargo run --release --example memory_ci_compare
+cargo run --release --example memory_jemalloc_bench
+cargo run --release --example memory_staircase_test
+cargo run --release --example memory_tracker_btree
 ```
 
 ## Architecture
@@ -132,7 +135,7 @@ Three-layer design with clear separation of concerns:
 
 - **`server/`** — Axum HTTP layer. `handlers.rs` routes `/announce`, `/scrape`, `/healthz`, `/api/*`, and dashboard static files. `blacklist.rs` hot-reloads a torrent blacklist file every 5 seconds. `trends.rs` manages a 7-day ring buffer with optional JSONL persistence (10-min sampling).
 
-`AppState` (in `server.rs`) is the shared state clone passed to all handlers, containing `Arc<TrackerPool>`, `Arc<RwLock<TrendStore>>`, and `Arc<RwLock<Arc<HashSet<InfoHash>>>>` for the blacklist.
+`AppState` (in `server.rs`) is the shared state clone passed to all handlers, containing `Arc<TrackerPool>`, `Arc<RwLock<TrendStore>>`, `Arc<RwLock<Arc<HashSet<InfoHash>>>>` for the blacklist, and `Arc<AtomicU64>` for the real-time RPS counter updated on every announce/scrape request.
 
 ## Key Design Decisions
 
@@ -157,18 +160,31 @@ cargo test --doc              # doctests only
 
 ## CI/CD
 
-GitHub Actions release workflow (`.github/workflows/release.yml`) triggers on pushes to `main` that modify `Cargo.toml`. It compares the version field between the push commit and its parent — if changed, builds Linux/Windows binaries and creates a GitHub Release with the new version tag. Bump `version` in `Cargo.toml` to trigger a release.
+GitHub Actions workflows:
+
+- **`release.yml`** — Triggers on pushes to `main` that modify `Cargo.toml`. Compares the version field between the push commit and its parent — if changed, builds Linux/Windows binaries and creates a GitHub Release with the new version tag. Bump `version` in `Cargo.toml` to trigger a release.
+- **`sync-deploy.yml`** — Personal deployment workflow triggered on version bumps or manual dispatch. Builds Linux (musl) and Windows artifacts without creating a GitHub Release.
+- **`memory-benchmark.yml`** — Manual dispatch workflow that runs `unified_bench` and system-vs-jemalloc allocator comparisons.
 
 ## CLI Configuration
 
-All flags support env var fallback (prefixed `RUSTRACKER_`). CLI takes precedence over env vars. Important operational flags include `--blacklist` / `RUSTRACKER_BLACKLIST`, `--trends-file` / `RUSTRACKER_TRENDS_FILE`, and `--admin-token` / `RUSTRACKER_ADMIN_TOKEN`.
+```
+--listen               RUSTRACKER_LISTEN            default: 0.0.0.0:8080
+--interval-secs        RUSTRACKER_INTERVAL_SECS      default: 1800
+--peer-timeout-secs    RUSTRACKER_PEER_TIMEOUT_SECS  default: 3000
+--blacklist            RUSTRACKER_BLACKLIST          optional: path to blacklist file
+--trends-file          RUSTRACKER_TRENDS_FILE        optional: path to trends JSONL
+--admin-token          RUSTRACKER_ADMIN_TOKEN        optional: bearer token for admin API
+```
+
+All flags support env var fallback. CLI takes precedence over env vars. `--interval-secs` controls the peer expiry sweep interval; `--peer-timeout-secs` is the peer timeout threshold.
 
 ## Key API Endpoints
 
 - `GET /announce` — BEP 3 announce endpoint (peer registration)
 - `GET /scrape` — BEP 3 scrape endpoint (torrent statistics)
 - `GET /healthz` — Health check (returns `200 OK` with body `ok`)
-- `GET /api/stats` — JSON statistics (peers, seeders, leechers, torrents, completed)
+- `GET /api/stats` — JSON statistics (peers, seeders, leechers, torrents, completed, rps, version, uptime_secs)
 - `GET /api/trends` — Historical trend data (7-day retention, 10-min sampling)
 - `GET /api/clients` — Client distribution (top 15 clients by peer count)
 - `GET /api/top100` — Top 100 torrents by peers/seeders/leechers/downloaded
