@@ -103,6 +103,23 @@
             margin-bottom: 24px;
         }
 
+        .topbar-rps {
+            text-align: right;
+            flex-shrink: 0;
+        }
+        .topbar-rps-label {
+            display: block;
+            color: var(--muted);
+            font-size: 11px;
+            text-transform: uppercase;
+            margin-bottom: 2px;
+        }
+        .topbar-rps strong {
+            font-size: 24px;
+            line-height: 1;
+            color: var(--red);
+        }
+
         h1 {
             margin: 0 0 6px;
             font-size: 28px;
@@ -142,7 +159,7 @@
 
         .metrics {
             display: grid;
-            grid-template-columns: repeat(6, minmax(140px, 1fr));
+            grid-template-columns: repeat(5, minmax(140px, 1fr));
             gap: 12px;
             margin-bottom: 20px;
         }
@@ -173,7 +190,6 @@
         .metric.leechers { border-top: 4px solid var(--amber); }
         .metric.torrents { border-top: 4px solid var(--blue); }
         .metric.completed { border-top: 4px solid var(--violet); }
-        .metric.rps { border-top: 4px solid var(--red); }
 
         .chart-panel {
             background: var(--panel);
@@ -502,6 +518,8 @@
             .app { grid-template-columns: 1fr; }
             .main { padding: 60px 18px 18px; }
             .topbar, .chart-head { flex-direction: column; align-items: stretch; }
+            .topbar-rps { text-align: left; }
+            .topbar-rps strong { font-size: 20px; }
             .metrics { grid-template-columns: repeat(2, minmax(130px, 1fr)); }
             #trendChart, #clientChart { height: 330px; }
             .hamburger { display: block; }
