@@ -232,7 +232,8 @@ pub fn router(state: AppState) -> Router {
         .route("/style.css", get(handlers::style))
         .route("/app.js", get(handlers::app_js));
 
-    r.with_state(state)
+    r.fallback(handlers::not_found)
+        .with_state(state)
 }
 
 // ── TrackerPool ────────────────────────────────────────────────────────────

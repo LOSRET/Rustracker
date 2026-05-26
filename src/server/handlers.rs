@@ -126,6 +126,10 @@ pub(crate) async fn healthz() -> &'static str {
     "ok"
 }
 
+pub(crate) async fn not_found() -> (StatusCode, &'static str) {
+    (StatusCode::NOT_FOUND, "404 Not Found")
+}
+
 // ── Admin API ────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize)]
