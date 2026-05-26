@@ -25,7 +25,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-tikv-jemallocator = { version = "0.6", features = ["background_threads"] }
+tikv-jemallocator = { version = "0.7", features = ["background_threads"] }
 
 [dev-dependencies]
 hyper = "1.4"
