@@ -106,18 +106,36 @@
         .topbar-rps {
             text-align: right;
             flex-shrink: 0;
+            background: var(--soft);
+            padding: 8px 14px;
+            border-radius: 4px;
         }
         .topbar-rps-label {
-            display: block;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 5px;
             color: var(--muted);
             font-size: 11px;
             text-transform: uppercase;
             margin-bottom: 2px;
         }
+        .topbar-rps-live {
+            width: 7px;
+            height: 7px;
+            background: var(--green);
+            border-radius: 50%;
+            flex-shrink: 0;
+            animation: rps-pulse 2s ease-in-out infinite;
+        }
+        @keyframes rps-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.35; }
+        }
         .topbar-rps strong {
-            font-size: 24px;
+            font-size: 22px;
             line-height: 1;
-            color: var(--red);
+            color: var(--ink);
         }
 
         h1 {
@@ -519,6 +537,7 @@
             .main { padding: 60px 18px 18px; }
             .topbar, .chart-head { flex-direction: column; align-items: stretch; }
             .topbar-rps { text-align: left; }
+            .topbar-rps-label { justify-content: flex-start; }
             .topbar-rps strong { font-size: 20px; }
             .metrics { grid-template-columns: repeat(2, minmax(130px, 1fr)); }
             #trendChart, #clientChart { height: 330px; }
