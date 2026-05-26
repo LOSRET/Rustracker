@@ -17,13 +17,13 @@ pub enum AnnounceEvent {
     Empty,
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Ord, PartialOrd)]
 pub struct Ipv4PeerKey {
     pub ip: [u8; 4],
     pub port: u16,
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Ord, PartialOrd)]
 pub struct Ipv6PeerKey {
     pub ip: [u8; 16],
     pub port: u16,

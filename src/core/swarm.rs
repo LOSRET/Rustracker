@@ -21,34 +21,41 @@ pub(crate) struct PackedIpv4Peers {
 
 impl PackedIpv4Peers {
     pub(crate) fn insert(&mut self, key: Ipv4PeerKey, peer: PeerState) -> Option<PeerState> {
-        if let Some(index) = self.find(&key) {
-            let old = self.state_at(index);
-            self.write_at(index, key, peer);
-            Some(old)
-        } else {
-            self.push(key, peer);
-            None
+        match self.search_index(&key) {
+            Ok(index) => {
+                let old = self.state_at(index);
+                self.write_at(index, key, peer);
+                Some(old)
+            }
+            Err(index) => {
+                self.insert_at(index, key, peer);
+                None
+            }
         }
     }
 
     pub(crate) fn remove(&mut self, key: &Ipv4PeerKey) -> Option<PeerState> {
-        self.find(key).map(|index| self.swap_remove(index))
+        self.find(key).map(|index| self.remove_at(index))
     }
 
     pub(crate) fn retain<F>(&mut self, mut keep: F)
     where
         F: FnMut(Ipv4PeerKey, PeerState) -> bool,
     {
-        let mut index = 0;
-        while index < self.len() {
-            let key = self.key_at(index);
-            let peer = self.state_at(index);
+        let mut write = 0usize;
+        for read in 0..self.len() {
+            let key = self.key_at(read);
+            let peer = self.state_at(read);
             if keep(key, peer) {
-                index += 1;
-            } else {
-                self.swap_remove(index);
+                if write != read {
+                    let src = read * IPV4_ENTRY_LEN;
+                    let dst = write * IPV4_ENTRY_LEN;
+                    self.bytes.copy_within(src..src + IPV4_ENTRY_LEN, dst);
+                }
+                write += 1;
             }
         }
+        self.bytes.truncate(write * IPV4_ENTRY_LEN);
     }
 
     pub(crate) fn len(&self) -> usize {
@@ -131,16 +138,44 @@ impl PackedIpv4Peers {
     }
 
     fn find(&self, key: &Ipv4PeerKey) -> Option<usize> {
-        (0..self.len()).find(|&index| self.key_at(index) == *key)
+        self.search_index(key).ok()
     }
 
-    fn push(&mut self, key: Ipv4PeerKey, peer: PeerState) {
-        self.bytes.extend_from_slice(&key.ip);
-        self.bytes.extend_from_slice(&key.port.to_be_bytes());
-        self.bytes.push(flags(&peer));
-        self.bytes.push(peer.client_tag);
-        self.bytes
-            .extend_from_slice(&peer.last_seen_secs.to_be_bytes());
+    fn search_index(&self, key: &Ipv4PeerKey) -> Result<usize, usize> {
+        let mut size = self.len();
+        let mut base = 0usize;
+        while size > 0 {
+            let half = size / 2;
+            let mid = base + half;
+            match self.key_at(mid).cmp(key) {
+                std::cmp::Ordering::Less => {
+                    base = mid + 1;
+                    size -= half + 1;
+                }
+                std::cmp::Ordering::Greater => {
+                    size = half;
+                }
+                std::cmp::Ordering::Equal => return Ok(mid),
+            }
+        }
+        Err(base)
+    }
+
+    fn insert_at(&mut self, index: usize, key: Ipv4PeerKey, peer: PeerState) {
+        let offset = index * IPV4_ENTRY_LEN;
+        let old_len = self.bytes.len();
+        self.bytes.resize(old_len + IPV4_ENTRY_LEN, 0);
+        self.bytes.copy_within(offset..old_len, offset + IPV4_ENTRY_LEN);
+        self.write_at(index, key, peer);
+    }
+
+    fn remove_at(&mut self, index: usize) -> PeerState {
+        let removed = self.state_at(index);
+        let offset = index * IPV4_ENTRY_LEN;
+        let next = offset + IPV4_ENTRY_LEN;
+        self.bytes.copy_within(next.., offset);
+        self.bytes.truncate(self.bytes.len() - IPV4_ENTRY_LEN);
+        removed
     }
 
     fn write_at(&mut self, index: usize, key: Ipv4PeerKey, peer: PeerState) {
@@ -150,18 +185,6 @@ impl PackedIpv4Peers {
         entry[6] = flags(&peer);
         entry[7] = peer.client_tag;
         entry[8..12].copy_from_slice(&peer.last_seen_secs.to_be_bytes());
-    }
-
-    fn swap_remove(&mut self, index: usize) -> PeerState {
-        let removed = self.state_at(index);
-        let last = self.len() - 1;
-        if index != last {
-            let mut replacement = [0_u8; IPV4_ENTRY_LEN];
-            replacement.copy_from_slice(&self.bytes[ipv4_range(last)]);
-            self.bytes[ipv4_range(index)].copy_from_slice(&replacement);
-        }
-        self.bytes.truncate(last * IPV4_ENTRY_LEN);
-        removed
     }
 
     fn key_at(&self, index: usize) -> Ipv4PeerKey {
@@ -191,34 +214,41 @@ pub(crate) struct PackedIpv6Peers {
 
 impl PackedIpv6Peers {
     pub(crate) fn insert(&mut self, key: Ipv6PeerKey, peer: PeerState) -> Option<PeerState> {
-        if let Some(index) = self.find(&key) {
-            let old = self.state_at(index);
-            self.write_at(index, key, peer);
-            Some(old)
-        } else {
-            self.push(key, peer);
-            None
+        match self.search_index(&key) {
+            Ok(index) => {
+                let old = self.state_at(index);
+                self.write_at(index, key, peer);
+                Some(old)
+            }
+            Err(index) => {
+                self.insert_at(index, key, peer);
+                None
+            }
         }
     }
 
     pub(crate) fn remove(&mut self, key: &Ipv6PeerKey) -> Option<PeerState> {
-        self.find(key).map(|index| self.swap_remove(index))
+        self.find(key).map(|index| self.remove_at(index))
     }
 
     pub(crate) fn retain<F>(&mut self, mut keep: F)
     where
         F: FnMut(Ipv6PeerKey, PeerState) -> bool,
     {
-        let mut index = 0;
-        while index < self.len() {
-            let key = self.key_at(index);
-            let peer = self.state_at(index);
+        let mut write = 0usize;
+        for read in 0..self.len() {
+            let key = self.key_at(read);
+            let peer = self.state_at(read);
             if keep(key, peer) {
-                index += 1;
-            } else {
-                self.swap_remove(index);
+                if write != read {
+                    let src = read * IPV6_ENTRY_LEN;
+                    let dst = write * IPV6_ENTRY_LEN;
+                    self.bytes.copy_within(src..src + IPV6_ENTRY_LEN, dst);
+                }
+                write += 1;
             }
         }
+        self.bytes.truncate(write * IPV6_ENTRY_LEN);
     }
 
     pub(crate) fn len(&self) -> usize {
@@ -301,16 +331,44 @@ impl PackedIpv6Peers {
     }
 
     fn find(&self, key: &Ipv6PeerKey) -> Option<usize> {
-        (0..self.len()).find(|&index| self.key_at(index) == *key)
+        self.search_index(key).ok()
     }
 
-    fn push(&mut self, key: Ipv6PeerKey, peer: PeerState) {
-        self.bytes.extend_from_slice(&key.ip);
-        self.bytes.extend_from_slice(&key.port.to_be_bytes());
-        self.bytes.push(flags(&peer));
-        self.bytes.push(peer.client_tag);
-        self.bytes
-            .extend_from_slice(&peer.last_seen_secs.to_be_bytes());
+    fn search_index(&self, key: &Ipv6PeerKey) -> Result<usize, usize> {
+        let mut size = self.len();
+        let mut base = 0usize;
+        while size > 0 {
+            let half = size / 2;
+            let mid = base + half;
+            match self.key_at(mid).cmp(key) {
+                std::cmp::Ordering::Less => {
+                    base = mid + 1;
+                    size -= half + 1;
+                }
+                std::cmp::Ordering::Greater => {
+                    size = half;
+                }
+                std::cmp::Ordering::Equal => return Ok(mid),
+            }
+        }
+        Err(base)
+    }
+
+    fn insert_at(&mut self, index: usize, key: Ipv6PeerKey, peer: PeerState) {
+        let offset = index * IPV6_ENTRY_LEN;
+        let old_len = self.bytes.len();
+        self.bytes.resize(old_len + IPV6_ENTRY_LEN, 0);
+        self.bytes.copy_within(offset..old_len, offset + IPV6_ENTRY_LEN);
+        self.write_at(index, key, peer);
+    }
+
+    fn remove_at(&mut self, index: usize) -> PeerState {
+        let removed = self.state_at(index);
+        let offset = index * IPV6_ENTRY_LEN;
+        let next = offset + IPV6_ENTRY_LEN;
+        self.bytes.copy_within(next.., offset);
+        self.bytes.truncate(self.bytes.len() - IPV6_ENTRY_LEN);
+        removed
     }
 
     fn write_at(&mut self, index: usize, key: Ipv6PeerKey, peer: PeerState) {
@@ -320,18 +378,6 @@ impl PackedIpv6Peers {
         entry[18] = flags(&peer);
         entry[19] = peer.client_tag;
         entry[20..24].copy_from_slice(&peer.last_seen_secs.to_be_bytes());
-    }
-
-    fn swap_remove(&mut self, index: usize) -> PeerState {
-        let removed = self.state_at(index);
-        let last = self.len() - 1;
-        if index != last {
-            let mut replacement = [0_u8; IPV6_ENTRY_LEN];
-            replacement.copy_from_slice(&self.bytes[ipv6_range(last)]);
-            self.bytes[ipv6_range(index)].copy_from_slice(&replacement);
-        }
-        self.bytes.truncate(last * IPV6_ENTRY_LEN);
-        removed
     }
 
     fn key_at(&self, index: usize) -> Ipv6PeerKey {
