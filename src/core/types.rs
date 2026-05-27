@@ -105,6 +105,13 @@ impl PeerState {
     }
 }
 
+pub(crate) trait PeerKey: Copy + Eq + Ord {
+    const KEY_LEN: usize;
+    fn read(buf: &[u8]) -> Self;
+    fn write(self, buf: &mut [u8]);
+    fn contact(self) -> PeerContact;
+}
+
 impl Ipv4PeerKey {
     pub fn new(ip: Ipv4Addr, port: u16) -> Self {
         Self {
@@ -128,6 +135,26 @@ impl Ipv4PeerKey {
     }
 }
 
+impl PeerKey for Ipv4PeerKey {
+    const KEY_LEN: usize = 6;
+
+    fn read(buf: &[u8]) -> Self {
+        Self {
+            ip: [buf[0], buf[1], buf[2], buf[3]],
+            port: u16::from_be_bytes([buf[4], buf[5]]),
+        }
+    }
+
+    fn write(self, buf: &mut [u8]) {
+        buf[0..4].copy_from_slice(&self.ip);
+        buf[4..6].copy_from_slice(&self.port.to_be_bytes());
+    }
+
+    fn contact(self) -> PeerContact {
+        self.contact()
+    }
+}
+
 impl Ipv6PeerKey {
     pub fn new(ip: Ipv6Addr, port: u16) -> Self {
         Self {
@@ -148,6 +175,28 @@ impl Ipv6PeerKey {
         out[..16].copy_from_slice(&self.ip);
         out[16..].copy_from_slice(&self.port.to_be_bytes());
         out
+    }
+}
+
+impl PeerKey for Ipv6PeerKey {
+    const KEY_LEN: usize = 18;
+
+    fn read(buf: &[u8]) -> Self {
+        let mut ip = [0_u8; 16];
+        ip.copy_from_slice(&buf[0..16]);
+        Self {
+            ip,
+            port: u16::from_be_bytes([buf[16], buf[17]]),
+        }
+    }
+
+    fn write(self, buf: &mut [u8]) {
+        buf[0..16].copy_from_slice(&self.ip);
+        buf[16..18].copy_from_slice(&self.port.to_be_bytes());
+    }
+
+    fn contact(self) -> PeerContact {
+        self.contact()
     }
 }
 
