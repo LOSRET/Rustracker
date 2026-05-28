@@ -4,8 +4,7 @@ use std::time::Duration;
 
 use anyhow::Context;
 use clap::Parser;
-use rustracker::http1_server;
-use rustracker::server::{router, AppState, DEFAULT_TRACKER_SHARDS};
+use rustracker::server::{router, serve, AppState, DEFAULT_TRACKER_SHARDS};
 use tokio::net::TcpListener;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
@@ -75,7 +74,7 @@ async fn main() -> anyhow::Result<()> {
         keepalive_timeout_secs = args.keepalive_timeout_secs,
         "rustracker listening"
     );
-    http1_server::serve(
+    serve(
         listener,
         app,
         Duration::from_secs(args.keepalive_timeout_secs),
