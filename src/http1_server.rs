@@ -66,7 +66,6 @@ where
             builder
                 .keep_alive(true)
                 .writev(true)
-                .max_buf_size(16384)
                 .pipeline_flush(false)
                 .timer(TokioTimer::new())
                 .header_read_timeout(keepalive_timeout);
