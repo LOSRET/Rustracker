@@ -1,7 +1,6 @@
 use std::future::Future;
 use std::io;
 use std::net::SocketAddr;
-use std::pin::pin;
 use std::time::Duration;
 
 use axum::body::Body;
@@ -66,25 +65,25 @@ where
             let mut builder = Builder::new();
             builder
                 .keep_alive(true)
+                .writev(true)
+                .max_buf_size(16384)
+                .pipeline_flush(false)
                 .timer(TokioTimer::new())
                 .header_read_timeout(keepalive_timeout);
 
-            let conn = builder.serve_connection(io, hyper_service);
-            let mut conn = pin!(conn);
-            let mut shutdown_started = false;
+            let mut conn = Box::pin(builder.serve_connection(io, hyper_service));
 
-            loop {
-                tokio::select! {
-                    result = conn.as_mut() => {
-                        if let Err(err) = result {
-                            trace!("failed to serve connection: {err:#}");
-                        }
-                        break;
+            tokio::select! {
+                result = conn.as_mut() => {
+                    if let Err(err) = result {
+                        trace!("failed to serve connection: {err:#}");
                     }
-                    _ = signal_tx.closed(), if !shutdown_started => {
-                        shutdown_started = true;
-                        trace!("signal received in task, starting graceful shutdown");
-                        conn.as_mut().graceful_shutdown();
+                }
+                _ = signal_tx.closed() => {
+                    trace!("signal received in task, starting graceful shutdown");
+                    conn.as_mut().graceful_shutdown();
+                    if let Err(err) = conn.await {
+                        trace!("failed to serve connection: {err:#}");
                     }
                 }
             }
