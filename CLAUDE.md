@@ -172,13 +172,12 @@ GitHub Actions workflows:
 --listen                  RUSTRACKER_LISTEN                  default: 0.0.0.0:8080
 --interval-secs           RUSTRACKER_INTERVAL_SECS           default: 1800
 --peer-timeout-secs       RUSTRACKER_PEER_TIMEOUT_SECS       default: 3000
---keepalive-timeout-secs  RUSTRACKER_KEEPALIVE_TIMEOUT_SECS  default: 2
 --blacklist               RUSTRACKER_BLACKLIST               optional: path to blacklist file
 --trends-file             RUSTRACKER_TRENDS_FILE             optional: path to trends JSONL
 --admin-token             RUSTRACKER_ADMIN_TOKEN             optional: bearer token for admin API
 ```
 
-All flags support env var fallback. CLI takes precedence over env vars. `--interval-secs` controls the peer expiry sweep interval; `--peer-timeout-secs` is the peer timeout threshold; `--keepalive-timeout-secs` controls how long an idle HTTP/1 keep-alive connection can wait for the next request.
+All flags support env var fallback. CLI takes precedence over env vars. `--interval-secs` controls the peer expiry sweep interval; `--peer-timeout-secs` is the peer timeout threshold.
 
 ## Key API Endpoints
 

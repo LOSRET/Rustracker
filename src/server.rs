@@ -11,7 +11,6 @@ use std::time::{Duration, Instant, SystemTime};
 
 use axum::routing::get;
 use axum::Router;
-use hyper_util::rt::TokioTimer;
 use tokio::net::TcpListener;
 use tokio::sync::RwLock;
 use tokio::time::MissedTickBehavior;
@@ -243,12 +242,7 @@ fn file_mtime(path: &Path) -> SystemTime {
         .unwrap_or(SystemTime::UNIX_EPOCH)
 }
 
-pub async fn serve<F>(
-    listener: TcpListener,
-    app: Router,
-    keepalive_timeout: Duration,
-    shutdown: F,
-) -> io::Result<()>
+pub async fn serve<F>(listener: TcpListener, app: Router, shutdown: F) -> io::Result<()>
 where
     F: Future<Output = ()> + Send + 'static,
 {
@@ -259,9 +253,7 @@ where
         .http1()
         .keep_alive(true)
         .writev(true)
-        .pipeline_flush(false)
-        .timer(TokioTimer::new())
-        .header_read_timeout(keepalive_timeout);
+        .pipeline_flush(false);
 
     let handle = axum_server::Handle::new();
     let server = server.handle(handle.clone());
@@ -287,20 +279,13 @@ mod serve_tests {
 
     use super::*;
 
-    async fn slow() -> &'static str {
-        tokio::time::sleep(Duration::from_millis(300)).await;
-        "slow"
-    }
-
-    async fn start_server(app: Router, keepalive_timeout: Duration) -> SocketAddr {
+    async fn start_server(app: Router) -> SocketAddr {
         let listener = TcpListener::bind(std::net::SocketAddr::from(([127, 0, 0, 1], 0)))
             .await
             .unwrap();
         let addr = listener.local_addr().unwrap();
         tokio::spawn(async move {
-            serve(listener, app, keepalive_timeout, future::pending())
-                .await
-                .unwrap();
+            serve(listener, app, future::pending()).await.unwrap();
         });
         addr
     }
@@ -326,45 +311,19 @@ mod serve_tests {
     }
 
     #[tokio::test]
-    async fn keepalive_connection_accepts_second_request_before_timeout() {
+    async fn keepalive_connection_accepts_later_request() {
         let app = Router::new().route("/healthz", get(|| async { "ok" }));
-        let addr = start_server(app, Duration::from_millis(500)).await;
+        let addr = start_server(app).await;
         let mut stream = TcpStream::connect(addr).await.unwrap();
 
         send_request(&mut stream, "/healthz").await;
         let first = read_response(&mut stream, b"ok").await;
         assert!(first.windows(b"200 OK".len()).any(|w| w == b"200 OK"));
 
+        tokio::time::sleep(Duration::from_millis(300)).await;
+
         send_request(&mut stream, "/healthz").await;
         let second = read_response(&mut stream, b"ok").await;
         assert!(second.windows(b"200 OK".len()).any(|w| w == b"200 OK"));
-    }
-
-    #[tokio::test]
-    async fn keepalive_connection_closes_after_idle_timeout() {
-        let app = Router::new().route("/healthz", get(|| async { "ok" }));
-        let addr = start_server(app, Duration::from_millis(100)).await;
-        let mut stream = TcpStream::connect(addr).await.unwrap();
-
-        send_request(&mut stream, "/healthz").await;
-        let response = read_response(&mut stream, b"ok").await;
-        assert!(response.windows(b"200 OK".len()).any(|w| w == b"200 OK"));
-
-        tokio::time::sleep(Duration::from_millis(300)).await;
-
-        let mut buf = [0_u8; 1];
-        let read = stream.read(&mut buf).await.unwrap();
-        assert_eq!(read, 0);
-    }
-
-    #[tokio::test]
-    async fn keepalive_timeout_does_not_abort_active_request() {
-        let app = Router::new().route("/slow", get(slow));
-        let addr = start_server(app, Duration::from_millis(100)).await;
-        let mut stream = TcpStream::connect(addr).await.unwrap();
-
-        send_request(&mut stream, "/slow").await;
-        let response = read_response(&mut stream, b"slow").await;
-        assert!(response.windows(b"200 OK".len()).any(|w| w == b"200 OK"));
     }
 }
