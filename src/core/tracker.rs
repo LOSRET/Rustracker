@@ -1,3 +1,4 @@
+use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, HashMap};
 use std::time::{Duration, Instant};
 
@@ -86,12 +87,11 @@ impl Tracker {
         let numwant = input.numwant;
         let new_tag = input.client_tag;
 
-        // Detect new torrent before borrowing swarms.
-        let is_new_torrent = !self.swarms.contains_key(&info_hash);
-
         // All swarm operations happen in this block; borrow released before client_counts access
         let (output, pending_decr, pending_incr) = {
-            let swarm = self.swarms.entry(info_hash).or_default();
+            let entry = self.swarms.entry(info_hash);
+            let is_new_torrent = matches!(&entry, Entry::Vacant(_));
+            let swarm = entry.or_default();
 
             if is_new_torrent {
                 self.counters.add_torrent();
