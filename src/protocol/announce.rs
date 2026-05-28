@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
 
-use percent_encoding::percent_decode_str;
 use thiserror::Error;
 
 use super::bencode::{write_bytes, write_int, write_key};
@@ -52,20 +51,22 @@ pub fn parse_announce_query(raw_query: &str) -> Result<AnnounceQuery, ProtocolEr
         match key {
             "info_hash" => info_hash = Some(parse_info_hash_value(value)?),
             "peer_id" => peer_id = Some(parse_peer_id_value(value)?),
-            "port" => {
-                port = Some(value.parse().map_err(|_| ProtocolError::Invalid("port"))?)
-            }
+            "port" => port = Some(value.parse().map_err(|_| ProtocolError::Invalid("port"))?),
             "uploaded" => {
-                uploaded =
-                    Some(value.parse().map_err(|_| ProtocolError::Invalid("uploaded"))?)
+                uploaded = Some(
+                    value
+                        .parse()
+                        .map_err(|_| ProtocolError::Invalid("uploaded"))?,
+                )
             }
             "downloaded" => {
-                downloaded =
-                    Some(value.parse().map_err(|_| ProtocolError::Invalid("downloaded"))?)
+                downloaded = Some(
+                    value
+                        .parse()
+                        .map_err(|_| ProtocolError::Invalid("downloaded"))?,
+                )
             }
-            "left" => {
-                left = Some(value.parse().map_err(|_| ProtocolError::Invalid("left"))?)
-            }
+            "left" => left = Some(value.parse().map_err(|_| ProtocolError::Invalid("left"))?),
             "event" => {
                 event = Some(match value {
                     "started" => AnnounceEvent::Started,
@@ -76,8 +77,11 @@ pub fn parse_announce_query(raw_query: &str) -> Result<AnnounceQuery, ProtocolEr
                 })
             }
             "numwant" => {
-                numwant =
-                    Some(value.parse().map_err(|_| ProtocolError::Invalid("numwant"))?)
+                numwant = Some(
+                    value
+                        .parse()
+                        .map_err(|_| ProtocolError::Invalid("numwant"))?,
+                )
             }
             "compact" => {
                 compact = Some(
@@ -87,9 +91,7 @@ pub fn parse_announce_query(raw_query: &str) -> Result<AnnounceQuery, ProtocolEr
                         != 0,
                 )
             }
-            "ip" => {
-                ip = Some(value.parse().map_err(|_| ProtocolError::Invalid("ip"))?)
-            }
+            "ip" => ip = Some(value.parse().map_err(|_| ProtocolError::Invalid("ip"))?),
             _ => {}
         }
     }
@@ -135,41 +137,17 @@ pub fn peer_ip(query_ip: Option<IpAddr>, remote_addr: Option<SocketAddr>) -> IpA
         .unwrap_or(IpAddr::from([127, 0, 0, 1]))
 }
 
-pub fn announce_response(output: AnnounceOutput, compact: bool) -> Vec<u8> {
-    let mut buf = Vec::with_capacity(128 + output.peers.len() * 6);
+pub fn announce_response(output: AnnounceOutput, _compact: bool) -> Vec<u8> {
+    let (v4_bytes, v6_bytes) = output.peers;
+    let mut buf = Vec::with_capacity(160 + v4_bytes.len() + v6_bytes.len());
     buf.push(b'd');
 
     write_int(&mut buf, b"complete", output.complete as i64);
     write_int(&mut buf, b"incomplete", output.incomplete as i64);
     write_int(&mut buf, b"downloaded", output.downloaded as i64);
     write_int(&mut buf, b"interval", output.interval as i64);
-
-    if compact {
-        let mut v4_bytes = Vec::with_capacity(output.peers.len() * 6);
-        let mut v6_bytes = Vec::with_capacity(output.peers.len() * 18);
-        for peer in &output.peers {
-            if let Some(b) = peer.compact_ipv4() {
-                v4_bytes.extend_from_slice(&b);
-            }
-            if let Some(b) = peer.compact_ipv6() {
-                v6_bytes.extend_from_slice(&b);
-            }
-        }
-        write_bytes(&mut buf, b"peers", &v4_bytes);
-        write_bytes(&mut buf, b"peers6", &v6_bytes);
-    } else {
-        write_key(&mut buf, b"peers");
-        buf.push(b'l');
-        for peer in &output.peers {
-            buf.push(b'd');
-            let ip_str = peer.ip.to_string();
-            write_bytes(&mut buf, b"ip", ip_str.as_bytes());
-            write_int(&mut buf, b"port", peer.port as i64);
-            buf.push(b'e');
-        }
-        buf.push(b'e');
-        write_bytes(&mut buf, b"peers6", b"");
-    }
+    write_bytes(&mut buf, b"peers", &v4_bytes);
+    write_bytes(&mut buf, b"peers6", &v6_bytes);
 
     buf.push(b'e');
     buf
@@ -205,17 +183,56 @@ fn parse_peer_id_value(value: &str) -> Result<PeerId, ProtocolError> {
 }
 
 fn parse_20_byte_raw(value: &str, name: &'static str) -> Result<[u8; ID_LEN], ProtocolError> {
-    let bytes = percent_decode_str(value).collect::<Vec<_>>();
-    bytes.try_into().map_err(|_| ProtocolError::Invalid(name))
+    let bytes = value.as_bytes();
+    let mut buf = [0u8; ID_LEN];
+    let mut pos = 0usize;
+    let mut i = 0usize;
+
+    while i < bytes.len() {
+        if pos >= ID_LEN {
+            return Err(ProtocolError::Invalid(name));
+        }
+        match bytes[i] {
+            b'%' if i + 2 < bytes.len() => {
+                let hi = hex_decode(bytes[i + 1]).ok_or(ProtocolError::Invalid(name))?;
+                let lo = hex_decode(bytes[i + 2]).ok_or(ProtocolError::Invalid(name))?;
+                buf[pos] = (hi << 4) | lo;
+                i += 3;
+            }
+            b'+' => {
+                buf[pos] = b' ';
+                i += 1;
+            }
+            b => {
+                buf[pos] = b;
+                i += 1;
+            }
+        }
+        pos += 1;
+    }
+
+    if pos == ID_LEN {
+        Ok(buf)
+    } else {
+        Err(ProtocolError::Invalid(name))
+    }
+}
+
+fn hex_decode(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+    use std::net::Ipv6Addr;
 
     use super::{announce_response, parse_announce_query, parse_scrape_query};
     use crate::core::tracker::AnnounceOutput;
-    use crate::core::types::PeerContact;
 
     #[test]
     fn parses_binary_announce_fields() {
@@ -244,32 +261,24 @@ mod tests {
             complete: 1,
             incomplete: 0,
             downloaded: 0,
-            peers: vec![PeerContact {
-                ip: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-                port: 6881,
-            }],
+            peers: (vec![127, 0, 0, 1, 0x1a, 0xe1], vec![]),
         };
         let encoded = announce_response(output, true);
-        assert!(encoded
-            .windows(6)
-            .any(|w| w == [127, 0, 0, 1, 0x1a, 0xe1]));
+        assert!(encoded.windows(6).any(|w| w == [127, 0, 0, 1, 0x1a, 0xe1]));
     }
 
     #[test]
     fn announce_response_compact_ipv6() {
+        let mut v6 = Ipv6Addr::LOCALHOST.octets().to_vec();
+        v6.extend_from_slice(&6881_u16.to_be_bytes());
         let output = AnnounceOutput {
             interval: 1800,
             complete: 1,
             incomplete: 0,
             downloaded: 0,
-            peers: vec![PeerContact {
-                ip: IpAddr::V6(Ipv6Addr::LOCALHOST),
-                port: 6881,
-            }],
+            peers: (vec![], v6.clone()),
         };
         let encoded = announce_response(output, true);
-        let mut expected = Ipv6Addr::LOCALHOST.octets().to_vec();
-        expected.extend_from_slice(&6881_u16.to_be_bytes());
-        assert!(encoded.windows(18).any(|w| w == expected.as_slice()));
+        assert!(encoded.windows(18).any(|w| w == v6.as_slice()));
     }
 }

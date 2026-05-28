@@ -113,13 +113,6 @@ impl Ipv4PeerKey {
         }
     }
 
-    pub fn contact(self) -> PeerContact {
-        PeerContact {
-            ip: IpAddr::V4(Ipv4Addr::from(self.ip)),
-            port: self.port,
-        }
-    }
-
     pub fn compact(self) -> [u8; 6] {
         let mut out = [0_u8; 6];
         out[..4].copy_from_slice(&self.ip);
@@ -136,13 +129,6 @@ impl Ipv6PeerKey {
         }
     }
 
-    pub fn contact(self) -> PeerContact {
-        PeerContact {
-            ip: IpAddr::V6(Ipv6Addr::from(self.ip)),
-            port: self.port,
-        }
-    }
-
     pub fn compact(self) -> [u8; 18] {
         let mut out = [0_u8; 18];
         out[..16].copy_from_slice(&self.ip);
@@ -152,28 +138,6 @@ impl Ipv6PeerKey {
 }
 
 impl PeerContact {
-    pub fn compact_ipv4(&self) -> Option<[u8; 6]> {
-        let IpAddr::V4(ip) = self.ip else {
-            return None;
-        };
-
-        let mut out = [0_u8; 6];
-        out[..4].copy_from_slice(&ip.octets());
-        out[4..].copy_from_slice(&self.port.to_be_bytes());
-        Some(out)
-    }
-
-    pub fn compact_ipv6(&self) -> Option<[u8; 18]> {
-        let IpAddr::V6(ip) = self.ip else {
-            return None;
-        };
-
-        let mut out = [0_u8; 18];
-        out[..16].copy_from_slice(&ip.octets());
-        out[16..].copy_from_slice(&self.port.to_be_bytes());
-        Some(out)
-    }
-
     pub fn localhost(_peer_id: PeerId, port: u16) -> Self {
         Self {
             ip: IpAddr::V4(Ipv4Addr::LOCALHOST),

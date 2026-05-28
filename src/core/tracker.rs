@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 use super::counters::{ExpireResult, TrackerCounters};
 use super::swarm::{PeerEndpoint, Swarm};
 use super::topk::{self, Top100All};
-use super::types::{AnnounceEvent, InfoHash, PeerContact, PeerId, PeerState, TorrentStats};
+use super::types::{AnnounceEvent, InfoHash, PeerId, PeerState, TorrentStats};
 
 const INTERVAL_JITTER_PERCENT: u64 = 10;
 const EXPIRE_SWEEP_INTERVAL: Duration = Duration::from_secs(30);
@@ -29,7 +29,7 @@ pub struct AnnounceOutput {
     pub complete: usize,
     pub incomplete: usize,
     pub downloaded: u32,
-    pub peers: Vec<PeerContact>,
+    pub peers: (Vec<u8>, Vec<u8>),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -356,8 +356,8 @@ mod tests {
     use std::net::{IpAddr, Ipv4Addr};
     use std::time::{Duration, Instant};
 
-    use super::{AnnounceInput, Tracker};
     use super::super::types::{AnnounceEvent, InfoHash, PeerId};
+    use super::{AnnounceInput, Tracker};
 
     fn hash(byte: u8) -> InfoHash {
         InfoHash([byte; 20])
@@ -511,16 +511,15 @@ mod tests {
         let first = tracker.announce(request.clone(), now + Duration::from_secs(1));
         let second = tracker.announce(request, now + Duration::from_secs(60));
 
-        assert_eq!(first.peers.len(), 3);
-        assert_eq!(second.peers.len(), 3);
+        let num_v4_peers = first.peers.0.len() / 6 + first.peers.1.len() / 18;
+        assert_eq!(num_v4_peers, 3);
+        let num_v4_peers = second.peers.0.len() / 6 + second.peers.1.len() / 18;
+        assert_eq!(num_v4_peers, 3);
         assert_ne!(first.peers, second.peers);
-        assert!(!first
-            .peers
-            .iter()
-            .any(|contact| contact.ip == request_ip(9) && contact.port == 6881));
-        assert!(!second
-            .peers
-            .iter()
-            .any(|contact| contact.ip == request_ip(9) && contact.port == 6881));
+        let self_bytes = [127, 0, 0, 9, 0x1a, 0xe1];
+        assert!(!first.peers.0.windows(6).any(|w| w == self_bytes));
+        assert!(!first.peers.1.windows(18).any(|w| w[..6] == self_bytes));
+        assert!(!second.peers.0.windows(6).any(|w| w == self_bytes));
+        assert!(!second.peers.1.windows(18).any(|w| w[..6] == self_bytes));
     }
 }

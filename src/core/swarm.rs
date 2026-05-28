@@ -6,7 +6,7 @@
 use std::net::IpAddr;
 
 use super::counters::{ExpireResult, PeerRemoval, PeerUpsert};
-use super::types::{Ipv4PeerKey, Ipv6PeerKey, PeerContact, PeerState, TorrentStats};
+use super::types::{Ipv4PeerKey, Ipv6PeerKey, PeerState, TorrentStats};
 
 pub(crate) const FLAG_COMPLETE: u8 = 1;
 pub(crate) const IPV4_ENTRY_LEN: usize = 12;
@@ -120,25 +120,22 @@ impl PackedIpv4Peers {
         }
     }
 
-    pub(crate) fn append_contacts(
-        &self,
-        exclude: Option<&Ipv4PeerKey>,
-        contacts: &mut Vec<PeerContact>,
-    ) {
+    pub(crate) fn append_compact(&self, exclude: Option<&Ipv4PeerKey>, out: &mut Vec<u8>) {
         for index in 0..self.len() {
             let key = self.key_at(index);
             if exclude != Some(&key) {
-                contacts.push(key.contact());
+                out.extend_from_slice(&key.ip);
+                out.extend_from_slice(&key.port.to_be_bytes());
             }
         }
     }
 
-    pub(crate) fn select_random(
+    pub(crate) fn select_random_compact(
         &self,
         count: usize,
         rng: &mut Rng,
         exclude: Option<&Ipv4PeerKey>,
-        contacts: &mut Vec<PeerContact>,
+        out: &mut Vec<u8>,
     ) {
         let total = self.len();
         if total == 0 || count == 0 {
@@ -146,7 +143,7 @@ impl PackedIpv4Peers {
         }
 
         if count >= total {
-            self.append_contacts(exclude, contacts);
+            self.append_compact(exclude, out);
             return;
         }
 
@@ -164,17 +161,17 @@ impl PackedIpv4Peers {
         for remaining in (0..count).rev() {
             let diff = (((remaining as u64 + 1) * shifted_step) >> shift)
                 .saturating_sub(((remaining as u64) * shifted_step) >> shift);
-            let advance = 1
-                + if diff > 1 {
-                    rng.next_usize(diff as usize)
-                } else {
-                    0
-                };
+            let advance = 1 + if diff > 1 {
+                rng.next_usize(diff as usize)
+            } else {
+                0
+            };
             pos = (pos + advance) % total;
 
             let key = self.key_at(pos);
             if exclude != Some(&key) {
-                contacts.push(key.contact());
+                out.extend_from_slice(&key.ip);
+                out.extend_from_slice(&key.port.to_be_bytes());
             }
         }
     }
@@ -215,7 +212,8 @@ impl PackedIpv4Peers {
         let offset = index * IPV4_ENTRY_LEN;
         let old_len = self.bytes.len();
         self.bytes.resize(old_len + IPV4_ENTRY_LEN, 0);
-        self.bytes.copy_within(offset..old_len, offset + IPV4_ENTRY_LEN);
+        self.bytes
+            .copy_within(offset..old_len, offset + IPV4_ENTRY_LEN);
         self.write_at(index, key, peer);
     }
 
@@ -402,25 +400,22 @@ impl PackedIpv6Peers {
         }
     }
 
-    pub(crate) fn append_contacts(
-        &self,
-        exclude: Option<&Ipv6PeerKey>,
-        contacts: &mut Vec<PeerContact>,
-    ) {
+    pub(crate) fn append_compact(&self, exclude: Option<&Ipv6PeerKey>, out: &mut Vec<u8>) {
         for index in 0..self.len() {
             let key = self.key_at(index);
             if exclude != Some(&key) {
-                contacts.push(key.contact());
+                out.extend_from_slice(&key.ip);
+                out.extend_from_slice(&key.port.to_be_bytes());
             }
         }
     }
 
-    pub(crate) fn select_random(
+    pub(crate) fn select_random_compact(
         &self,
         count: usize,
         rng: &mut Rng,
         exclude: Option<&Ipv6PeerKey>,
-        contacts: &mut Vec<PeerContact>,
+        out: &mut Vec<u8>,
     ) {
         let total = self.len();
         if total == 0 || count == 0 {
@@ -428,7 +423,7 @@ impl PackedIpv6Peers {
         }
 
         if count >= total {
-            self.append_contacts(exclude, contacts);
+            self.append_compact(exclude, out);
             return;
         }
 
@@ -446,17 +441,17 @@ impl PackedIpv6Peers {
         for remaining in (0..count).rev() {
             let diff = (((remaining as u64 + 1) * shifted_step) >> shift)
                 .saturating_sub(((remaining as u64) * shifted_step) >> shift);
-            let advance = 1
-                + if diff > 1 {
-                    rng.next_usize(diff as usize)
-                } else {
-                    0
-                };
+            let advance = 1 + if diff > 1 {
+                rng.next_usize(diff as usize)
+            } else {
+                0
+            };
             pos = (pos + advance) % total;
 
             let key = self.key_at(pos);
             if exclude != Some(&key) {
-                contacts.push(key.contact());
+                out.extend_from_slice(&key.ip);
+                out.extend_from_slice(&key.port.to_be_bytes());
             }
         }
     }
@@ -497,7 +492,8 @@ impl PackedIpv6Peers {
         let offset = index * IPV6_ENTRY_LEN;
         let old_len = self.bytes.len();
         self.bytes.resize(old_len + IPV6_ENTRY_LEN, 0);
-        self.bytes.copy_within(offset..old_len, offset + IPV6_ENTRY_LEN);
+        self.bytes
+            .copy_within(offset..old_len, offset + IPV6_ENTRY_LEN);
         self.write_at(index, key, peer);
     }
 
@@ -814,14 +810,14 @@ impl Swarm {
         requesting_endpoint: PeerEndpoint,
         limit: usize,
         rng_seed: u64,
-    ) -> Vec<PeerContact> {
+    ) -> (Vec<u8>, Vec<u8>) {
         if limit == 0 {
-            return Vec::new();
+            return (Vec::new(), Vec::new());
         }
 
         let total = self.len();
         if total == 0 {
-            return Vec::new();
+            return (Vec::new(), Vec::new());
         }
 
         let v4_exclude = match requesting_endpoint {
@@ -836,12 +832,13 @@ impl Swarm {
         // Short circuit: return all peers except self when swarm is small
         let available = total - 1;
         if available <= limit {
-            let mut contacts = Vec::with_capacity(available);
+            let mut v4_bytes = Vec::with_capacity(self.ipv4_peers.len() * 6);
+            let mut v6_bytes = Vec::with_capacity(self.ipv6_peers.len() * 18);
             self.ipv4_peers
-                .append_contacts(v4_exclude.as_ref(), &mut contacts);
+                .append_compact(v4_exclude.as_ref(), &mut v4_bytes);
             self.ipv6_peers
-                .append_contacts(v6_exclude.as_ref(), &mut contacts);
-            return contacts;
+                .append_compact(v6_exclude.as_ref(), &mut v6_bytes);
+            return (v4_bytes, v6_bytes);
         }
 
         // Allocate between v4 and v6 proportionally (at least 1/4 each if available)
@@ -852,14 +849,36 @@ impl Swarm {
             allocate_v4_v6(self.ipv4_peers.len(), self.ipv6_peers.len(), limit + extra);
 
         let mut rng = Rng::new(rng_seed);
-        let mut contacts = Vec::with_capacity(limit);
+        let mut v4_bytes = Vec::with_capacity(v4_amount * 6);
+        let mut v6_bytes = Vec::with_capacity(v6_amount * 18);
 
-        self.ipv4_peers
-            .select_random(v4_amount, &mut rng, v4_exclude.as_ref(), &mut contacts);
-        self.ipv6_peers
-            .select_random(v6_amount, &mut rng, v6_exclude.as_ref(), &mut contacts);
+        self.ipv4_peers.select_random_compact(
+            v4_amount,
+            &mut rng,
+            v4_exclude.as_ref(),
+            &mut v4_bytes,
+        );
+        self.ipv6_peers.select_random_compact(
+            v6_amount,
+            &mut rng,
+            v6_exclude.as_ref(),
+            &mut v6_bytes,
+        );
 
-        contacts.truncate(limit);
-        contacts
+        // Truncate to limit — extra allocation may produce more than limit
+        // when the excluded peer is not selected.
+        let v4_count = v4_bytes.len() / 6;
+        let v6_count = v6_bytes.len() / 18;
+        let excess = (v4_count + v6_count).saturating_sub(limit);
+        if excess > 0 {
+            let v6_remove = excess.min(v6_count);
+            v6_bytes.truncate((v6_count - v6_remove) * 18);
+            let v4_remove = excess - v6_remove;
+            if v4_remove > 0 {
+                v4_bytes.truncate((v4_count - v4_remove) * 6);
+            }
+        }
+
+        (v4_bytes, v6_bytes)
     }
 }

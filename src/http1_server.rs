@@ -44,6 +44,8 @@ where
             }
         };
 
+        stream.set_nodelay(true)?;
+
         <IntoMakeServiceWithConnectInfo<Router, SocketAddr> as ServiceExt<SocketAddr>>::ready(
             &mut make_service,
         )

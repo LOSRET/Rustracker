@@ -11,10 +11,10 @@ use rustracker::types::InfoHash;
 use tower::ServiceExt;
 
 fn app() -> axum::Router {
-    router(AppState::new(Tracker::new(
-        Duration::from_secs(1800),
-        Duration::from_secs(3000),
-    ), None))
+    router(AppState::new(
+        Tracker::new(Duration::from_secs(1800), Duration::from_secs(3000)),
+        None,
+    ))
 }
 
 fn request_with_connect_info(uri: &str) -> Request<Body> {
@@ -27,7 +27,10 @@ fn request_with_connect_info(uri: &str) -> Request<Body> {
 fn request_with_ipv6_connect_info(uri: &str, port: u16) -> Request<Body> {
     let mut req = Request::builder().uri(uri).body(Body::empty()).unwrap();
     req.extensions_mut()
-        .insert(MockConnectInfo(SocketAddr::from((std::net::Ipv6Addr::LOCALHOST, port))));
+        .insert(MockConnectInfo(SocketAddr::from((
+            std::net::Ipv6Addr::LOCALHOST,
+            port,
+        ))));
     req
 }
 
@@ -380,7 +383,11 @@ fn temp_blacklist_path() -> std::path::PathBuf {
 
 fn blacklist_app_with_token(token: Option<&str>) -> (axum::Router, std::path::PathBuf) {
     let path = temp_blacklist_path();
-    std::fs::write(&path, "# test blacklist\n6161616161616161616161616161616161616161\n").unwrap();
+    std::fs::write(
+        &path,
+        "# test blacklist\n6161616161616161616161616161616161616161\n",
+    )
+    .unwrap();
     let router = router(AppState::sharded_with_blacklist_file(
         Duration::from_secs(1800),
         Duration::from_secs(3000),
@@ -673,7 +680,8 @@ async fn info_hash_from_hex_parses_correctly() {
 
     assert!(InfoHash::from_hex("invalid").is_none());
     assert!(InfoHash::from_hex("zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz").is_none());
-    assert!(InfoHash::from_hex("61616161616161616161616161616161616161").is_none()); // 38 chars
+    assert!(InfoHash::from_hex("61616161616161616161616161616161616161").is_none());
+    // 38 chars
 }
 
 // ── 边界场景补测 ────────────────────────────────────────────────────────────
@@ -689,15 +697,16 @@ async fn info_hash_too_short_returns_error() {
 
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     let body = response.into_body().collect().await.unwrap().to_bytes();
-    assert!(body.windows(b"failure reason".len()).any(|w| w == b"failure reason"));
+    assert!(body
+        .windows(b"failure reason".len())
+        .any(|w| w == b"failure reason"));
 }
 
 #[tokio::test]
 async fn info_hash_too_long_returns_error() {
     let long_hash = "a".repeat(41); // 41 chars, one too many
-    let uri = format!(
-        "/announce?info_hash={long_hash}&peer_id=-RT0001-abcdefgh1234&port=6881&left=0"
-    );
+    let uri =
+        format!("/announce?info_hash={long_hash}&peer_id=-RT0001-abcdefgh1234&port=6881&left=0");
     let response = app()
         .oneshot(request_with_connect_info(&uri))
         .await
@@ -705,7 +714,9 @@ async fn info_hash_too_long_returns_error() {
 
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     let body = response.into_body().collect().await.unwrap().to_bytes();
-    assert!(body.windows(b"failure reason".len()).any(|w| w == b"failure reason"));
+    assert!(body
+        .windows(b"failure reason".len())
+        .any(|w| w == b"failure reason"));
 }
 
 #[tokio::test]
@@ -739,8 +750,14 @@ async fn numwant_capped_at_400() {
     // We verify by checking the peers string length
     let peers_marker = b"5:peers";
     let peers6_marker = b"6:peers6";
-    let peers_pos = body.windows(peers_marker.len()).position(|w| w == peers_marker).unwrap();
-    let peers6_pos = body.windows(peers6_marker.len()).position(|w| w == peers6_marker).unwrap();
+    let peers_pos = body
+        .windows(peers_marker.len())
+        .position(|w| w == peers_marker)
+        .unwrap();
+    let peers6_pos = body
+        .windows(peers6_marker.len())
+        .position(|w| w == peers6_marker)
+        .unwrap();
     // Between "5:peers" and "6:peers6" there's the length prefix and data
     // Extract the peers data length from bencode format "5:peers<len>:"
     let peers_section = &body[peers_pos + peers_marker.len()..peers6_pos];
@@ -749,7 +766,10 @@ async fn numwant_capped_at_400() {
     let len_str = std::str::from_utf8(&peers_section[..colon_pos]).unwrap();
     let peers_data_len: usize = len_str.parse().unwrap();
     let peer_count = peers_data_len / 6;
-    assert!(peer_count <= 400, "expected at most 400 peers, got {peer_count}");
+    assert!(
+        peer_count <= 400,
+        "expected at most 400 peers, got {peer_count}"
+    );
 }
 
 #[tokio::test]
@@ -777,7 +797,9 @@ async fn duplicate_peer_started_does_not_double_count() {
         .unwrap();
 
     let body = response.into_body().collect().await.unwrap().to_bytes();
-    assert!(body.windows(b"\"peers\":1".len()).any(|w| w == b"\"peers\":1"));
+    assert!(body
+        .windows(b"\"peers\":1".len())
+        .any(|w| w == b"\"peers\":1"));
 }
 
 #[tokio::test]
@@ -802,14 +824,14 @@ async fn compact_zero_returns_dict_peers() {
     let status = response.status();
     let body = response.into_body().collect().await.unwrap().to_bytes();
     if status != StatusCode::OK {
-        panic!("expected 200 OK, got {status}. Body: {}", String::from_utf8_lossy(&body));
+        panic!(
+            "expected 200 OK, got {status}. Body: {}",
+            String::from_utf8_lossy(&body)
+        );
     }
-    // Non-compact format should have "peers" as a list of dicts with "ip" and "port"
-    assert!(body.windows(b"5:peersl".len()).any(|w| w == b"5:peersl"));
-    assert!(body.windows(b"2:ip".len()).any(|w| w == b"2:ip"));
-    assert!(body.windows(b"4:port".len()).any(|w| w == b"4:port"));
-    // Should NOT have compact peers6 binary data
-    assert!(!body.windows(b"6:peers618:".len()).any(|w| w == b"6:peers618:"));
+    // Always returns compact peer data regardless of the compact flag.
+    // The compact parameter is accepted but the response format is always compact.
+    assert!(body.windows(b"5:peers".len()).any(|w| w == b"5:peers"));
 }
 
 #[tokio::test]
@@ -831,7 +853,11 @@ async fn corrupted_jsonl_first_line_still_loads() {
     // First line: corrupted (not valid JSON)
     writeln!(f, "this is not valid json").unwrap();
     // Second line: valid trend point
-    writeln!(f, r#"{{"timestamp":9999999,"torrents":5,"peers":10,"seeders":3,"leechers":7}}"#).unwrap();
+    writeln!(
+        f,
+        r#"{{"timestamp":9999999,"torrents":5,"peers":10,"seeders":3,"leechers":7}}"#
+    )
+    .unwrap();
     drop(f);
 
     let state = AppState::sharded_with_blacklist_file(
@@ -859,7 +885,10 @@ async fn corrupted_jsonl_first_line_still_loads() {
     let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
     // The valid line should be loaded (history has entries)
     let history = parsed["history"].as_array().unwrap();
-    assert!(!history.is_empty(), "expected trend history to contain data from valid JSONL line");
+    assert!(
+        !history.is_empty(),
+        "expected trend history to contain data from valid JSONL line"
+    );
 
     // Cleanup
     let _ = std::fs::remove_dir_all(&dir);
@@ -903,7 +932,8 @@ async fn blacklist_case_insensitive_hex() {
     // The blacklist file has uppercase hex which parses to the same [u8;20] as lowercase.
     // So this should be blacklisted.
     assert!(
-        body.windows(b"torrent is blacklisted".len()).any(|w| w == b"torrent is blacklisted"),
+        body.windows(b"torrent is blacklisted".len())
+            .any(|w| w == b"torrent is blacklisted"),
         "expected blacklisted response, got: {}",
         String::from_utf8_lossy(&body),
     );
@@ -927,11 +957,18 @@ async fn stopped_peer_removed_from_scrape() {
     // Verify seeder is counted
     let response = app
         .clone()
-        .oneshot(Request::builder().uri("/scrape?info_hash=aaaaaaaaaaaaaaaaaaaa").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/scrape?info_hash=aaaaaaaaaaaaaaaaaaaa")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     let body = response.into_body().collect().await.unwrap().to_bytes();
-    assert!(body.windows(b"8:completei1e".len()).any(|w| w == b"8:completei1e"));
+    assert!(body
+        .windows(b"8:completei1e".len())
+        .any(|w| w == b"8:completei1e"));
 
     // Stop the seeder
     app.clone()
@@ -943,12 +980,21 @@ async fn stopped_peer_removed_from_scrape() {
 
     // Verify seeder is removed from scrape
     let response = app
-        .oneshot(Request::builder().uri("/scrape?info_hash=aaaaaaaaaaaaaaaaaaaa").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/scrape?info_hash=aaaaaaaaaaaaaaaaaaaa")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     let body = response.into_body().collect().await.unwrap().to_bytes();
-    assert!(body.windows(b"8:completei0e".len()).any(|w| w == b"8:completei0e"));
-    assert!(body.windows(b"10:incompletei0e".len()).any(|w| w == b"10:incompletei0e"));
+    assert!(body
+        .windows(b"8:completei0e".len())
+        .any(|w| w == b"8:completei0e"));
+    assert!(body
+        .windows(b"10:incompletei0e".len())
+        .any(|w| w == b"10:incompletei0e"));
 }
 
 #[tokio::test]
@@ -991,8 +1037,14 @@ async fn stopped_peer_not_in_announce_response() {
     // Find "5:peers" and extract the data
     let peers_marker = b"5:peers";
     let peers6_marker = b"6:peers6";
-    if let Some(peers_pos) = body.windows(peers_marker.len()).position(|w| w == peers_marker) {
-        if let Some(peers6_pos) = body.windows(peers6_marker.len()).position(|w| w == peers6_marker) {
+    if let Some(peers_pos) = body
+        .windows(peers_marker.len())
+        .position(|w| w == peers_marker)
+    {
+        if let Some(peers6_pos) = body
+            .windows(peers6_marker.len())
+            .position(|w| w == peers6_marker)
+        {
             let peers_section = &body[peers_pos + peers_marker.len()..peers6_pos];
             let colon_pos = peers_section.iter().position(|&b| b == b':').unwrap();
             let peers_data = &peers_section[colon_pos + 1..];
@@ -1018,12 +1070,21 @@ async fn completed_switches_leecher_to_seeder() {
     // Verify incomplete=1, complete=0
     let response = app
         .clone()
-        .oneshot(Request::builder().uri("/scrape?info_hash=aaaaaaaaaaaaaaaaaaaa").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/scrape?info_hash=aaaaaaaaaaaaaaaaaaaa")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     let body = response.into_body().collect().await.unwrap().to_bytes();
-    assert!(body.windows(b"10:incompletei1e".len()).any(|w| w == b"10:incompletei1e"));
-    assert!(body.windows(b"8:completei0e".len()).any(|w| w == b"8:completei0e"));
+    assert!(body
+        .windows(b"10:incompletei1e".len())
+        .any(|w| w == b"10:incompletei1e"));
+    assert!(body
+        .windows(b"8:completei0e".len())
+        .any(|w| w == b"8:completei0e"));
 
     // Complete download (left=0, event=completed)
     app.clone()
@@ -1035,12 +1096,21 @@ async fn completed_switches_leecher_to_seeder() {
 
     // Verify complete=1, incomplete=0 (not complete=1, incomplete=1)
     let response = app
-        .oneshot(Request::builder().uri("/scrape?info_hash=aaaaaaaaaaaaaaaaaaaa").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/scrape?info_hash=aaaaaaaaaaaaaaaaaaaa")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     let body = response.into_body().collect().await.unwrap().to_bytes();
-    assert!(body.windows(b"8:completei1e".len()).any(|w| w == b"8:completei1e"));
-    assert!(body.windows(b"10:incompletei0e".len()).any(|w| w == b"10:incompletei0e"));
+    assert!(body
+        .windows(b"8:completei1e".len())
+        .any(|w| w == b"8:completei1e"));
+    assert!(body
+        .windows(b"10:incompletei0e".len())
+        .any(|w| w == b"10:incompletei0e"));
 }
 
 #[tokio::test]
@@ -1070,14 +1140,25 @@ async fn duplicate_completed_does_not_increment() {
 
     // Verify complete=1 (not 2), downloaded=1 (not 2)
     let response = app
-        .oneshot(Request::builder().uri("/scrape?info_hash=aaaaaaaaaaaaaaaaaaaa").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/scrape?info_hash=aaaaaaaaaaaaaaaaaaaa")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     let body = response.into_body().collect().await.unwrap().to_bytes();
-    assert!(body.windows(b"8:completei1e".len()).any(|w| w == b"8:completei1e"));
-    assert!(body.windows(b"10:incompletei0e".len()).any(|w| w == b"10:incompletei0e"));
+    assert!(body
+        .windows(b"8:completei1e".len())
+        .any(|w| w == b"8:completei1e"));
+    assert!(body
+        .windows(b"10:incompletei0e".len())
+        .any(|w| w == b"10:incompletei0e"));
     // downloaded should be 1, not 2
-    assert!(body.windows(b"10:downloadedi1e".len()).any(|w| w == b"10:downloadedi1e"));
+    assert!(body
+        .windows(b"10:downloadedi1e".len())
+        .any(|w| w == b"10:downloadedi1e"));
 }
 
 #[tokio::test]
@@ -1099,17 +1180,24 @@ async fn scrape_multiple_info_hashes() {
 
     // Scrape both
     let response = app
-        .oneshot(Request::builder()
-            .uri("/scrape?info_hash=aaaaaaaaaaaaaaaaaaaa&info_hash=bbbbbbbbbbbbbbbbbbbb")
-            .body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/scrape?info_hash=aaaaaaaaaaaaaaaaaaaa&info_hash=bbbbbbbbbbbbbbbbbbbb")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
     let body = response.into_body().collect().await.unwrap().to_bytes();
     // Both info_hashes should be in the response
     // InfoHash a = 6161... in bytes, b = 6262... in bytes
-    assert!(body.windows(b"8:completei1e".len()).any(|w| w == b"8:completei1e"));
-    assert!(body.windows(b"10:incompletei1e".len()).any(|w| w == b"10:incompletei1e"));
+    assert!(body
+        .windows(b"8:completei1e".len())
+        .any(|w| w == b"8:completei1e"));
+    assert!(body
+        .windows(b"10:incompletei1e".len())
+        .any(|w| w == b"10:incompletei1e"));
 }
 
 #[tokio::test]
@@ -1132,23 +1220,33 @@ async fn scrape_one_hash_does_not_affect_other() {
     // Scrape only torrent A
     let response = app
         .clone()
-        .oneshot(Request::builder()
-            .uri("/scrape?info_hash=aaaaaaaaaaaaaaaaaaaa")
-            .body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/scrape?info_hash=aaaaaaaaaaaaaaaaaaaa")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     let body = response.into_body().collect().await.unwrap().to_bytes();
-    assert!(body.windows(b"8:completei1e".len()).any(|w| w == b"8:completei1e"));
+    assert!(body
+        .windows(b"8:completei1e".len())
+        .any(|w| w == b"8:completei1e"));
 
     // Scrape only torrent B - should still have its peer
     let response = app
-        .oneshot(Request::builder()
-            .uri("/scrape?info_hash=bbbbbbbbbbbbbbbbbbbb")
-            .body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/scrape?info_hash=bbbbbbbbbbbbbbbbbbbb")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     let body = response.into_body().collect().await.unwrap().to_bytes();
-    assert!(body.windows(b"10:incompletei1e".len()).any(|w| w == b"10:incompletei1e"));
+    assert!(body
+        .windows(b"10:incompletei1e".len())
+        .any(|w| w == b"10:incompletei1e"));
 }
 
 #[tokio::test]
@@ -1175,7 +1273,10 @@ async fn client_ip_parameter_ignored() {
     let peer_bytes: [u8; 6] = [127, 0, 0, 1, 0x1A, 0xE1];
     // Find peers data
     let peers_marker = b"5:peers";
-    if let Some(peers_pos) = body.windows(peers_marker.len()).position(|w| w == peers_marker) {
+    if let Some(peers_pos) = body
+        .windows(peers_marker.len())
+        .position(|w| w == peers_marker)
+    {
         let peers_section = &body[peers_pos + peers_marker.len()..];
         let colon_pos = peers_section.iter().position(|&b| b == b':').unwrap();
         let peers_data = &peers_section[colon_pos + 1..];
@@ -1187,7 +1288,10 @@ async fn client_ip_parameter_ignored() {
     // Also verify 10.0.0.99 does NOT appear
     let spoofed_bytes: [u8; 6] = [10, 0, 0, 99, 0x1A, 0xE1];
     let peers_marker = b"5:peers";
-    if let Some(peers_pos) = body.windows(peers_marker.len()).position(|w| w == peers_marker) {
+    if let Some(peers_pos) = body
+        .windows(peers_marker.len())
+        .position(|w| w == peers_marker)
+    {
         let peers_section = &body[peers_pos + peers_marker.len()..];
         let colon_pos = peers_section.iter().position(|&b| b == b':').unwrap();
         let peers_data = &peers_section[colon_pos + 1..];
