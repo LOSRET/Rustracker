@@ -25,14 +25,6 @@ struct Args {
     #[arg(long, env = "RUSTRACKER_PEER_TIMEOUT_SECS", default_value_t = 3000)]
     peer_timeout_secs: u64,
 
-    #[arg(
-        long,
-        env = "RUSTRACKER_KEEPALIVE_TIMEOUT_SECS",
-        default_value_t = 2,
-        value_parser = clap::value_parser!(u64).range(1..)
-    )]
-    keepalive_timeout_secs: u64,
-
     /// Path to a torrent blacklist file (one 40-char hex info_hash per line).
     #[arg(long, env = "RUSTRACKER_BLACKLIST")]
     blacklist: Option<PathBuf>,
@@ -69,18 +61,8 @@ async fn main() -> anyhow::Result<()> {
         .await
         .with_context(|| format!("failed to bind {}", args.listen))?;
 
-    info!(
-        listen = %args.listen,
-        keepalive_timeout_secs = args.keepalive_timeout_secs,
-        "rustracker listening"
-    );
-    serve(
-        listener,
-        app,
-        Duration::from_secs(args.keepalive_timeout_secs),
-        shutdown_signal(),
-    )
-    .await?;
+    info!(listen = %args.listen, "rustracker listening");
+    serve(listener, app, shutdown_signal()).await?;
 
     Ok(())
 }

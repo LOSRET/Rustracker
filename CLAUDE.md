@@ -142,6 +142,7 @@ Three-layer design with clear separation of concerns:
 - **Sharding**: 64 shards chosen via `DefaultHasher(info_hash) % 64` to minimize lock contention
 - **Peer storage**: Packed binary, no heap allocation per peer — stored inline in `Vec<u8>`
 - **Background tasks**: Peer expiry sweeps every 1s, trend sampling every 10min, blacklist file watch every 5s
+- **HTTP connections**: HTTP/1 keep-alive is disabled; connections close after each response to avoid idle connection buildup, at the cost of more TCP handshakes and TIME_WAIT sockets
 - **build.rs**: Reads `assets/index.html` and injects `assets/contact.html` content at the `<!-- CONTACT -->` placeholder when `personal-contact` feature is enabled; outputs the result to `$OUT_DIR/index.html`
 - **Features**: `dashboard` (default) enables web UI routes and embeds the HTML at compile time; `personal-contact` injects contact info into the HTML
 
@@ -172,13 +173,12 @@ GitHub Actions workflows:
 --listen                  RUSTRACKER_LISTEN                  default: 0.0.0.0:8080
 --interval-secs           RUSTRACKER_INTERVAL_SECS           default: 1800
 --peer-timeout-secs       RUSTRACKER_PEER_TIMEOUT_SECS       default: 3000
---keepalive-timeout-secs  RUSTRACKER_KEEPALIVE_TIMEOUT_SECS  default: 2
 --blacklist               RUSTRACKER_BLACKLIST               optional: path to blacklist file
 --trends-file             RUSTRACKER_TRENDS_FILE             optional: path to trends JSONL
 --admin-token             RUSTRACKER_ADMIN_TOKEN             optional: bearer token for admin API
 ```
 
-All flags support env var fallback. CLI takes precedence over env vars. `--interval-secs` controls the peer expiry sweep interval; `--peer-timeout-secs` is the peer timeout threshold; `--keepalive-timeout-secs` controls how long an idle HTTP/1 keep-alive connection can wait for the next request.
+All flags support env var fallback. CLI takes precedence over env vars. `--interval-secs` controls the peer expiry sweep interval; `--peer-timeout-secs` is the peer timeout threshold.
 
 ## Key API Endpoints
 
