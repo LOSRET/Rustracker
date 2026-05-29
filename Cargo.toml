@@ -29,5 +29,6 @@ tikv-jemallocator = { version = "0.7", features = ["background_threads"] }
 
 [dev-dependencies]
 http-body-util = "0.1"
+mimalloc = "0.1"
 rand = "0.10"
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }

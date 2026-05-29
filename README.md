@@ -346,6 +346,7 @@ rustracker/
 │   ├── unified_bench.rs           # Unified benchmark suite
 │   ├── memory_tracker_bench.rs    # Memory usage benchmark
 │   ├── memory_jemalloc_bench.rs   # Memory benchmark with jemalloc allocator
+│   ├── memory_mimalloc_bench.rs   # Memory benchmark with mimalloc allocator
 │   ├── memory_tracker_btree.rs    # BTree memory layout analysis
 │   ├── memory_staircase_test.rs   # Memory staircase growth test
 │   └── memory_ci_compare.rs       # CI memory regression comparison
@@ -483,6 +484,9 @@ cargo run --release --example memory_tracker_bench
 
 # Jemalloc allocator comparison (Linux only)
 cargo run --release --example memory_jemalloc_bench
+
+# Mimalloc allocator comparison
+cargo run --release --example memory_mimalloc_bench
 
 # BTree memory layout analysis
 cargo run --release --example memory_tracker_btree

@@ -346,6 +346,7 @@ rustracker/
 │   ├── unified_bench.rs           # 统一基准测试套件
 │   ├── memory_tracker_bench.rs    # 内存占用基准
 │   ├── memory_jemalloc_bench.rs   # jemalloc 分配器内存基准
+│   ├── memory_mimalloc_bench.rs   # mimalloc 分配器内存基准
 │   ├── memory_tracker_btree.rs    # BTree 内存布局分析
 │   ├── memory_staircase_test.rs   # 内存阶梯增长测试
 │   └── memory_ci_compare.rs       # CI 内存回归对比
@@ -483,6 +484,9 @@ cargo run --release --example memory_tracker_bench
 
 # jemalloc 分配器对比（仅 Linux）
 cargo run --release --example memory_jemalloc_bench
+
+# mimalloc 分配器对比
+cargo run --release --example memory_mimalloc_bench
 
 # BTree 内存布局分析
 cargo run --release --example memory_tracker_btree
