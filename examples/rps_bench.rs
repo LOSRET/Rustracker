@@ -1,4 +1,4 @@
-﻿//! RPS benchmark: single-task mixed traffic
+//! RPS benchmark: single-task mixed traffic
 //!
 //! Simulates a real tracker lifecycle in one loop:
 //!   - Early: mostly new peer joins (tracker warming up)
@@ -19,23 +19,49 @@ use tower::ServiceExt;
 mod mem {
     use std::mem;
     #[repr(C)]
-    struct PMC { cb:u32,pfc:u32,pws:usize,ws:usize,qppp:usize,qpp:usize,qpnp:usize,qnp:usize,pf:usize,ppf:usize }
-    #[link(name="psapi")] extern "system" { fn GetCurrentProcess()->isize; fn GetProcessMemoryInfo(p:isize,c:*mut PMC,b:u32)->i32; }
-    pub fn rss_bytes()->usize { unsafe { let mut i:PMC=mem::zeroed(); i.cb=mem::size_of::<PMC>() as u32; GetProcessMemoryInfo(GetCurrentProcess(),&mut i,i.cb); i.ws } }
+    struct PMC {
+        cb: u32,
+        pfc: u32,
+        pws: usize,
+        ws: usize,
+        qppp: usize,
+        qpp: usize,
+        qpnp: usize,
+        qnp: usize,
+        pf: usize,
+        ppf: usize,
+    }
+    #[link(name = "psapi")]
+    extern "system" {
+        fn GetCurrentProcess() -> isize;
+        fn GetProcessMemoryInfo(p: isize, c: *mut PMC, b: u32) -> i32;
+    }
+    pub fn rss_bytes() -> usize {
+        unsafe {
+            let mut i: PMC = mem::zeroed();
+            i.cb = mem::size_of::<PMC>() as u32;
+            GetProcessMemoryInfo(GetCurrentProcess(), &mut i, i.cb);
+            i.ws
+        }
+    }
 }
 
 #[cfg(unix)]
 mod mem {
     pub fn rss_bytes() -> usize {
         std::fs::read_to_string("/proc/self/status")
-            .unwrap_or_default().lines()
+            .unwrap_or_default()
+            .lines()
             .find(|l| l.starts_with("VmRSS:"))
             .and_then(|l| l.split_whitespace().nth(1)?.parse::<usize>().ok())
-            .unwrap_or(0) * 1024
+            .unwrap_or(0)
+            * 1024
     }
 }
 
-fn fmt_mb(b: usize) -> String { format!("{:.1}", b as f64 / (1024.0 * 1024.0)) }
+fn fmt_mb(b: usize) -> String {
+    format!("{:.1}", b as f64 / (1024.0 * 1024.0))
+}
 
 fn percent_encode(bytes: [u8; 20]) -> String {
     let mut s = String::with_capacity(60);
@@ -52,7 +78,11 @@ fn percent_encode(bytes: [u8; 20]) -> String {
 }
 
 fn hex_digit(n: u8) -> char {
-    match n { 0..=9 => (b'0'+n) as char, 10..=15 => (b'a'+n-10) as char, _ => '?' }
+    match n {
+        0..=9 => (b'0' + n) as char,
+        10..=15 => (b'a' + n - 10) as char,
+        _ => '?',
+    }
 }
 
 fn make_info_hash(torrent: usize) -> [u8; 20] {
@@ -77,7 +107,9 @@ fn announce_uri(info_hash: [u8; 20], peer_id: [u8; 20], port: u16, left: u64) ->
 struct Rng(u64);
 
 impl Rng {
-    fn new(seed: u64) -> Self { Self(seed | 1) }
+    fn new(seed: u64) -> Self {
+        Self(seed | 1)
+    }
     fn next_u64(&mut self) -> u64 {
         self.0 ^= self.0 << 13;
         self.0 ^= self.0 >> 7;
@@ -85,7 +117,11 @@ impl Rng {
         self.0
     }
     fn next_usize(&mut self, bound: usize) -> usize {
-        if bound == 0 { 0 } else { (self.next_u64() as usize) % bound }
+        if bound == 0 {
+            0
+        } else {
+            (self.next_u64() as usize) % bound
+        }
     }
 }
 
@@ -134,13 +170,19 @@ async fn main() {
         if is_new {
             let torrent_idx = next_peer_idx % max_torrents;
             let port = (6881 + next_peer_idx % 60000) as u16;
-            let left = if rng.next_usize(3) == 0 { 0 } else { 1_000_000_000 };
+            let left = if rng.next_usize(3) == 0 {
+                0
+            } else {
+                1_000_000_000
+            };
             let uri = announce_uri(
                 make_info_hash(torrent_idx),
                 make_peer_id(next_peer_idx),
-                port, left,
+                port,
+                left,
             );
-            let resp = app.clone()
+            let resp = app
+                .clone()
                 .oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
                 .await
                 .unwrap();
@@ -158,7 +200,8 @@ async fn main() {
                 port,
                 rng.next_usize(2_000_000_000) as u64,
             );
-            let resp = app.clone()
+            let resp = app
+                .clone()
                 .oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
                 .await
                 .unwrap();
@@ -174,14 +217,21 @@ async fn main() {
             let cum_rps = request_count as f64 / elapsed;
             let window_rps = if last_sample_elapsed > 0.0 {
                 (request_count - last_sample_count) as f64 / (elapsed - last_sample_elapsed)
-            } else { cum_rps };
+            } else {
+                cum_rps
+            };
             last_sample_elapsed = elapsed;
             last_sample_count = request_count;
             let rss = mem::rss_bytes();
             println!(
                 "{},{},{:.0},{:.0},{},{},{}",
-                request_count, active_peers.len(), cum_rps, window_rps,
-                new_join_count, reannounce_count, fmt_mb(rss),
+                request_count,
+                active_peers.len(),
+                cum_rps,
+                window_rps,
+                new_join_count,
+                reannounce_count,
+                fmt_mb(rss),
             );
             eprintln!(
                 "  req={:>8}  peers={:>10}  rps={:>10.0}  win={:>10.0}  new={:>8}  re={:>8}  rss={}",
@@ -195,7 +245,11 @@ async fn main() {
     let total_time = bench_start.elapsed().as_secs_f64();
     eprintln!(
         "\nDone. {} requests in {:.1}s = {:.0} rps | peers={} (new={}, re={})",
-        request_count, total_time, request_count as f64 / total_time,
-        active_peers.len(), new_join_count, reannounce_count,
+        request_count,
+        total_time,
+        request_count as f64 / total_time,
+        active_peers.len(),
+        new_join_count,
+        reannounce_count,
     );
 }

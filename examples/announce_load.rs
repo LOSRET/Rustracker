@@ -206,7 +206,11 @@ fn percent_encode(bytes: &[u8]) -> String {
 }
 
 fn hex_digit(n: u8) -> char {
-    match n { 0..=9 => (b'0' + n) as char, 10..=15 => (b'a' + n - 10) as char, _ => '?' }
+    match n {
+        0..=9 => (b'0' + n) as char,
+        10..=15 => (b'a' + n - 10) as char,
+        _ => '?',
+    }
 }
 
 fn announce_url(addr: SocketAddr, index: usize, torrents: usize) -> String {

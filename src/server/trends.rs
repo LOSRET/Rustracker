@@ -9,8 +9,8 @@ use std::time::UNIX_EPOCH;
 
 use serde::{Deserialize, Serialize};
 
-use crate::protocol::client_id;
 use crate::core::tracker::TrackerSnapshot;
+use crate::protocol::client_id;
 
 // ── Response types exported for handlers ─────────────────────────────────────
 
@@ -125,8 +125,7 @@ impl TrendStore {
         self.points.push(point);
 
         let min_timestamp = bucket.saturating_sub(Self::RETENTION_SECS);
-        self.points
-            .retain(|point| point.timestamp >= min_timestamp);
+        self.points.retain(|point| point.timestamp >= min_timestamp);
 
         self.filled_cache = self.filled_points(min_timestamp, bucket);
         self.cache_start = min_timestamp;
@@ -135,8 +134,7 @@ impl TrendStore {
     }
 
     fn filled_points(&self, start: u64, end: u64) -> Vec<TrendPointResponse> {
-        let mut points =
-            Vec::with_capacity(((end - start) / Self::SAMPLE_SECS + 1) as usize);
+        let mut points = Vec::with_capacity(((end - start) / Self::SAMPLE_SECS + 1) as usize);
         let mut timestamp = start;
         let mut recorded_index = 0;
 
@@ -169,18 +167,18 @@ impl TrendStore {
         points
     }
 
-    pub(crate) fn record_clients(
-        &mut self,
-        now: u64,
-        clients: &[(u8, u64)],
-    ) -> &ClientTrendData {
+    pub(crate) fn record_clients(&mut self, now: u64, clients: &[(u8, u64)]) -> &ClientTrendData {
         let bucket = now - (now % Self::SAMPLE_SECS);
 
         // Store full distribution
         let dist: Vec<(u8, u32)> = clients.iter().map(|(t, c)| (*t, *c as u32)).collect();
 
         // 已有该 bucket 的点则直接跳过，不再覆盖（写入即冻结）
-        if self.client_points.last().is_some_and(|(ts, _)| *ts == bucket) {
+        if self
+            .client_points
+            .last()
+            .is_some_and(|(ts, _)| *ts == bucket)
+        {
             return &self.client_cache;
         }
 
@@ -190,8 +188,7 @@ impl TrendStore {
         // Prune old data
         let min_timestamp = bucket.saturating_sub(Self::RETENTION_SECS);
         let old_len = self.client_points.len();
-        self.client_points
-            .retain(|(ts, _)| *ts >= min_timestamp);
+        self.client_points.retain(|(ts, _)| *ts >= min_timestamp);
         if self.client_points.len() != old_len {
             self.client_cache_dirty = true;
         }
@@ -323,9 +320,7 @@ pub(crate) fn load_trends_from_file(
 ) -> anyhow::Result<TrendStore> {
     let content = match std::fs::read_to_string(path) {
         Ok(c) => c,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            return Ok(TrendStore::default())
-        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(TrendStore::default()),
         Err(e) => return Err(e.into()),
     };
 

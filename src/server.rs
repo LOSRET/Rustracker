@@ -30,9 +30,11 @@ pub use pool::DEFAULT_TRACKER_SHARDS;
 use trends::TrendStore;
 
 fn load_trends(trends_file: &Option<PathBuf>) -> TrendStore {
-    let top_clients_file = trends_file
-        .as_ref()
-        .map(|p| p.parent().unwrap_or(Path::new(".")).join("top_clients.jsonl"));
+    let top_clients_file = trends_file.as_ref().map(|p| {
+        p.parent()
+            .unwrap_or(Path::new("."))
+            .join("top_clients.jsonl")
+    });
     match trends_file
         .as_ref()
         .map(|p| trends::load_trends_from_file(p, top_clients_file.as_ref()))
@@ -158,7 +160,10 @@ impl AppState {
                 store.record_clients(now, &snapshot.clients);
                 if let Some(ref path) = trends_file {
                     let _ = trends::save_client_point(
-                        &path.parent().unwrap_or(Path::new(".")).join("top_clients.jsonl"),
+                        &path
+                            .parent()
+                            .unwrap_or(Path::new("."))
+                            .join("top_clients.jsonl"),
                         now,
                         &snapshot.clients,
                     );
@@ -232,8 +237,7 @@ pub fn router(state: AppState) -> Router {
         .route("/style.css", get(handlers::style))
         .route("/app.js", get(handlers::app_js));
 
-    r.fallback(handlers::not_found)
-        .with_state(state)
+    r.fallback(handlers::not_found).with_state(state)
 }
 
 fn file_mtime(path: &Path) -> SystemTime {

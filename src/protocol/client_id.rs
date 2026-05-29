@@ -269,7 +269,7 @@ const fn build_azureus_table() -> [[u8; 256]; 256] {
     t[b'E' as usize][b'S' as usize] = ELECTRIC_SHEEP;
     // FlashGet
     t[b'F' as usize][b'G' as usize] = VAGAA; // leecher category
-    // FileCroc
+                                             // FileCroc
     t[b'F' as usize][b'C' as usize] = FILECROC;
     // FrostWire
     t[b'F' as usize][b'W' as usize] = FROSTWIRE;
@@ -319,7 +319,7 @@ const fn build_azureus_table() -> [[u8; 256]; 256] {
     t[b'N' as usize][b'E' as usize] = BT_NEXT;
     // Net Transport
     t[b'N' as usize][b'X' as usize] = VAGAA; // leecher category
-    // OneSwarm
+                                             // OneSwarm
     t[b'O' as usize][b'S' as usize] = ONESWARM;
     // OmegaTorrent
     t[b'O' as usize][b'T' as usize] = OMEGA;

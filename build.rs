@@ -9,14 +9,13 @@ fn main() {
     let index_path = Path::new(&manifest_dir).join("assets/index.html");
     let contact_path = Path::new(&manifest_dir).join("assets/contact.html");
 
-    let mut index_html = fs::read_to_string(&index_path)
-        .expect("failed to read assets/index.html");
+    let mut index_html = fs::read_to_string(&index_path).expect("failed to read assets/index.html");
 
     let has_contact = env::var("CARGO_FEATURE_PERSONAL_CONTACT").is_ok();
 
     if has_contact {
-        let contact_html = fs::read_to_string(&contact_path)
-            .expect("failed to read assets/contact.html");
+        let contact_html =
+            fs::read_to_string(&contact_path).expect("failed to read assets/contact.html");
         index_html = index_html.replace("<!-- CONTACT -->", &contact_html);
     } else {
         index_html = index_html.replace("<!-- CONTACT -->\n", "");

@@ -82,19 +82,49 @@ fn parse_args() -> anyhow::Result<Config> {
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
-            "--duration" => { i += 1; cfg.duration = Duration::from_secs(args.get(i).context("--duration")?.parse()?); }
-            "--concurrency" => { i += 1; cfg.concurrency = args.get(i).context("--concurrency")?.parse()?; }
-            "--torrents" => { i += 1; cfg.torrents = args.get(i).context("--torrents")?.parse()?; }
-            "--peers" => { i += 1; cfg.peers = args.get(i).context("--peers")?.parse()?; }
-            "--scrape-weight" => { i += 1; cfg.scrape_weight = args.get(i).context("--scrape-weight")?.parse()?; }
-            "--announce-weight" => { i += 1; cfg.announce_weight = args.get(i).context("--announce-weight")?.parse()?; }
+            "--duration" => {
+                i += 1;
+                cfg.duration = Duration::from_secs(args.get(i).context("--duration")?.parse()?);
+            }
+            "--concurrency" => {
+                i += 1;
+                cfg.concurrency = args.get(i).context("--concurrency")?.parse()?;
+            }
+            "--torrents" => {
+                i += 1;
+                cfg.torrents = args.get(i).context("--torrents")?.parse()?;
+            }
+            "--peers" => {
+                i += 1;
+                cfg.peers = args.get(i).context("--peers")?.parse()?;
+            }
+            "--scrape-weight" => {
+                i += 1;
+                cfg.scrape_weight = args.get(i).context("--scrape-weight")?.parse()?;
+            }
+            "--announce-weight" => {
+                i += 1;
+                cfg.announce_weight = args.get(i).context("--announce-weight")?.parse()?;
+            }
             "--keep-alive" => cfg.keep_alive = true,
             "--no-keep-alive" => cfg.keep_alive = false,
-            "--target" => { i += 1; cfg.target = Some(args.get(i).context("--target")?.parse()?); }
-            "--port" => { i += 1; cfg.listen_port = args.get(i).context("--port")?.parse()?; }
-            "--shards" => { i += 1; cfg.shards = args.get(i).context("--shards")?.parse()?; }
+            "--target" => {
+                i += 1;
+                cfg.target = Some(args.get(i).context("--target")?.parse()?);
+            }
+            "--port" => {
+                i += 1;
+                cfg.listen_port = args.get(i).context("--port")?.parse()?;
+            }
+            "--shards" => {
+                i += 1;
+                cfg.shards = args.get(i).context("--shards")?.parse()?;
+            }
             "--no-embed" => {}
-            "--progress-interval" => { i += 1; cfg.progress_interval = args.get(i).context("--progress-interval")?.parse()?; }
+            "--progress-interval" => {
+                i += 1;
+                cfg.progress_interval = args.get(i).context("--progress-interval")?.parse()?;
+            }
             other => anyhow::bail!("unknown argument: {other}"),
         }
         i += 1;
@@ -120,28 +150,57 @@ struct LatencyRecorder {
 impl LatencyRecorder {
     fn record(&self, latency: Duration) {
         let us = latency.as_micros() as u64;
-        if let Ok(mut v) = self.samples.lock() { v.push(us); }
+        if let Ok(mut v) = self.samples.lock() {
+            v.push(us);
+        }
     }
 
     fn snapshot_and_drain(&self) -> Option<LatencyStats> {
-        let mut v = { let mut g = self.samples.lock().unwrap(); std::mem::take(&mut *g) };
-        if v.is_empty() { return None; }
+        let mut v = {
+            let mut g = self.samples.lock().unwrap();
+            std::mem::take(&mut *g)
+        };
+        if v.is_empty() {
+            return None;
+        }
         v.sort_unstable();
         let n = v.len();
         let sum: u64 = v.iter().sum();
         Some(LatencyStats {
-            count: n, min_us: v[0], max_us: v[n - 1], avg_us: sum / n as u64,
-            p50_us: v[n * 50 / 100], p95_us: v[n * 95 / 100], p99_us: v[n * 99 / 100],
+            count: n,
+            min_us: v[0],
+            max_us: v[n - 1],
+            avg_us: sum / n as u64,
+            p50_us: v[n * 50 / 100],
+            p95_us: v[n * 95 / 100],
+            p99_us: v[n * 99 / 100],
         })
     }
 }
 
-struct LatencyStats { count: usize, min_us: u64, max_us: u64, avg_us: u64, p50_us: u64, p95_us: u64, p99_us: u64 }
+struct LatencyStats {
+    count: usize,
+    min_us: u64,
+    max_us: u64,
+    avg_us: u64,
+    p50_us: u64,
+    p95_us: u64,
+    p99_us: u64,
+}
 
 impl std::fmt::Display for LatencyStats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "n={} min={}µs avg={}µs p50={}µs p95={}µs p99={}µs max={}µs",
-            self.count, self.min_us, self.avg_us, self.p50_us, self.p95_us, self.p99_us, self.max_us)
+        write!(
+            f,
+            "n={} min={}µs avg={}µs p50={}µs p95={}µs p99={}µs max={}µs",
+            self.count,
+            self.min_us,
+            self.avg_us,
+            self.p50_us,
+            self.p95_us,
+            self.p99_us,
+            self.max_us
+        )
     }
 }
 
@@ -151,18 +210,25 @@ impl std::fmt::Display for LatencyStats {
 
 #[derive(Default)]
 struct Counters {
-    announce_ok: AtomicUsize, announce_err: AtomicUsize,
-    scrape_ok: AtomicUsize, scrape_err: AtomicUsize,
+    announce_ok: AtomicUsize,
+    announce_err: AtomicUsize,
+    scrape_ok: AtomicUsize,
+    scrape_err: AtomicUsize,
 }
 
 // ---------------------------------------------------------------------------
 // Zipf distribution
 // ---------------------------------------------------------------------------
 
-struct ZipfSampler { n: usize, exponent: f64 }
+struct ZipfSampler {
+    n: usize,
+    exponent: f64,
+}
 
 impl ZipfSampler {
-    fn new(n: usize, exponent: f64) -> Self { Self { n, exponent } }
+    fn new(n: usize, exponent: f64) -> Self {
+        Self { n, exponent }
+    }
 
     fn sample<R: Rng>(&self, rng: &mut R) -> usize {
         let u: f64 = rng.random();
@@ -175,21 +241,27 @@ impl ZipfSampler {
 // Pre-computed info_hash strings
 // ---------------------------------------------------------------------------
 
-struct InfoHashes { hashes: Vec<String> }
+struct InfoHashes {
+    hashes: Vec<String>,
+}
 
 impl InfoHashes {
     fn new(n: usize) -> Self {
-        let hashes: Vec<String> = (0..n).map(|i| {
-            let mut id = [b'h'; 20];
-            let s = format!("{i:018}");
-            id[2..].copy_from_slice(s.as_bytes());
-            String::from_utf8_lossy(&id).into_owned()
-        }).collect();
+        let hashes: Vec<String> = (0..n)
+            .map(|i| {
+                let mut id = [b'h'; 20];
+                let s = format!("{i:018}");
+                id[2..].copy_from_slice(s.as_bytes());
+                String::from_utf8_lossy(&id).into_owned()
+            })
+            .collect();
         Self { hashes }
     }
 
     #[inline]
-    fn get(&self, idx: usize) -> &str { &self.hashes[idx % self.hashes.len()] }
+    fn get(&self, idx: usize) -> &str {
+        &self.hashes[idx % self.hashes.len()]
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -216,17 +288,24 @@ impl PeerPool {
     fn new(total_peers: usize, total_torrents: usize, hashes: Arc<InfoHashes>) -> Self {
         let mut rng = StdRng::seed_from_u64(42);
         let zipf = ZipfSampler::new(total_torrents, 1.1);
-        let peers: Vec<SimPeer> = (0..total_peers).map(|i| {
-            let ih = zipf.sample(&mut rng);
-            SimPeer {
-                info_hash_idx: ih,
-                peer_id: format!("p{i:019}"),
-                port: 10_000 + (i as u16 % 50_000),
-                is_seeder: rng.random_bool(0.4),
-                alive: true,
-            }
-        }).collect();
-        Self { peers: Mutex::new(peers), zipf, total_peers, hashes }
+        let peers: Vec<SimPeer> = (0..total_peers)
+            .map(|i| {
+                let ih = zipf.sample(&mut rng);
+                SimPeer {
+                    info_hash_idx: ih,
+                    peer_id: format!("p{i:019}"),
+                    port: 10_000 + (i as u16 % 50_000),
+                    is_seeder: rng.random_bool(0.4),
+                    alive: true,
+                }
+            })
+            .collect();
+        Self {
+            peers: Mutex::new(peers),
+            zipf,
+            total_peers,
+            hashes,
+        }
     }
 
     async fn next_announce_url(&self, base: SocketAddr, rng: &mut impl Rng) -> String {
@@ -239,7 +318,14 @@ impl PeerPool {
             peer.info_hash_idx = self.zipf.sample(rng);
             peer.is_seeder = rng.random_bool(0.4);
             peer.alive = true;
-            ("started", if peer.is_seeder { 0u64 } else { rng.random_range(1..10_000_000u64) })
+            (
+                "started",
+                if peer.is_seeder {
+                    0u64
+                } else {
+                    rng.random_range(1..10_000_000u64)
+                },
+            )
         } else if action < 0.02 {
             peer.alive = false;
             ("stopped", 0u64)
@@ -247,7 +333,14 @@ impl PeerPool {
             peer.is_seeder = true;
             ("completed", 0u64)
         } else {
-            ("", if peer.is_seeder { 0u64 } else { rng.random_range(1..10_000_000u64) })
+            (
+                "",
+                if peer.is_seeder {
+                    0u64
+                } else {
+                    rng.random_range(1..10_000_000u64)
+                },
+            )
         };
 
         let ih = self.hashes.get(peer.info_hash_idx).to_owned();
@@ -255,15 +348,22 @@ impl PeerPool {
         let port = peer.port;
         drop(peers);
 
-        let mut url = format!("http://{base}/announce?info_hash={ih}&peer_id={pid}&port={port}&left={left}&compact=1");
-        if !event.is_empty() { url.push_str("&event="); url.push_str(event); }
+        let mut url = format!(
+            "http://{base}/announce?info_hash={ih}&peer_id={pid}&port={port}&left={left}&compact=1"
+        );
+        if !event.is_empty() {
+            url.push_str("&event=");
+            url.push_str(event);
+        }
         url
     }
 
     fn next_scrape_url(&self, base: SocketAddr, rng: &mut impl Rng) -> String {
         let mut url = format!("http://{base}/scrape?");
         for i in 0..5 {
-            if i > 0 { url.push('&'); }
+            if i > 0 {
+                url.push('&');
+            }
             let idx = self.zipf.sample(rng);
             url.push_str("info_hash=");
             url.push_str(self.hashes.get(idx));
@@ -284,11 +384,20 @@ async fn main() -> anyhow::Result<()> {
         (target, None)
     } else {
         let listener = TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], cfg.listen_port)))
-            .await.context("bind")?;
+            .await
+            .context("bind")?;
         let addr = listener.local_addr()?;
-        let app = router(AppState::sharded(Duration::from_secs(1800), Duration::from_secs(3000), cfg.shards));
+        let app = router(AppState::sharded(
+            Duration::from_secs(1800),
+            Duration::from_secs(3000),
+            cfg.shards,
+        ));
         let h = tokio::spawn(async move {
-            axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await
+            axum::serve(
+                listener,
+                app.into_make_service_with_connect_info::<SocketAddr>(),
+            )
+            .await
         });
         wait_until_ready(addr).await?;
         (addr, Some(h))
@@ -300,7 +409,10 @@ async fn main() -> anyhow::Result<()> {
     println!("concurrency:   {}", cfg.concurrency);
     println!("torrents:      {} (Zipf s=1.1)", cfg.torrents);
     println!("peers:         {}", cfg.peers);
-    println!("announce:scrape = {}:{}", cfg.announce_weight, cfg.scrape_weight);
+    println!(
+        "announce:scrape = {}:{}",
+        cfg.announce_weight, cfg.scrape_weight
+    );
     println!("keep-alive:    {}", cfg.keep_alive);
     println!("shards:        {}", cfg.shards);
     println!();
@@ -309,7 +421,11 @@ async fn main() -> anyhow::Result<()> {
         .pool_max_idle_per_host(if cfg.keep_alive { cfg.concurrency } else { 0 })
         .pool_idle_timeout(Duration::from_secs(90))
         .timeout(Duration::from_secs(10))
-        .tcp_keepalive(if cfg.keep_alive { Some(Duration::from_secs(30)) } else { None })
+        .tcp_keepalive(if cfg.keep_alive {
+            Some(Duration::from_secs(30))
+        } else {
+            None
+        })
         .build()?;
 
     let counters = Arc::new(Counters::default());
@@ -339,9 +455,13 @@ async fn main() -> anyhow::Result<()> {
             let mut rng = SmallRng::from_rng(&mut rand::rng());
             while !stop.load(Ordering::Relaxed) {
                 let permit = match semaphore.clone().acquire_owned().await {
-                    Ok(p) => p, Err(_) => break,
+                    Ok(p) => p,
+                    Err(_) => break,
                 };
-                if stop.load(Ordering::Relaxed) { drop(permit); break; }
+                if stop.load(Ordering::Relaxed) {
+                    drop(permit);
+                    break;
+                }
 
                 let is_scrape = rng.random_range(0..total_weight) < scrape_weight;
                 let client = client.clone();
@@ -353,11 +473,31 @@ async fn main() -> anyhow::Result<()> {
                 tokio::spawn(async move {
                     let _permit = permit;
                     if is_scrape {
-                        let url = { let mut r = SmallRng::from_rng(&mut rand::rng()); peer_pool.next_scrape_url(addr, &mut r) };
-                        send_request(&client, url, &scrape_latency, &counters.scrape_ok, &counters.scrape_err).await;
+                        let url = {
+                            let mut r = SmallRng::from_rng(&mut rand::rng());
+                            peer_pool.next_scrape_url(addr, &mut r)
+                        };
+                        send_request(
+                            &client,
+                            url,
+                            &scrape_latency,
+                            &counters.scrape_ok,
+                            &counters.scrape_err,
+                        )
+                        .await;
                     } else {
-                        let url = { let mut r = SmallRng::from_rng(&mut rand::rng()); peer_pool.next_announce_url(addr, &mut r).await };
-                        send_request(&client, url, &announce_latency, &counters.announce_ok, &counters.announce_err).await;
+                        let url = {
+                            let mut r = SmallRng::from_rng(&mut rand::rng());
+                            peer_pool.next_announce_url(addr, &mut r).await
+                        };
+                        send_request(
+                            &client,
+                            url,
+                            &announce_latency,
+                            &counters.announce_ok,
+                            &counters.announce_err,
+                        )
+                        .await;
                     }
                 });
             }
@@ -387,8 +527,14 @@ async fn main() -> anyhow::Result<()> {
                 let rps = total as f64 / elapsed.max(0.001);
                 let interval_rps = (total - last_total) as f64 / interval as f64;
                 last_total = total;
-                let a_lat = announce_latency.snapshot_and_drain().map(|s| format!("{s}")).unwrap_or_else(|| "no data".into());
-                let s_lat = scrape_latency.snapshot_and_drain().map(|s| format!("{s}")).unwrap_or_else(|| "no data".into());
+                let a_lat = announce_latency
+                    .snapshot_and_drain()
+                    .map(|s| format!("{s}"))
+                    .unwrap_or_else(|| "no data".into());
+                let s_lat = scrape_latency
+                    .snapshot_and_drain()
+                    .map(|s| format!("{s}"))
+                    .unwrap_or_else(|| "no data".into());
                 println!("[{:>4}s] total={:<8} rps(avg)={:<10.0} rps(now)={:<8.0} | announce: ok={} err={} lat=[{}] | scrape: ok={} err={} lat=[{}]",
                     elapsed as u64, total, rps, interval_rps, a_ok, a_err, a_lat, s_ok, s_err, s_lat);
             }
@@ -418,27 +564,61 @@ async fn main() -> anyhow::Result<()> {
     println!();
     println!("announce ok:   {a_ok}");
     println!("announce err:  {a_err}");
-    if let Some(s) = announce_latency.snapshot_and_drain() { println!("announce lat:  {s}"); }
+    if let Some(s) = announce_latency.snapshot_and_drain() {
+        println!("announce lat:  {s}");
+    }
     println!();
     println!("scrape ok:     {s_ok}");
     println!("scrape err:    {s_err}");
-    if let Some(s) = scrape_latency.snapshot_and_drain() { println!("scrape lat:    {s}"); }
+    if let Some(s) = scrape_latency.snapshot_and_drain() {
+        println!("scrape lat:    {s}");
+    }
 
-    let stats: serde_json::Value = client.get(format!("http://{addr}/api/stats")).send().await?.error_for_status()?.json().await?;
+    let stats: serde_json::Value = client
+        .get(format!("http://{addr}/api/stats"))
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
     println!();
-    println!("tracker torrents: {}", stats["torrents"].as_u64().unwrap_or(0));
+    println!(
+        "tracker torrents: {}",
+        stats["torrents"].as_u64().unwrap_or(0)
+    );
     println!("tracker peers:    {}", stats["peers"].as_u64().unwrap_or(0));
-    println!("tracker seeders:  {}", stats["seeders"].as_u64().unwrap_or(0));
-    println!("tracker leechers: {}", stats["leechers"].as_u64().unwrap_or(0));
+    println!(
+        "tracker seeders:  {}",
+        stats["seeders"].as_u64().unwrap_or(0)
+    );
+    println!(
+        "tracker leechers: {}",
+        stats["leechers"].as_u64().unwrap_or(0)
+    );
 
     Ok(())
 }
 
-async fn send_request(client: &Client, url: String, latency: &LatencyRecorder, ok: &AtomicUsize, err: &AtomicUsize) {
+async fn send_request(
+    client: &Client,
+    url: String,
+    latency: &LatencyRecorder,
+    ok: &AtomicUsize,
+    err: &AtomicUsize,
+) {
     let t0 = Instant::now();
     match client.get(&url).send().await {
-        Ok(r) => { latency.record(t0.elapsed()); if r.status().is_success() { ok.fetch_add(1, Ordering::Relaxed); } else { err.fetch_add(1, Ordering::Relaxed); } }
-        Err(_) => { err.fetch_add(1, Ordering::Relaxed); }
+        Ok(r) => {
+            latency.record(t0.elapsed());
+            if r.status().is_success() {
+                ok.fetch_add(1, Ordering::Relaxed);
+            } else {
+                err.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+        Err(_) => {
+            err.fetch_add(1, Ordering::Relaxed);
+        }
     }
 }
 
@@ -447,7 +627,9 @@ async fn wait_until_ready(addr: SocketAddr) -> anyhow::Result<()> {
     let deadline = Instant::now() + Duration::from_secs(5);
     while Instant::now() < deadline {
         if let Ok(r) = client.get(format!("http://{addr}/healthz")).send().await {
-            if r.status().is_success() { return Ok(()); }
+            if r.status().is_success() {
+                return Ok(());
+            }
         }
         tokio::time::sleep(Duration::from_millis(25)).await;
     }

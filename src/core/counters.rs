@@ -98,13 +98,7 @@ impl TrackerCounters {
 
     /// Verify counters match a full traversal (debug builds only).
     #[cfg(debug_assertions)]
-    pub(crate) fn verify(
-        &self,
-        torrents: usize,
-        peers: usize,
-        seeders: usize,
-        downloaded: u64,
-    ) {
+    pub(crate) fn verify(&self, torrents: usize, peers: usize, seeders: usize, downloaded: u64) {
         assert_eq!(self.torrents, torrents, "torrents counter drift");
         assert_eq!(self.peers, peers, "peers counter drift");
         assert_eq!(self.seeders, seeders, "seeders counter drift");
@@ -144,7 +138,12 @@ mod tests {
 
     #[test]
     fn upsert_leecher_to_seeder() {
-        let mut c = TrackerCounters { torrents: 1, peers: 1, seeders: 0, downloaded: 0 };
+        let mut c = TrackerCounters {
+            torrents: 1,
+            peers: 1,
+            seeders: 0,
+            downloaded: 0,
+        };
         c.apply_upsert(&PeerUpsert {
             is_new_peer: false,
             was_complete: false,
@@ -157,7 +156,12 @@ mod tests {
 
     #[test]
     fn upsert_seeder_to_leecher() {
-        let mut c = TrackerCounters { torrents: 1, peers: 1, seeders: 1, downloaded: 0 };
+        let mut c = TrackerCounters {
+            torrents: 1,
+            peers: 1,
+            seeders: 1,
+            downloaded: 0,
+        };
         c.apply_upsert(&PeerUpsert {
             is_new_peer: false,
             was_complete: true,
@@ -170,31 +174,52 @@ mod tests {
 
     #[test]
     fn removal_seeder() {
-        let mut c = TrackerCounters { torrents: 1, peers: 2, seeders: 1, downloaded: 0 };
-        c.apply_removal(&PeerRemoval { tag: 0, was_complete: true });
+        let mut c = TrackerCounters {
+            torrents: 1,
+            peers: 2,
+            seeders: 1,
+            downloaded: 0,
+        };
+        c.apply_removal(&PeerRemoval {
+            tag: 0,
+            was_complete: true,
+        });
         assert_eq!(c.peers, 1);
         assert_eq!(c.seeders, 0);
     }
 
     #[test]
     fn removal_leecher() {
-        let mut c = TrackerCounters { torrents: 1, peers: 2, seeders: 1, downloaded: 0 };
-        c.apply_removal(&PeerRemoval { tag: 0, was_complete: false });
+        let mut c = TrackerCounters {
+            torrents: 1,
+            peers: 2,
+            seeders: 1,
+            downloaded: 0,
+        };
+        c.apply_removal(&PeerRemoval {
+            tag: 0,
+            was_complete: false,
+        });
         assert_eq!(c.peers, 1);
         assert_eq!(c.seeders, 1);
     }
 
     #[test]
     fn expire_mixed() {
-        let mut c = TrackerCounters { torrents: 3, peers: 10, seeders: 4, downloaded: 50 };
+        let mut c = TrackerCounters {
+            torrents: 3,
+            peers: 10,
+            seeders: 4,
+            downloaded: 50,
+        };
         c.apply_expire(
             &ExpireResult {
                 tags: vec![],
                 removed_peers: 3,
                 removed_complete: 1,
             },
-            1,   // removed_swarms
-            5,   // removed_downloaded
+            1, // removed_swarms
+            5, // removed_downloaded
         );
         assert_eq!(c.torrents, 2);
         assert_eq!(c.peers, 7);
@@ -204,8 +229,16 @@ mod tests {
 
     #[test]
     fn saturating_on_underflow() {
-        let mut c = TrackerCounters { torrents: 0, peers: 0, seeders: 0, downloaded: 0 };
-        c.apply_removal(&PeerRemoval { tag: 0, was_complete: true });
+        let mut c = TrackerCounters {
+            torrents: 0,
+            peers: 0,
+            seeders: 0,
+            downloaded: 0,
+        };
+        c.apply_removal(&PeerRemoval {
+            tag: 0,
+            was_complete: true,
+        });
         assert_eq!(c.peers, 0);
         assert_eq!(c.seeders, 0);
     }

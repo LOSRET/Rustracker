@@ -1,6 +1,6 @@
+use std::cmp::Reverse;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{BinaryHeap, HashMap};
-use std::cmp::Reverse;
 use std::hash::{Hash, Hasher};
 use std::time::{Duration, Instant};
 
@@ -83,16 +83,52 @@ impl TrackerPool {
         for shard in &self.shards {
             let all = shard.read().await.top_torrents_all(limit);
             for (info_hash, seeders, leechers, downloaded) in all.peers {
-                topk::try_heap_insert(&mut heaps[0], &mut mins[0], limit, (seeders + leechers) as u64, info_hash, seeders, leechers, downloaded);
+                topk::try_heap_insert(
+                    &mut heaps[0],
+                    &mut mins[0],
+                    limit,
+                    (seeders + leechers) as u64,
+                    info_hash,
+                    seeders,
+                    leechers,
+                    downloaded,
+                );
             }
             for (info_hash, seeders, leechers, downloaded) in all.seeders {
-                topk::try_heap_insert(&mut heaps[1], &mut mins[1], limit, seeders as u64, info_hash, seeders, leechers, downloaded);
+                topk::try_heap_insert(
+                    &mut heaps[1],
+                    &mut mins[1],
+                    limit,
+                    seeders as u64,
+                    info_hash,
+                    seeders,
+                    leechers,
+                    downloaded,
+                );
             }
             for (info_hash, seeders, leechers, downloaded) in all.leechers {
-                topk::try_heap_insert(&mut heaps[2], &mut mins[2], limit, leechers as u64, info_hash, seeders, leechers, downloaded);
+                topk::try_heap_insert(
+                    &mut heaps[2],
+                    &mut mins[2],
+                    limit,
+                    leechers as u64,
+                    info_hash,
+                    seeders,
+                    leechers,
+                    downloaded,
+                );
             }
             for (info_hash, seeders, leechers, downloaded) in all.downloaded {
-                topk::try_heap_insert(&mut heaps[3], &mut mins[3], limit, downloaded, info_hash, seeders, leechers, downloaded);
+                topk::try_heap_insert(
+                    &mut heaps[3],
+                    &mut mins[3],
+                    limit,
+                    downloaded,
+                    info_hash,
+                    seeders,
+                    leechers,
+                    downloaded,
+                );
             }
         }
 

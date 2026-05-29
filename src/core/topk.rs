@@ -6,7 +6,7 @@
 #![allow(clippy::too_many_arguments)]
 
 use std::cmp::Reverse;
-use std::collections::{BinaryHeap, BTreeMap};
+use std::collections::{BTreeMap, BinaryHeap};
 
 use super::swarm::Swarm;
 use super::types::InfoHash;
@@ -52,19 +52,59 @@ pub(crate) fn top_torrents_all(swarms: &BTreeMap<InfoHash, Swarm>, limit: usize)
 
         // Fast path: all four heaps are full and this torrent is
         // below every threshold — skip without constructing entries.
-        if heap_p.len() >= limit && peers <= min_p
-            && heap_s.len() >= limit && seeders <= min_s
-            && heap_l.len() >= limit && leechers <= min_l
-            && heap_d.len() >= limit && downloaded <= min_d
+        if heap_p.len() >= limit
+            && peers <= min_p
+            && heap_s.len() >= limit
+            && seeders <= min_s
+            && heap_l.len() >= limit
+            && leechers <= min_l
+            && heap_d.len() >= limit
+            && downloaded <= min_d
         {
             continue;
         }
 
         let dl = stats.downloaded as u64;
-        try_heap_insert(&mut heap_p, &mut min_p, limit, peers, *info_hash, stats.complete, stats.incomplete, dl);
-        try_heap_insert(&mut heap_s, &mut min_s, limit, seeders, *info_hash, stats.complete, stats.incomplete, dl);
-        try_heap_insert(&mut heap_l, &mut min_l, limit, leechers, *info_hash, stats.complete, stats.incomplete, dl);
-        try_heap_insert(&mut heap_d, &mut min_d, limit, downloaded, *info_hash, stats.complete, stats.incomplete, dl);
+        try_heap_insert(
+            &mut heap_p,
+            &mut min_p,
+            limit,
+            peers,
+            *info_hash,
+            stats.complete,
+            stats.incomplete,
+            dl,
+        );
+        try_heap_insert(
+            &mut heap_s,
+            &mut min_s,
+            limit,
+            seeders,
+            *info_hash,
+            stats.complete,
+            stats.incomplete,
+            dl,
+        );
+        try_heap_insert(
+            &mut heap_l,
+            &mut min_l,
+            limit,
+            leechers,
+            *info_hash,
+            stats.complete,
+            stats.incomplete,
+            dl,
+        );
+        try_heap_insert(
+            &mut heap_d,
+            &mut min_d,
+            limit,
+            downloaded,
+            *info_hash,
+            stats.complete,
+            stats.incomplete,
+            dl,
+        );
     }
 
     Top100All {
@@ -93,14 +133,14 @@ pub(crate) fn try_heap_insert(
         heap.push(entry);
         if heap.len() == limit {
             if let Some(peek) = heap.peek() {
-                *min_key = peek.0.0;
+                *min_key = peek.0 .0;
             }
         }
     } else {
         heap.pop();
         heap.push(entry);
         if let Some(peek) = heap.peek() {
-            *min_key = peek.0.0;
+            *min_key = peek.0 .0;
         }
     }
 }
