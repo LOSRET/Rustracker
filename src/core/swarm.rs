@@ -114,7 +114,7 @@ impl PackedIpv4Peers {
             return;
         }
         if self.bytes.capacity() > IPV4_ENTRY_LEN * 32
-            && self.bytes.len() <= self.bytes.capacity() / 2
+            && self.bytes.len() * 5 <= self.bytes.capacity() * 4
         {
             let entries = self.bytes.len() / IPV4_ENTRY_LEN;
             let target = entries.next_power_of_two().max(8) * IPV4_ENTRY_LEN;
@@ -398,7 +398,7 @@ impl PackedIpv6Peers {
             return;
         }
         if self.bytes.capacity() > IPV6_ENTRY_LEN * 32
-            && self.bytes.len() <= self.bytes.capacity() / 2
+            && self.bytes.len() * 5 <= self.bytes.capacity() * 4
         {
             let entries = self.bytes.len() / IPV6_ENTRY_LEN;
             let target = entries.next_power_of_two().max(8) * IPV6_ENTRY_LEN;
