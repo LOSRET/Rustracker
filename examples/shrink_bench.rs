@@ -219,6 +219,12 @@ fn main() {
         // shrink_if_idle was called on every non-empty swarm.
         // The anchor survived, so each swarm has 1 peer left.
         // Vec shrinks from 300+ capacity → 1 entry.
+
+        // Let jemalloc's background decay thread purge freed pages
+        // (default decay time is 10s; we've waited 9s since last regrow,
+        //  this extra 3s pushes it past 10s so RSS actually drops).
+        std::thread::sleep(Duration::from_secs(3));
+
         let rss_shrink = rss_mb();
 
         eprint!("regrow...");
