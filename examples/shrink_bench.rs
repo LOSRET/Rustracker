@@ -171,7 +171,7 @@ fn main() {
     eprintln!();
 
     // ── CSV header ─────────────────────────────────────────────
-    println!("cycle,torrents,rss_build_mb,rss_shrink_mb,rss_regrow_mb,overhead_mb");
+    println!("cycle,torrents,rss_build_mb,peers_after_expire,rss_shrink_mb,rss_regrow_mb,overhead_mb");
 
     let mut prev_regrow_rss = rss_build;
 
@@ -193,6 +193,16 @@ fn main() {
         tracker.expire_due(now);
         // shrink_if_idle runs on every non-empty swarm:
         // Vec shrinks from ~300 entries to 1 entry, capacity drops.
+
+        // Sanity check: after expire, only anchors should remain.
+        let snap = tracker.snapshot();
+        let expected = n_torrents;
+        if snap.totals.peers != expected {
+            eprintln!();
+            eprintln!("  ⚠️  expire left {} peers (expected {}), diff={}",
+                snap.totals.peers, expected,
+                snap.totals.peers.saturating_sub(expected));
+        }
 
         // Let jemalloc / glibc decay freed pages
         std::thread::sleep(Duration::from_secs(2));
@@ -222,8 +232,8 @@ fn main() {
         prev_regrow_rss = rss_regrow;
 
         println!(
-            ",{},{:.1},{:.1},{:.1},{:.1}",
-            n_torrents, rss_build, rss_shrink, rss_regrow, overhead,
+            ",{},{:.1},{},{:.1},{:.1},{:.1}",
+            n_torrents, rss_build, snap.totals.peers, rss_shrink, rss_regrow, overhead,
         );
         eprintln!("  {:.1}→{:.1}→{:.1} overhead={:.1}",
             rss_build, rss_shrink, rss_regrow, overhead);

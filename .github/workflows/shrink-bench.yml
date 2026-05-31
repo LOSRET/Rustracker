@@ -31,10 +31,10 @@ jobs:
         run: |
           echo "# Shrink/Regrow Memory Benchmark" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Cycle | Torrents | Build RSS | Shrink RSS | Regrow RSS | Overhead |" >> $GITHUB_STEP_SUMMARY
-          echo "|---:|---:|---:|---:|---:|---:|" >> $GITHUB_STEP_SUMMARY
-          tail -n +2 shrink.csv | while IFS=',' read cycle torrents build shrink regrow overhead; do
-            echo "| $cycle | $(printf "%'d" $torrents) | ${build} MB | ${shrink} MB | ${regrow} MB | ${overhead} MB |" >> $GITHUB_STEP_SUMMARY
+          echo "| Cycle | Torrents | Build RSS | Peers after expire | Shrink RSS | Regrow RSS | Overhead |" >> $GITHUB_STEP_SUMMARY
+          echo "|---:|---:|---:|---:|---:|---:|---:|" >> $GITHUB_STEP_SUMMARY
+          tail -n +2 shrink.csv | while IFS=',' read cycle torrents build peers shrink regrow overhead; do
+            echo "| $cycle | $(printf "%'d" $torrents) | ${build} MB | $(printf "%'d" $peers) | ${shrink} MB | ${regrow} MB | ${overhead} MB |" >> $GITHUB_STEP_SUMMARY
           done
           echo "" >> $GITHUB_STEP_SUMMARY
           final=$(tail -1 shrink.csv | awk -F',' '{print $5}')
