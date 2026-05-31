@@ -20,6 +20,12 @@
 use std::net::{IpAddr, Ipv4Addr};
 use std::time::{Duration, Instant};
 
+// The library's globals don't apply to example binaries, so
+// explicitly use jemalloc on Linux (same as the server binary).
+#[cfg(target_os = "linux")]
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 use rustracker::tracker::{AnnounceInput, Tracker};
 use rustracker::types::{AnnounceEvent, InfoHash, PeerId};
 
