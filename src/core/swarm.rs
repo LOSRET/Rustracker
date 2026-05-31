@@ -114,9 +114,13 @@ impl PackedIpv4Peers {
             return;
         }
         if self.bytes.capacity() > IPV4_ENTRY_LEN * 32
-            && self.bytes.len() * 9 < self.bytes.capacity() * 10
+            && self.bytes.len() <= self.bytes.capacity() / 2
         {
-            self.bytes.shrink_to_fit();
+            let entries = self.bytes.len() / IPV4_ENTRY_LEN;
+            let target = entries.next_power_of_two().max(8) * IPV4_ENTRY_LEN;
+            if target < self.bytes.capacity() {
+                self.bytes.shrink_to(target);
+            }
         }
     }
 
@@ -394,9 +398,13 @@ impl PackedIpv6Peers {
             return;
         }
         if self.bytes.capacity() > IPV6_ENTRY_LEN * 32
-            && self.bytes.len() * 9 < self.bytes.capacity() * 10
+            && self.bytes.len() <= self.bytes.capacity() / 2
         {
-            self.bytes.shrink_to_fit();
+            let entries = self.bytes.len() / IPV6_ENTRY_LEN;
+            let target = entries.next_power_of_two().max(8) * IPV6_ENTRY_LEN;
+            if target < self.bytes.capacity() {
+                self.bytes.shrink_to(target);
+            }
         }
     }
 

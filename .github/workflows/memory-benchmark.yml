@@ -32,6 +32,37 @@ jobs:
       - uses: actions/upload-artifact@v7
         with: { name: benchmark, path: bench.csv }
 
+  shrink-bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --release --example shrink_bench
+      - name: Run
+        run: cargo run --release --example shrink_bench 2>shrink.log | tee shrink.csv
+      - name: Show log
+        run: cat shrink.log
+      - name: Summary
+        run: |
+          echo "# Shrink/Regrow Memory Benchmark" >> $GITHUB_STEP_SUMMARY
+          echo "Measures RSS overhead after repeated grow→shrink→regrow cycles." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Cycle | Torrents | Build RSS | Shrink RSS | Regrow RSS | Overhead |" >> $GITHUB_STEP_SUMMARY
+          echo "|---:|---:|---:|---:|---:|---:|" >> $GITHUB_STEP_SUMMARY
+          tail -n +2 shrink.csv | while IFS=',' read cycle torrents build shrink regrow overhead; do
+            echo "| $cycle | $(printf "%'d" $torrents) | ${build} MB | ${shrink} MB | ${regrow} MB | ${overhead} MB |" >> $GITHUB_STEP_SUMMARY
+          done
+          echo "" >> $GITHUB_STEP_SUMMARY
+          final=$(tail -1 shrink.csv | awk -F',' '{print $5}')
+          initial=$(tail -1 shrink.csv | awk -F',' '{print $3}')
+          growth=$(awk "BEGIN{printf \"%.1f\", $final - $initial}")
+          echo "**Final overhead: ${growth} MB** (build RSS vs last regrow RSS)" >> $GITHUB_STEP_SUMMARY
+      - uses: actions/upload-artifact@v7
+        with: { name: shrink-bench, path: shrink.csv }
+
   allocator-compare:
     runs-on: ubuntu-latest
     timeout-minutes: 45
