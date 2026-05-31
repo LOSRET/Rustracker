@@ -113,12 +113,11 @@ impl PackedIpv4Peers {
             self.bytes = Vec::new();
             return;
         }
-        if self.bytes.capacity() > IPV4_ENTRY_LEN * 32
-            && self.bytes.len() * 5 <= self.bytes.capacity() * 4
-        {
+        let cap = self.bytes.capacity();
+        if cap > IPV4_ENTRY_LEN * 32 {
             let entries = self.bytes.len() / IPV4_ENTRY_LEN;
             let target = entries.next_power_of_two().max(8) * IPV4_ENTRY_LEN;
-            if target < self.bytes.capacity() {
+            if target < cap {
                 self.bytes.shrink_to(target);
             }
         }
@@ -397,12 +396,11 @@ impl PackedIpv6Peers {
             self.bytes = Vec::new();
             return;
         }
-        if self.bytes.capacity() > IPV6_ENTRY_LEN * 32
-            && self.bytes.len() * 5 <= self.bytes.capacity() * 4
-        {
+        let cap = self.bytes.capacity();
+        if cap > IPV6_ENTRY_LEN * 32 {
             let entries = self.bytes.len() / IPV6_ENTRY_LEN;
             let target = entries.next_power_of_two().max(8) * IPV6_ENTRY_LEN;
-            if target < self.bytes.capacity() {
+            if target < cap {
                 self.bytes.shrink_to(target);
             }
         }
