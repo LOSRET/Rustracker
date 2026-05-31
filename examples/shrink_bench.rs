@@ -102,17 +102,17 @@ fn main() {
     let n_torrents: usize = std::env::var("SHRINK_TORRENTS")
         .ok()
         .and_then(|s| s.parse().ok())
-        .unwrap_or(5_000);
+        .unwrap_or(30_000);
 
     let bulk_per_torrent: usize = std::env::var("SHRINK_BULK")
         .ok()
         .and_then(|s| s.parse().ok())
-        .unwrap_or(100);
+        .unwrap_or(300);
 
     let n_cycles: usize = std::env::var("SHRINK_CYCLES")
         .ok()
         .and_then(|s| s.parse().ok())
-        .unwrap_or(5);
+        .unwrap_or(10);
 
     // Use a short peer_timeout so each cycle is fast (~5-7s).
     // With peer_timeout=5 and sweep_interval=min(5,30).max(1)=5:
