@@ -1,14 +1,12 @@
 //! shrink/regrow cycle memory benchmark
 //!
-//! Measures RSS overhead after repeated grow→shrink→regrow cycles
-//! through the real Tracker API (exercises PackedIpv4Peers::shrink_if_idle).
+//! Measures RSS overhead after repeated grow→shrink→regrow cycles.
 //!
 //! design:
-//!   Each torrent has 1 anchor peer (re-announced every cycle, survives expire)
-//!   and N bulk peers (added fresh each cycle, expire at next cycle).
-//!   A 5-second peer_timeout means cycles must space out by >5s between
-//!   regrow and the next expire.  Uses real wall-clock sleep to ensure
-//!   correct expiry regardless of machine speed.
+//!   peer_timeout=1s so timing constraints are trivial:
+//!   re-anchor and expire happen at the same Instant (anchor aged 0s, stays alive).
+//!   Previous cycle's bulk peers are always >1s old → always expired.
+//!   No timing windows, no race conditions.
 //!
 //! Usage: cargo run --release --example shrink_bench
 //!
@@ -20,14 +18,13 @@
 use std::net::{IpAddr, Ipv4Addr};
 use std::time::{Duration, Instant};
 
-// The library's globals don't apply to example binaries, so
-// explicitly use jemalloc on Linux (same as the server binary).
+use rustracker::tracker::{AnnounceInput, Tracker};
+use rustracker::types::{AnnounceEvent, InfoHash, PeerId};
+
+// Example binaries don't inherit src/main.rs's global allocator.
 #[cfg(target_os = "linux")]
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
-
-use rustracker::tracker::{AnnounceInput, Tracker};
-use rustracker::types::{AnnounceEvent, InfoHash, PeerId};
 
 // ─── RSS measurement ──────────────────────────────────────────────
 
@@ -129,67 +126,49 @@ fn main() {
         .and_then(|s| s.parse().ok())
         .unwrap_or(10);
 
-    // Short peer_timeout so we don't wait too long between cycles.
-    // After regrow we sleep(6s), then expire: regrow peers have aged 6s,
-    // peer_timeout=5 → all expire cleanly.
-    let peer_timeout = Duration::from_secs(5);
-    let mut tracker = Tracker::new(
-        Duration::from_secs(1800),
-        peer_timeout,
-    );
+    // peer_timeout=1s means:
+    //   - anchor re-announced at same Instant as expire → survives
+    //   - any bulk from >1s ago → expired
+    //   - expire can fire again in just 1s (sweep_interval = 1s)
+    let peer_timeout = Duration::from_secs(1);
+    let mut tracker = Tracker::new(Duration::from_secs(1800), peer_timeout);
 
     eprintln!(
         "shrink_bench: torrents={} bulk/torrent={} cycles={} peer_timeout={}s",
-        n_torrents,
-        bulk_per_torrent,
-        n_cycles,
-        peer_timeout.as_secs(),
+        n_torrents, bulk_per_torrent, n_cycles, peer_timeout.as_secs(),
     );
     eprintln!();
 
     // ── Phase 1: Build ─────────────────────────────────────────
-    // Use a shared Instant for all build announces so they have
-    // the same last_seen_secs and expire together.
     eprint!("  building...");
     let build_time = Instant::now();
     let anchor_port: u16 = 6881;
 
     for t in 0..n_torrents {
-        // Anchor peer (1 per torrent, survives expiry)
+        // Insert anchor peer (1 per torrent, survives expiry via re-announce)
         announce(
-            &mut tracker,
-            t as u64,
-            t as u64,
-            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
-            anchor_port,
-            build_time,
+            &mut tracker, t as u64, t as u64,
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)), anchor_port, build_time,
         );
-
-        // Bulk peers (300 per torrent)
+        // Insert bulk peers (will be expired each cycle)
         for j in 0..bulk_per_torrent {
             let seed = (t * bulk_per_torrent + j) as u64;
             let ip_octet = 2 + (seed % 253) as u8;
-            let port = 6881u16.wrapping_add((seed % 60000) as u16);
             announce(
-                &mut tracker,
-                t as u64,
-                seed + 1_000_000_000,
+                &mut tracker, t as u64, seed + 1_000_000_000,
                 IpAddr::V4(Ipv4Addr::new(10, 0, ip_octet, (seed >> 8) as u8)),
-                port,
-                build_time,
+                6881u16.wrapping_add((seed % 60000) as u16), build_time,
             );
         }
     }
     eprintln!(" done");
+    // Build peers need to age past peer_timeout=1s before first expire.
+    // Build itself took time; add a small safety margin.
+    std::thread::sleep(Duration::from_secs(2));
+
     let rss_build = rss_mb();
     eprintln!("  build RSS = {:.1} MB", rss_build);
     eprintln!();
-
-    // Wait for build peers to age past peer_timeout.
-    // build_time + 8s > build_time + peer_timeout(5s) + margin → all expired.
-    eprint!("  ageing build peers...");
-    std::thread::sleep(Duration::from_secs(8));
-    eprintln!(" done");
 
     // ── CSV header ─────────────────────────────────────────────
     println!("cycle,torrents,rss_build_mb,rss_shrink_mb,rss_regrow_mb,overhead_mb");
@@ -198,42 +177,28 @@ fn main() {
 
     // ── Cycles ─────────────────────────────────────────────────
     for cycle in 0..n_cycles {
-        eprint!("  cycle {:2}/{}: re-anchor...", cycle + 1, n_cycles);
+        eprint!("  cycle {:2}/{}", cycle + 1, n_cycles);
 
-        // ── Re-anchor ──────────────────────────────────────────
-        // Update anchor's last_seen_secs so it survives expire.
-        let anchor_time = Instant::now();
+        // ── Re-anchor + expire (same Instant) ──────────────────
+        // Anchor: aged 0s → definitely survives (peer_timeout=1s).
+        // Previous bulk peers (from build or last regrow): aged
+        // at least 2s (build→expire) or 3s (regrow→expire) → expired.
+        let now = Instant::now();
         for t in 0..n_torrents {
             announce(
-                &mut tracker,
-                t as u64,
-                t as u64,
-                IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
-                anchor_port,
-                anchor_time,
+                &mut tracker, t as u64, t as u64,
+                IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)), anchor_port, now,
             );
         }
+        tracker.expire_due(now);
+        // shrink_if_idle runs on every non-empty swarm:
+        // Vec shrinks from ~300 entries to 1 entry, capacity drops.
 
-        // Wait 3s: anchor has only aged 3s ≤ peer_timeout(5s), so survives.
-        // But ALL previous bulk peers have aged 8s+3s = 11s > 5s → expired.
-        std::thread::sleep(Duration::from_secs(3));
-
-        eprint!("expire...");
-
-        // ── Expire ─────────────────────────────────────────────
-        tracker.expire_due(Instant::now());
-        // shrink_if_idle was called on every non-empty swarm.
-        // The anchor survived, so each swarm has 1 peer left.
-        // Vec shrinks from 300+ capacity → 1 entry.
-
-        // Let jemalloc's background decay thread purge freed pages
-        // (default decay time is 10s; we've waited 9s since last regrow,
-        //  this extra 3s pushes it past 10s so RSS actually drops).
-        std::thread::sleep(Duration::from_secs(3));
+        // Let jemalloc / glibc decay freed pages
+        std::thread::sleep(Duration::from_secs(2));
+        eprint!("  shrink");
 
         let rss_shrink = rss_mb();
-
-        eprint!("regrow...");
 
         // ── Regrow ─────────────────────────────────────────────
         let regrow_time = Instant::now();
@@ -242,37 +207,30 @@ fn main() {
                 let seed = (cycle as u64) * 10_000_000_000
                     + (t * bulk_per_torrent + j) as u64;
                 let ip_octet = 2 + (seed % 253) as u8;
-                let port = 6881u16.wrapping_add((seed % 60000) as u16);
                 announce(
-                    &mut tracker,
-                    t as u64,
-                    seed + 2_000_000_000,
+                    &mut tracker, t as u64, seed + 2_000_000_000,
                     IpAddr::V4(Ipv4Addr::new(10, 1, ip_octet, (seed >> 8) as u8)),
-                    port,
-                    regrow_time,
+                    6881u16.wrapping_add((seed % 60000) as u16), regrow_time,
                 );
             }
         }
+        eprint!("  regrow");
+
         let rss_regrow = rss_mb();
 
         let overhead = rss_regrow - prev_regrow_rss;
         prev_regrow_rss = rss_regrow;
 
         println!(
-            "{},{},{:.1},{:.1},{:.1},{:.1}",
-            cycle + 1, n_torrents, rss_build, rss_shrink, rss_regrow, overhead,
+            ",{},{:.1},{:.1},{:.1},{:.1}",
+            n_torrents, rss_build, rss_shrink, rss_regrow, overhead,
         );
+        eprintln!("  {:.1}→{:.1}→{:.1} overhead={:.1}",
+            rss_build, rss_shrink, rss_regrow, overhead);
 
-        eprintln!(
-            " shrink={:.1} regrow={:.1} overhead={:.1} MB",
-            rss_shrink, rss_regrow, overhead,
-        );
-
-        // Wait for regrow peers to age past peer_timeout for next cycle.
-        // Next cycle's re-anchor + 3s wait = next expire at regrow_time + 6s.
-        // So regrow peers have aged 6s > peer_timeout(5s) → expired.
-        // Anchor will be re-announced in next cycle, only 3s before expire → stays.
-        std::thread::sleep(Duration::from_secs(6));
+        // Wait for regrow peers to age past peer_timeout=1s.
+        // This + next cycle's re-anchor overhead gives >1s gap.
+        std::thread::sleep(Duration::from_secs(2));
     }
 
     // ── Summary ────────────────────────────────────────────────
