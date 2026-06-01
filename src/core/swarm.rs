@@ -114,9 +114,9 @@ impl PackedIpv4Peers {
             return;
         }
         let cap = self.bytes.capacity();
-        if cap > IPV4_ENTRY_LEN * 3 {
+        if cap > IPV4_ENTRY_LEN * 4 {
             let entries = self.bytes.len() / IPV4_ENTRY_LEN;
-            let target = entries.next_power_of_two().max(3) * IPV4_ENTRY_LEN;
+            let target = entries.next_power_of_two().max(4) * IPV4_ENTRY_LEN;
             if target < cap {
                 self.bytes.shrink_to(target);
             }
