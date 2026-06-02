@@ -156,7 +156,7 @@ Three-layer design with clear separation of concerns:
 
 - **Sharding**: 64 shards chosen via `DefaultHasher(info_hash) % 64` to minimize lock contention
 - **Peer storage**: Packed binary, no heap allocation per peer — stored inline in `Vec<u8>`
-- **Shrink strategy (`shrink_if_idle`)**: After peer expiry sweeps, each `Swarm`'s `Vec<u8>` shrinks to `next_power_of_two(entries).max(floor) * entry_size`. This keeps post-shrink utilization at 50–100% — more aggressive than opentracker's <25% trigger.
+- **Shrink strategy (`shrink_if_idle`)**: After peer expiry sweeps, each `Swarm`'s `Vec<u8>` checks if `cap > floor * entry_size` (skip tiny vecs), then computes `target = next_power_of_two(entries).max(floor) * entry_size`. Shrinks to target only if `target < cap`, yielding 50–100% post-shrink utilization. This is tighter than opentracker's approach (waits until <25% utilization, then halves).
 - **Background tasks**: Peer expiry sweeps every 1s, trend sampling every 10min, blacklist file watch every 5s
 - **build.rs**: Reads `assets/index.html` and injects `assets/contact.html` content at the `<!-- CONTACT -->` placeholder when `personal-contact` feature is enabled; outputs the result to `$OUT_DIR/index.html`
 - **Features**: `dashboard` (default) enables web UI routes and embeds the HTML at compile time; `personal-contact` injects contact info into the HTML
