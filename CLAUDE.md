@@ -127,6 +127,21 @@ cargo run --release --example memory_tracker_btree
 
 ## Architecture
 
+```
+┌──────────────────────────────────────────────────────┐
+│                    Axum HTTP Server                   │
+│  /announce  /scrape  /healthz  /  /api/*             │
+└──────────┬───────────────────────────────────────────┘
+           │
+           ▼
+┌──────────────────────┐     ┌─────────────────────────┐
+│    TrackerPool        │     │     TrendStore           │
+│  (64 sharded RwLock)  │     │  (7-day JSONL history)   │
+│  BTreeMap<InfoHash,   │     │  10-min sampling          │
+│   Swarm>              │     └─────────────────────────┘
+└───────────────────────┘
+```
+
 Three-layer design with clear separation of concerns:
 
 - **`core/`** — Pure tracker engine, no I/O. `Tracker` holds a `BTreeMap<InfoHash, Swarm>` where each `Swarm` stores peers in packed binary format (6 bytes/IPv4 peer, 18 bytes/IPv6 peer). `TrackerPool` wraps 64 shards with per-shard `RwLock` for concurrency. `counters.rs` provides O(1) incremental snapshots; `topk.rs` does 4-way top-K ranking.
@@ -141,6 +156,7 @@ Three-layer design with clear separation of concerns:
 
 - **Sharding**: 64 shards chosen via `DefaultHasher(info_hash) % 64` to minimize lock contention
 - **Peer storage**: Packed binary, no heap allocation per peer — stored inline in `Vec<u8>`
+- **Shrink strategy (`shrink_if_idle`)**: After peer expiry sweeps, each `Swarm`'s `Vec<u8>` shrinks to `next_power_of_two(entries).max(floor) * entry_size`. This keeps post-shrink utilization at 50–100% — more aggressive than opentracker's <25% trigger.
 - **Background tasks**: Peer expiry sweeps every 1s, trend sampling every 10min, blacklist file watch every 5s
 - **build.rs**: Reads `assets/index.html` and injects `assets/contact.html` content at the `<!-- CONTACT -->` placeholder when `personal-contact` feature is enabled; outputs the result to `$OUT_DIR/index.html`
 - **Features**: `dashboard` (default) enables web UI routes and embeds the HTML at compile time; `personal-contact` injects contact info into the HTML
