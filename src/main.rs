@@ -16,7 +16,7 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 #[derive(Debug, Parser)]
 #[command(version, about)]
 struct Args {
-    #[arg(long, env = "RUSTRACKER_LISTEN", default_value = "0.0.0.0:8080")]
+    #[arg(long, env = "RUSTRACKER_LISTEN", default_value = "[::]:8080")]
     listen: SocketAddr,
 
     #[arg(long, env = "RUSTRACKER_INTERVAL_SECS", default_value_t = 1800)]
