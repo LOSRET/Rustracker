@@ -2,4 +2,6 @@
 # Strip solitary @ lines from commit messages.
 # PowerShell here-string syntax (@'...'@) can leak @ into the message
 # when the closing '@ isn't at column 0.
-sed -i '/^@$/d' "$1"
+#
+# Uses grep+mv for portability (GNU sed -i differs from BSD sed -i).
+grep -v '^@$' "$1" > "$1.tmp" && mv "$1.tmp" "$1"

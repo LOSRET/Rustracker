@@ -100,11 +100,9 @@ RUST_LOG=rustracker=trace cargo run --release
 # Validation (run before committing)
 cargo fmt --check                          # style check
 cargo clippy --all-targets --all-features  # lints
-
-# Git: avoid PowerShell here-string (causes stray @ in messages)
-# Hook at .githooks/commit-msg strips solitary @ lines automatically.
-# Enable with: git config core.hooksPath .githooks
 ```
+
+> **Note:** `.githooks/commit-msg` strips solitary `@` lines from commit messages (PowerShell here-string artifact). Enable with `git config core.hooksPath .githooks` after cloning.
 
 ## Load Testing / Benchmarks
 
