@@ -16,8 +16,13 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 #[derive(Debug, Parser)]
 #[command(version, about)]
 struct Args {
-    #[arg(long, env = "RUSTRACKER_LISTEN", default_value = "[::]:8080")]
-    listen: SocketAddr,
+    #[arg(
+        long,
+        env = "RUSTRACKER_LISTEN",
+        default_values = &["[::]:8080", "0.0.0.0:8080"],
+        value_delimiter = ','
+    )]
+    listen: Vec<SocketAddr>,
 
     #[arg(long, env = "RUSTRACKER_INTERVAL_SECS", default_value_t = 1800)]
     interval_secs: u64,
@@ -57,12 +62,17 @@ async fn main() -> anyhow::Result<()> {
         args.trends_file,
         args.admin_token,
     ));
-    let listener = TcpListener::bind(args.listen)
-        .await
-        .with_context(|| format!("failed to bind {}", args.listen))?;
+    let mut listeners = Vec::with_capacity(args.listen.len());
+    for addr in &args.listen {
+        let listener = TcpListener::bind(addr)
+            .await
+            .with_context(|| format!("failed to bind {addr}"))?;
+        listeners.push(listener);
+    }
 
-    info!(listen = %args.listen, "rustracker listening");
-    serve(listener, app, shutdown_signal()).await?;
+    let addrs: Vec<String> = args.listen.iter().map(|a| a.to_string()).collect();
+    info!(listen = %addrs.join(", "), "rustracker listening");
+    serve(listeners, app, shutdown_signal()).await?;
 
     Ok(())
 }

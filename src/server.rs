@@ -246,30 +246,43 @@ fn file_mtime(path: &Path) -> SystemTime {
         .unwrap_or(SystemTime::UNIX_EPOCH)
 }
 
-pub async fn serve<F>(listener: TcpListener, app: Router, shutdown: F) -> io::Result<()>
+pub async fn serve<F>(listeners: Vec<TcpListener>, app: Router, shutdown: F) -> io::Result<()>
 where
     F: Future<Output = ()> + Send + 'static,
 {
-    let mut server = axum_server::from_tcp(listener.into_std()?)?;
-
-    server
-        .http_builder()
-        .http1()
-        .keep_alive(true)
-        .writev(true)
-        .pipeline_flush(false);
-
     let handle = axum_server::Handle::new();
-    let server = server.handle(handle.clone());
+    let shutdown_handle = handle.clone();
     tokio::spawn(async move {
         shutdown.await;
         tracing::trace!("received graceful shutdown signal");
-        handle.graceful_shutdown(None);
+        shutdown_handle.graceful_shutdown(None);
     });
 
-    server
-        .serve(app.into_make_service_with_connect_info::<SocketAddr>())
-        .await
+    let mut tasks = Vec::with_capacity(listeners.len());
+    for listener in listeners {
+        let app = app.clone();
+        let handle = handle.clone();
+        tasks.push(tokio::spawn(async move {
+            let mut server = axum_server::from_tcp(listener.into_std()?)?;
+
+            server
+                .http_builder()
+                .http1()
+                .keep_alive(true)
+                .writev(true)
+                .pipeline_flush(false);
+
+            server
+                .handle(handle)
+                .serve(app.into_make_service_with_connect_info::<SocketAddr>())
+                .await
+        }));
+    }
+
+    for task in tasks {
+        task.await.expect("server task panicked")?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -289,7 +302,7 @@ mod serve_tests {
             .unwrap();
         let addr = listener.local_addr().unwrap();
         tokio::spawn(async move {
-            serve(listener, app, future::pending()).await.unwrap();
+            serve(vec![listener], app, future::pending()).await.unwrap();
         });
         addr
     }
