@@ -63,7 +63,7 @@ Download the latest release from [GitHub Releases](https://github.com/LOSRET/Rus
 
 | Flag | Env Variable | Default | Description |
 |------|-------------|---------|-------------|
-| `--listen` | `RUSTRACKER_LISTEN` | `0.0.0.0:8080` | Socket address to bind |
+| `--listen` | `RUSTRACKER_LISTEN` | `[::]:8080` + `0.0.0.0:8080` | Socket address(es) to bind (repeatable, defaults to dual-stack) |
 | `--interval-secs` | `RUSTRACKER_INTERVAL_SECS` | `1800` | Announce interval (seconds) |
 | `--peer-timeout-secs` | `RUSTRACKER_PEER_TIMEOUT_SECS` | `3000` | Peer expiry timeout (seconds) |
 | `--blacklist` | `RUSTRACKER_BLACKLIST` | — | Path to torrent blacklist file |
