@@ -1,5 +1,5 @@
         :root {
-            color-scheme: light;
+            color-scheme: light dark;
             --ink: #1f2937;
             --muted: #64748b;
             --line: #d8dee8;
@@ -252,6 +252,7 @@
             display: flex;
             justify-content: flex-end;
             align-items: center;
+            flex-wrap: wrap;
             gap: 24px;
             padding: 16px 0;
             color: var(--muted);
@@ -347,6 +348,7 @@
         .tracker-addr-wrap {
             display: flex;
             align-items: center;
+            flex-wrap: wrap;
             gap: 4px;
             margin-bottom: 20px;
         }
@@ -562,4 +564,46 @@
             .metrics { grid-template-columns: 1fr; }
             h1 { font-size: 24px; }
             #trendChart, #clientChart { height: 275px; }
+        }
+
+        /* ===== Dark mode ===== */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --ink: #e2e8f0;
+                --muted: #94a3b8;
+                --line: #334155;
+                --panel: #1e293b;
+                --soft: #0f172a;
+                --blue: #3b82f6;
+                --blue-dark: #2563eb;
+                --green: #22c55e;
+                --amber: #f59e0b;
+                --violet: #a78bfa;
+                --red: #ef4444;
+            }
+
+            .button.secondary {
+                background: #334155;
+                color: #e2e8f0;
+            }
+            .button.secondary:hover { background: #475569; }
+
+            .side { background: #0f172a; }
+            .nav-item.active { background: #1e293b; }
+            .lang-sel { background: #1e293b; border-color: #475569; }
+
+            .range-btn:hover { background: #1e293b; }
+            .sort-btn:hover { background: #1e293b; }
+            .refresh-btn:hover { background: #1e293b; }
+
+            .top100-table td { border-bottom-color: #1e293b; }
+            .top100-table tr:hover td { background: #1e293b; }
+            .col-hash code { background: #0f172a; }
+
+            .tracker-addr.copied::after {
+                background: #e2e8f0;
+                color: #0f172a;
+            }
+
+            .hamburger { background: #0f172a; }
         }
