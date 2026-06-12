@@ -162,6 +162,7 @@ Three-layer design with clear separation of concerns:
 - **Background tasks**: Peer expiry sweeps every 1s, trend sampling every 10min, blacklist file watch every 5s
 - **build.rs**: Reads `assets/index.html` and injects `assets/contact.html` content at the `<!-- CONTACT -->` placeholder when `personal-contact` feature is enabled; outputs the result to `$OUT_DIR/index.html`
 - **Features**: `dashboard` (default) enables web UI routes and embeds the HTML at compile time; `personal-contact` injects contact info into the HTML
+- **Frontend i18n**: `assets/app.js` contains a `T` dictionary with 6 languages (zh/en/ja/ru/de/uk). Language auto-detects from `navigator.language`. All UI text uses `data-i18n` attributes. SEO metadata (`<html lang>`, `og:locale`, `<title>`, `<meta description>`, Twitter Card) updates dynamically on language switch via `LANG_LOCALE` and `OG_LOCALE` mapping tables.
 
 ## Testing Pattern
 

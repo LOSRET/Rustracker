@@ -21,7 +21,7 @@ A lightweight, high-performance HTTP BitTorrent tracker with a real-time dashboa
 - ECharts trend charts: Torrents, Peers, Seeders, Leechers over 24h / 3d / 7d
 - Top 100 Torrents page ranked by Peers / Seeders / Leechers / Downloaded
 - Top 15 client distribution chart over time
-- Bilingual UI (中文 / English) with auto-detection
+- Multilingual UI — 6 languages (中文 / English / 日本語 / Русский / Deutsch / Українська) with auto-detection
 
 **Operations**
 - 64-shard concurrent tracker pool for high throughput
@@ -213,7 +213,7 @@ The tracker serves a full-featured dashboard at `/` on the same port:
 - **Client chart** — top 15 BitTorrent clients by peer count over time
 - **Top 100 page** — sortable table of the most active torrents
 - **Disclaimer** — built-in legal disclaimer for public-facing deployments
-- **i18n** — automatic Chinese / English detection with manual toggle
+- **i18n** — 6 languages (zh/en/ja/ru/de/uk) with auto-detection and manual toggle
 
 Static assets (`style.css`, `app.js`) are cached for 1 hour by the server.
 
