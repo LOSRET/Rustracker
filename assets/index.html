@@ -152,7 +152,11 @@
             </section>
             <section class="top100-panel">
                 <div class="top100-toolbar">
-                    <span class="clients-total" id="clientsTotal"></span>
+                    <div class="sort-group" id="clientsSortGroup">
+                        <button class="sort-btn active" data-sort="peers" type="button" data-i18n="sort_peers">Peers</button>
+                        <button class="sort-btn" data-sort="seeders" type="button" data-i18n="sort_seeders">Seeders</button>
+                        <button class="sort-btn" data-sort="leechers" type="button" data-i18n="sort_leechers">Leechers</button>
+                    </div>
                     <div class="top100-right">
                         <span id="clientsStatus" class="top100-status"></span>
                         <button class="refresh-btn" id="clientsRefresh" type="button" data-i18n="refresh">刷新</button>

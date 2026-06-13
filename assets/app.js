@@ -7,7 +7,7 @@
             if (_nav.startsWith("uk")) return "uk";
             return "en";
         })();
-        const state = { data: null, trendsData: null, clientData: null, range: "24h", lang: _detectLang, page: "dashboard", top100Data: null, top100Sort: "peers", allClientsData: null };
+        const state = { data: null, trendsData: null, clientData: null, range: "24h", lang: _detectLang, page: "dashboard", top100Data: null, top100Sort: "peers", allClientsData: null, clientsSort: "peers" };
         const $ = (id) => document.getElementById(id);
         const escapeHtml = (s) => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
         const NUM_LOCALE = { zh: "zh-CN", en: "en-US", ja: "ja-JP", ru: "ru-RU", de: "de-DE", uk: "uk-UA" };
@@ -580,8 +580,8 @@
                 return;
             }
             const total = d.total_peers || 0;
-            $("clientsTotal").textContent = (state.lang === "zh" ? "共 " : "Total: ") + clients.length + (state.lang === "zh" ? " 个客户端" : " clients");
-            body.innerHTML = clients.map((item, i) => {
+            const sorted = [...clients].sort((a, b) => (b[state.clientsSort] || 0) - (a[state.clientsSort] || 0));
+            body.innerHTML = sorted.map((item, i) => {
                 const name = escapeHtml(item.name);
                 const pct = total > 0 ? ((item.peers / total) * 100).toFixed(1) : "0.0";
                 const color = resolveClientColor(name);
@@ -599,6 +599,15 @@
         $("clientsRefresh").addEventListener("click", () => {
             state.allClientsData = null;
             loadAllClients();
+        });
+
+        $("clientsSortGroup").addEventListener("click", (e) => {
+            const btn = e.target.closest(".sort-btn");
+            if (!btn || btn.classList.contains("active")) return;
+            $("clientsSortGroup").querySelectorAll(".sort-btn").forEach((b) => b.classList.remove("active"));
+            btn.classList.add("active");
+            state.clientsSort = btn.dataset.sort;
+            renderAllClients();
         });
 
         $("langSelect").value = state.lang;
