@@ -43,6 +43,22 @@ pub(crate) struct ClientsResponse {
     pub history: Vec<ClientTrendPoint>,
 }
 
+#[derive(Debug, Serialize)]
+pub(crate) struct AllClientsResponse {
+    pub timestamp: u64,
+    pub total_peers: u64,
+    pub clients: Vec<ClientEntry>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct ClientEntry {
+    pub tag: u8,
+    pub name: String,
+    pub peers: u64,
+    pub seeders: u64,
+    pub leechers: u64,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub(crate) struct TrendPointResponse {
     pub timestamp: u64,

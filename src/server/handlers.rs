@@ -119,23 +119,7 @@ pub(crate) async fn clients(State(state): State<AppState>) -> Json<ClientsRespon
     })
 }
 
-#[derive(Debug, Serialize)]
-pub(crate) struct AllClientsResponse {
-    pub timestamp: u64,
-    pub total_peers: u64,
-    pub clients: Vec<ClientEntry>,
-}
-
-#[derive(Debug, Serialize)]
-pub(crate) struct ClientEntry {
-    pub tag: u8,
-    pub name: String,
-    pub peers: u64,
-    pub seeders: u64,
-    pub leechers: u64,
-}
-
-pub(crate) async fn clients_all(State(state): State<AppState>) -> Json<AllClientsResponse> {
+pub(crate) async fn clients_all(State(state): State<AppState>) -> Json<trends::AllClientsResponse> {
     let snapshot = state.tracker.snapshot().await;
     let now = trends::unix_timestamp();
     let total_peers = snapshot.totals.peers as u64;
@@ -146,13 +130,13 @@ pub(crate) async fn clients_all(State(state): State<AppState>) -> Json<AllClient
         seeder_map.insert(*tag, *count);
     }
 
-    let mut entries: Vec<ClientEntry> = snapshot
+    let mut entries: Vec<trends::ClientEntry> = snapshot
         .clients
         .iter()
         .map(|(tag, peers)| {
             let seeders = seeder_map.get(tag).copied().unwrap_or(0);
             let leechers = peers.saturating_sub(seeders);
-            ClientEntry {
+            trends::ClientEntry {
                 tag: *tag,
                 name: client_id::client_name(*tag).to_string(),
                 peers: *peers,
@@ -164,7 +148,7 @@ pub(crate) async fn clients_all(State(state): State<AppState>) -> Json<AllClient
 
     entries.sort_unstable_by(|a, b| b.peers.cmp(&a.peers));
 
-    Json(AllClientsResponse {
+    Json(trends::AllClientsResponse {
         timestamp: now,
         total_peers,
         clients: entries,
