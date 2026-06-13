@@ -153,10 +153,12 @@ impl TrackerPool {
             peer_timeout: 0,
             totals: Default::default(),
             clients: Vec::new(),
+            client_seeders: Vec::new(),
         });
 
         combined.totals = Default::default();
         let mut client_map: HashMap<u8, u64> = HashMap::new();
+        let mut seeder_map: HashMap<u8, u64> = HashMap::new();
         for snapshot in snapshots {
             combined.totals.torrents += snapshot.totals.torrents;
             combined.totals.peers += snapshot.totals.peers;
@@ -169,8 +171,12 @@ impl TrackerPool {
             for (tag, count) in snapshot.clients {
                 *client_map.entry(tag).or_insert(0) += count;
             }
+            for (tag, count) in snapshot.client_seeders {
+                *seeder_map.entry(tag).or_insert(0) += count;
+            }
         }
         combined.clients = client_map.into_iter().collect();
+        combined.client_seeders = seeder_map.into_iter().collect();
 
         combined
     }

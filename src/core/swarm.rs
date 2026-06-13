@@ -750,16 +750,17 @@ impl Swarm {
     pub(crate) fn expire(&mut self, now_secs: u32, timeout_secs: u32) -> ExpireResult {
         let mut expired_complete: usize = 0;
         let mut expired_count: usize = 0;
-        let mut expired_tags: Vec<u8> = Vec::new();
+        let mut expired_tags: Vec<(u8, bool)> = Vec::new();
 
         self.ipv4_peers.retain(|_, peer| {
             let keep = now_secs.saturating_sub(peer.last_seen_secs) <= timeout_secs;
             if !keep {
                 expired_count += 1;
-                if peer.is_complete() {
+                let is_seeder = peer.is_complete();
+                if is_seeder {
                     expired_complete += 1;
                 }
-                expired_tags.push(peer.client_tag);
+                expired_tags.push((peer.client_tag, is_seeder));
             }
             keep
         });
@@ -768,10 +769,11 @@ impl Swarm {
             let keep = now_secs.saturating_sub(peer.last_seen_secs) <= timeout_secs;
             if !keep {
                 expired_count += 1;
-                if peer.is_complete() {
+                let is_seeder = peer.is_complete();
+                if is_seeder {
                     expired_complete += 1;
                 }
-                expired_tags.push(peer.client_tag);
+                expired_tags.push((peer.client_tag, is_seeder));
             }
             keep
         });

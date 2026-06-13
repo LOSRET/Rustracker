@@ -119,6 +119,58 @@ pub(crate) async fn clients(State(state): State<AppState>) -> Json<ClientsRespon
     })
 }
 
+#[derive(Debug, Serialize)]
+pub(crate) struct AllClientsResponse {
+    pub timestamp: u64,
+    pub total_peers: u64,
+    pub clients: Vec<ClientEntry>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct ClientEntry {
+    pub tag: u8,
+    pub name: String,
+    pub peers: u64,
+    pub seeders: u64,
+    pub leechers: u64,
+}
+
+pub(crate) async fn clients_all(State(state): State<AppState>) -> Json<AllClientsResponse> {
+    let snapshot = state.tracker.snapshot().await;
+    let now = trends::unix_timestamp();
+    let total_peers = snapshot.totals.peers as u64;
+
+    // Build a map from tag → seeders
+    let mut seeder_map: std::collections::HashMap<u8, u64> = std::collections::HashMap::new();
+    for (tag, count) in &snapshot.client_seeders {
+        seeder_map.insert(*tag, *count);
+    }
+
+    let mut entries: Vec<ClientEntry> = snapshot
+        .clients
+        .iter()
+        .map(|(tag, peers)| {
+            let seeders = seeder_map.get(tag).copied().unwrap_or(0);
+            let leechers = peers.saturating_sub(seeders);
+            ClientEntry {
+                tag: *tag,
+                name: client_id::client_name(*tag).to_string(),
+                peers: *peers,
+                seeders,
+                leechers,
+            }
+        })
+        .collect();
+
+    entries.sort_unstable_by(|a, b| b.peers.cmp(&a.peers));
+
+    Json(AllClientsResponse {
+        timestamp: now,
+        total_peers,
+        clients: entries,
+    })
+}
+
 pub(crate) async fn healthz() -> &'static str {
     "ok"
 }

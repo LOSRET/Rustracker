@@ -39,8 +39,8 @@ pub(crate) struct PeerRemoval {
 
 /// Returned by [`Swarm::expire`](crate::core::tracker::Swarm::expire).
 pub(crate) struct ExpireResult {
-    /// Client tags of all expired peers.
-    pub tags: Vec<u8>,
+    /// (tag, is_seeder) of all expired peers.
+    pub tags: Vec<(u8, bool)>,
     /// Number of peers that expired.
     pub removed_peers: usize,
     /// Number of expired peers that were seeders.

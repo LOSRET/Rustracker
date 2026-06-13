@@ -39,6 +39,7 @@ pub struct TrackerSnapshot {
     pub peer_timeout: u64,
     pub totals: TrackerTotals,
     pub clients: Vec<(u8, u64)>,
+    pub client_seeders: Vec<(u8, u64)>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -58,6 +59,7 @@ pub struct Tracker {
     next_expire_at: Instant,
     swarms: BTreeMap<InfoHash, Swarm>,
     client_counts: Vec<(u8, u64)>,
+    client_seeders: Vec<(u8, u64)>,
     counters: TrackerCounters,
 }
 
@@ -74,6 +76,7 @@ impl Tracker {
             next_expire_at: started_at,
             swarms: BTreeMap::new(),
             client_counts: Vec::new(),
+            client_seeders: Vec::new(),
             counters: TrackerCounters::default(),
         }
     }
@@ -97,13 +100,13 @@ impl Tracker {
                 self.counters.add_torrent();
             }
 
-            let mut decr: Vec<u8> = Vec::new();
-            let mut incr: Option<u8> = None;
+            let mut decr: Vec<(u8, bool)> = Vec::new();
+            let mut incr: Option<(u8, bool)> = None;
 
             match input.event {
                 AnnounceEvent::Stopped => {
                     if let Some(removal) = swarm.remove_peer_tag(endpoint) {
-                        decr.push(removal.tag);
+                        decr.push((removal.tag, removal.was_complete));
                         self.counters.apply_removal(&removal);
                         if swarm.is_empty() {
                             // Swarm stays in BTreeMap; will be removed by expire.
@@ -119,11 +122,11 @@ impl Tracker {
                     }
                     if let Some(tag) = upsert.old_tag {
                         if tag != new_tag {
-                            decr.push(tag);
+                            decr.push((tag, upsert.was_complete));
                         }
                     }
                     if upsert.old_tag != Some(new_tag) {
-                        incr = Some(new_tag);
+                        incr = Some((new_tag, upsert.now_complete));
                     }
                     self.counters.apply_upsert(&upsert);
                 }
@@ -131,11 +134,11 @@ impl Tracker {
                     let upsert = swarm.upsert_peer(endpoint, input.into_peer_state(now_secs));
                     if let Some(tag) = upsert.old_tag {
                         if tag != new_tag {
-                            decr.push(tag);
+                            decr.push((tag, upsert.was_complete));
                         }
                     }
                     if upsert.old_tag != Some(new_tag) {
-                        incr = Some(new_tag);
+                        incr = Some((new_tag, upsert.now_complete));
                     }
                     self.counters.apply_upsert(&upsert);
                 }
@@ -166,11 +169,11 @@ impl Tracker {
         };
 
         // Apply client count changes after swarm borrow is released
-        for tag in pending_decr {
-            self.decr_client(tag);
+        for (tag, is_seeder) in pending_decr {
+            self.decr_client(tag, is_seeder);
         }
-        if let Some(tag) = pending_incr {
-            self.incr_client(tag);
+        if let Some((tag, is_seeder)) = pending_incr {
+            self.incr_client(tag, is_seeder);
         }
 
         #[cfg(debug_assertions)]
@@ -211,6 +214,7 @@ impl Tracker {
                 downloaded: c.downloaded,
             },
             clients: self.client_distribution().to_vec(),
+            client_seeders: self.client_seeders.clone(),
         }
     }
 
@@ -235,19 +239,34 @@ impl Tracker {
         &self.client_counts
     }
 
-    fn incr_client(&mut self, tag: u8) {
+    fn incr_client(&mut self, tag: u8, is_seeder: bool) {
         match self.client_counts.iter_mut().find(|(t, _)| *t == tag) {
             Some((_, c)) => *c = c.saturating_add(1),
             None => self.client_counts.push((tag, 1)),
         }
+        if is_seeder {
+            match self.client_seeders.iter_mut().find(|(t, _)| *t == tag) {
+                Some((_, c)) => *c = c.saturating_add(1),
+                None => self.client_seeders.push((tag, 1)),
+            }
+        }
     }
 
-    fn decr_client(&mut self, tag: u8) {
+    fn decr_client(&mut self, tag: u8, is_seeder: bool) {
         if let Some(pos) = self.client_counts.iter().position(|(t, _)| *t == tag) {
             let count = &mut self.client_counts[pos].1;
             *count = count.saturating_sub(1);
             if *count == 0 {
                 self.client_counts.swap_remove(pos);
+            }
+        }
+        if is_seeder {
+            if let Some(pos) = self.client_seeders.iter().position(|(t, _)| *t == tag) {
+                let count = &mut self.client_seeders[pos].1;
+                *count = count.saturating_sub(1);
+                if *count == 0 {
+                    self.client_seeders.swap_remove(pos);
+                }
             }
         }
     }
@@ -264,7 +283,7 @@ impl Tracker {
     fn expire(&mut self, now: Instant) {
         let now_secs = self.elapsed_secs(now);
         let timeout_secs = saturating_u32_secs(self.peer_timeout);
-        let mut all_expired_tags: Vec<u8> = Vec::new();
+        let mut all_expired_tags: Vec<(u8, bool)> = Vec::new();
         let mut total_expired_peers: usize = 0;
         let mut total_expired_complete: usize = 0;
         let mut removed_swarms: usize = 0;
@@ -294,8 +313,8 @@ impl Tracker {
             removed_downloaded,
         );
 
-        for tag in all_expired_tags {
-            self.decr_client(tag);
+        for (tag, is_seeder) in all_expired_tags {
+            self.decr_client(tag, is_seeder);
         }
 
         #[cfg(debug_assertions)]

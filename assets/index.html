@@ -47,6 +47,7 @@
             <div class="nav-label" data-i18n="monitoring">监控</div>
             <div class="nav-item active" id="navDashboard" onclick="switchPage('dashboard')"><span data-i18n="overview">Tracker 概览</span><span id="navState" data-i18n="running">运行中</span></div>
             <div class="nav-item" id="navTop100" onclick="switchPage('top100')"><span>🏆 <span data-i18n="top100_link">Top 100 Torrents</span></span><span>→</span></div>
+            <div class="nav-item" id="navClients" onclick="switchPage('clients')"><span>📊 <span data-i18n="clients_link">所有客户端</span></span><span>→</span></div>
             <a class="nav-item nav-link" href="#disclaimer"><span data-i18n="disc_link">Tracker 免责说明</span><span data-i18n="view">查看</span></a>
             <p class="side-note" data-i18n="side_note">HTTP tracker 的连接、做种、下载和完成统计。</p>
         </aside>
@@ -140,6 +141,42 @@
                 </div>
             </section>
             </div><!-- end pageTop100 -->
+
+            <!-- All Clients Page -->
+            <div id="pageClients" class="page-hidden">
+            <section class="topbar">
+                <div>
+                    <h1 data-i18n="clients_title">📊 所有客户端</h1>
+                    <p class="subtle" data-i18n="clients_subtitle">按 Peer 数量排序的完整客户端分布</p>
+                </div>
+            </section>
+            <section class="top100-panel">
+                <div class="top100-toolbar">
+                    <span class="clients-total" id="clientsTotal"></span>
+                    <div class="top100-right">
+                        <span id="clientsStatus" class="top100-status"></span>
+                        <button class="refresh-btn" id="clientsRefresh" type="button" data-i18n="refresh">刷新</button>
+                    </div>
+                </div>
+                <div class="top100-table-wrap">
+                    <table class="top100-table">
+                        <thead>
+                            <tr>
+                                <th class="col-rank">#</th>
+                                <th data-i18n="col_client">Client</th>
+                                <th class="col-num">Peers</th>
+                                <th class="col-num">Seeders</th>
+                                <th class="col-num">Leechers</th>
+                                <th class="col-num" data-i18n="col_pct">占比</th>
+                            </tr>
+                        </thead>
+                        <tbody id="clientsBody">
+                            <tr><td colspan="6" class="top100-empty" data-i18n="clients_loading">加载中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            </div><!-- end pageClients -->
 
             <section class="disclaimer" id="disclaimer" aria-label="Tracker 免责说明">
                 <h2 data-i18n="disc_title">Tracker 免责说明</h2>

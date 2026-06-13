@@ -7,7 +7,7 @@
             if (_nav.startsWith("uk")) return "uk";
             return "en";
         })();
-        const state = { data: null, trendsData: null, clientData: null, range: "24h", lang: _detectLang, page: "dashboard", top100Data: null, top100Sort: "peers" };
+        const state = { data: null, trendsData: null, clientData: null, range: "24h", lang: _detectLang, page: "dashboard", top100Data: null, top100Sort: "peers", allClientsData: null };
         const $ = (id) => document.getElementById(id);
         const escapeHtml = (s) => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
         const NUM_LOCALE = { zh: "zh-CN", en: "en-US", ja: "ja-JP", ru: "ru-RU", de: "de-DE", uk: "uk-UA" };
@@ -31,6 +31,10 @@
                 top100_subtitle: "按 Peers / Seeders / Leechers 数量排序",
                 sort_peers: "Peers", sort_seeders: "Seeders", sort_leechers: "Leechers", sort_downloaded: "Downloaded",
                 col_hash: "Info Hash", top100_loading: "加载中...", top100_empty: "暂无数据", top100_error: "读取失败",
+                clients_link: "所有客户端", clients_title: "📊 所有客户端",
+                clients_subtitle: "按 Peer 数量排序的完整客户端分布",
+                col_client: "Client", col_pct: "占比",
+                clients_loading: "加载中...", clients_empty: "暂无数据", clients_error: "读取失败",
                 refresh: "刷新",
                 tracker_addr_label: "Tracker 地址：",
                 config_fmt: () => `${window.location.origin}/announce`,
@@ -60,6 +64,10 @@
                 top100_subtitle: "Sorted by Peers / Seeders / Leechers count",
                 sort_peers: "Peers", sort_seeders: "Seeders", sort_leechers: "Leechers", sort_downloaded: "Downloaded",
                 col_hash: "Info Hash", top100_loading: "Loading...", top100_empty: "No data", top100_error: "Read failed",
+                clients_link: "All Clients", clients_title: "📊 All Clients",
+                clients_subtitle: "Complete client distribution sorted by peer count",
+                col_client: "Client", col_pct: "Share",
+                clients_loading: "Loading...", clients_empty: "No data", clients_error: "Read failed",
                 refresh: "Refresh",
                 tracker_addr_label: "Tracker URL: ",
                 config_fmt: () => `${window.location.origin}/announce`,
@@ -89,6 +97,10 @@
                 top100_subtitle: "Peers / Seeders / Leechers数でソート",
                 sort_peers: "Peers", sort_seeders: "Seeders", sort_leechers: "Leechers", sort_downloaded: "Downloaded",
                 col_hash: "Info Hash", top100_loading: "読み込み中...", top100_empty: "データなし", top100_error: "読み込み失敗",
+                clients_link: "すべてのクライアント", clients_title: "📊 すべてのクライアント",
+                clients_subtitle: "ピア数でソートされた完全なクライアント分布",
+                col_client: "Client", col_pct: "割合",
+                clients_loading: "読み込み中...", clients_empty: "データなし", clients_error: "読み込み失敗",
                 refresh: "更新",
                 tracker_addr_label: "Trackerアドレス：",
                 config_fmt: () => `${window.location.origin}/announce`,
@@ -118,6 +130,10 @@
                 top100_subtitle: "Сортировка по Peers / Seeders / Leechers",
                 sort_peers: "Peers", sort_seeders: "Seeders", sort_leechers: "Leechers", sort_downloaded: "Downloaded",
                 col_hash: "Info Hash", top100_loading: "Загрузка...", top100_empty: "Нет данных", top100_error: "Ошибка чтения",
+                clients_link: "Все клиенты", clients_title: "📊 Все клиенты",
+                clients_subtitle: "Полное распределение клиентов по количеству пиров",
+                col_client: "Client", col_pct: "Доля",
+                clients_loading: "Загрузка...", clients_empty: "Нет данных", clients_error: "Ошибка чтения",
                 refresh: "Обновить",
                 tracker_addr_label: "Адрес трекера: ",
                 config_fmt: () => `${window.location.origin}/announce`,
@@ -147,6 +163,10 @@
                 top100_subtitle: "Sortiert nach Peers / Seeders / Leechers",
                 sort_peers: "Peers", sort_seeders: "Seeders", sort_leechers: "Leechers", sort_downloaded: "Downloaded",
                 col_hash: "Info Hash", top100_loading: "Wird geladen...", top100_empty: "Keine Daten", top100_error: "Lesefehler",
+                clients_link: "Alle Clients", clients_title: "📊 Alle Clients",
+                clients_subtitle: "Vollständige Client-Verteilung nach Peer-Anzahl",
+                col_client: "Client", col_pct: "Anteil",
+                clients_loading: "Wird geladen...", clients_empty: "Keine Daten", clients_error: "Lesefehler",
                 refresh: "Aktualisieren",
                 tracker_addr_label: "Tracker-Adresse: ",
                 config_fmt: () => `${window.location.origin}/announce`,
@@ -176,6 +196,10 @@
                 top100_subtitle: "Сортування за Peers / Seeders / Leechers",
                 sort_peers: "Peers", sort_seeders: "Seeders", sort_leechers: "Leechers", sort_downloaded: "Downloaded",
                 col_hash: "Info Hash", top100_loading: "Завантаження...", top100_empty: "Немає даних", top100_error: "Помилка читання",
+                clients_link: "Всі клієнти", clients_title: "📊 Всі клієнти",
+                clients_subtitle: "Повний розподіл клієнтів за кількістю пірів",
+                col_client: "Client", col_pct: "Частка",
+                clients_loading: "Завантаження...", clients_empty: "Немає даних", clients_error: "Помилка читання",
                 refresh: "Оновити",
                 tracker_addr_label: "Адреса трекера: ",
                 config_fmt: () => `${window.location.origin}/announce`,
@@ -469,9 +493,12 @@
             state.page = page;
             $("pageDashboard").classList.toggle("page-hidden", page !== "dashboard");
             $("pageTop100").classList.toggle("page-hidden", page !== "top100");
+            $("pageClients").classList.toggle("page-hidden", page !== "clients");
             $("navDashboard").classList.toggle("active", page === "dashboard");
             $("navTop100").classList.toggle("active", page === "top100");
+            $("navClients").classList.toggle("active", page === "clients");
             if (page === "top100" && !state.top100Data) loadTop100();
+            if (page === "clients" && !state.allClientsData) loadAllClients();
             if (page === "dashboard") { chart.resize(); clientChart.resize(); }
         };
 
@@ -522,6 +549,56 @@
             btn.classList.add("active");
             state.top100Sort = btn.dataset.sort;
             renderTop100();
+        });
+
+        /* ===== All Clients ===== */
+        async function loadAllClients() {
+            $("clientsRefresh").disabled = true;
+            $("clientsStatus").textContent = state.lang === "zh" ? "加载中..." : "Loading...";
+            try {
+                const res = await fetch("/api/clients/all", { cache: "no-store" });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                state.allClientsData = await res.json();
+                renderAllClients();
+                $("clientsStatus").textContent = `${t("last_update")} ${new Date().toLocaleTimeString(localeFor())}`;
+            } catch (error) {
+                const body = $("clientsBody");
+                body.innerHTML = `<tr><td colspan="6" class="top100-empty">${escapeHtml(t("clients_error") + ": " + error.message)}</td></tr>`;
+                $("clientsStatus").textContent = t("clients_error");
+            } finally {
+                $("clientsRefresh").disabled = false;
+            }
+        }
+
+        function renderAllClients() {
+            const d = state.allClientsData;
+            const body = $("clientsBody");
+            const clients = d?.clients;
+            if (!clients || !clients.length) {
+                body.innerHTML = `<tr><td colspan="6" class="top100-empty">${t("clients_empty")}</td></tr>`;
+                $("clientsTotal").textContent = "";
+                return;
+            }
+            const total = d.total_peers || 0;
+            $("clientsTotal").textContent = (state.lang === "zh" ? "共 " : "Total: ") + clients.length + (state.lang === "zh" ? " 个客户端" : " clients");
+            body.innerHTML = clients.map((item, i) => {
+                const name = escapeHtml(item.name);
+                const pct = total > 0 ? ((item.peers / total) * 100).toFixed(1) : "0.0";
+                const color = resolveClientColor(name);
+                return `<tr>
+                    <td class="col-rank">${i + 1}</td>
+                    <td><span class="client-dot" style="--c:${color}"></span>${name}</td>
+                    <td class="col-num">${number(item.peers)}</td>
+                    <td class="col-num text-green">${number(item.seeders)}</td>
+                    <td class="col-num text-amber">${number(item.leechers)}</td>
+                    <td class="col-num text-violet">${pct}%</td>
+                </tr>`;
+            }).join("");
+        }
+
+        $("clientsRefresh").addEventListener("click", () => {
+            state.allClientsData = null;
+            loadAllClients();
         });
 
         $("langSelect").value = state.lang;
