@@ -104,6 +104,7 @@ pub const MLDONKEY: u8 = 98;
 pub const BM: u8 = 99;
 pub const ALLPEERS: u8 = 100;
 pub const QVOD: u8 = 101;
+pub const ANIMEKO: u8 = 102;
 
 /// Name for a client tag value. Returns "Unknown" for tag 0.
 pub fn client_name(tag: u8) -> &'static str {
@@ -209,6 +210,7 @@ pub fn client_name(tag: u8) -> &'static str {
         BM => "BitMagnet",
         ALLPEERS => "AllPeers",
         QVOD => "QVOD",
+        ANIMEKO => "Animeko",
         _ => "Unknown",
     }
 }
@@ -225,6 +227,8 @@ const fn build_azureus_table() -> [[u8; 256]; 256] {
     t[b'A' as usize][b'G' as usize] = ARES;
     t[b'A' as usize][b'N' as usize] = ARES;
     t[b'A' as usize][b'R' as usize] = ARES;
+    // Animeko (AniLibtorrent)
+    t[b'A' as usize][b'L' as usize] = ANIMEKO;
     // Avicora
     t[b'A' as usize][b'V' as usize] = AVICORA;
     // BitPump
