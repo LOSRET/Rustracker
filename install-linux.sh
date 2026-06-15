@@ -12,6 +12,8 @@ DEFAULT_TIMEOUT="3000"
 DEFAULT_MALLOC_CONF="background_thread:true,dirty_decay_ms:5000,muzzy_decay_ms:5000,narenas:4"
 BLACKLIST_PATH="/etc/rustracker/blacklist.txt"
 TRENDS_FILE_PATH="/var/lib/rustracker/trends.jsonl"
+SYSCTL_PATH="/etc/sysctl.d/99-rustracker.conf"
+LIMITS_PATH="/etc/security/limits.d/rustracker.conf"
 
 load_existing_config() {
     LISTEN_DEFAULT=$DEFAULT_LISTEN
@@ -144,9 +146,29 @@ Restart=on-failure
 RestartSec=3
 User=root
 WorkingDirectory=$INSTALL_DIR
+LimitNOFILE=1048576
 
 [Install]
 WantedBy=multi-user.target
+EOF
+}
+
+apply_sysctl() {
+    cat > "$SYSCTL_PATH" <<'EOF'
+net.core.somaxconn = 65535
+net.ipv4.tcp_max_syn_backlog = 65535
+net.ipv4.ip_local_port_range = 1024 65535
+net.ipv4.tcp_tw_reuse = 1
+EOF
+    sysctl --system >/dev/null 2>&1 || true
+}
+
+apply_limits() {
+    cat > "$LIMITS_PATH" <<'EOF'
+* soft nofile 1048576
+* hard nofile 1048576
+root soft nofile 1048576
+root hard nofile 1048576
 EOF
 }
 
@@ -167,6 +189,8 @@ install_app() {
 
     write_env
     write_service
+    apply_sysctl
+    apply_limits
 
     if [ ! -f "$BLACKLIST_PATH" ]; then
         mkdir -p "$(dirname "$BLACKLIST_PATH")"
@@ -205,7 +229,10 @@ uninstall_app() {
     systemctl stop "$APP_NAME" >/dev/null 2>&1 || true
     systemctl disable "$APP_NAME" >/dev/null 2>&1 || true
     rm -f "$SERVICE_PATH"
+    rm -f "$SYSCTL_PATH"
+    rm -f "$LIMITS_PATH"
     systemctl daemon-reload
+    sysctl --system >/dev/null 2>&1 || true
 
     printf "是否删除程序目录 %s？[y/N]: " "$INSTALL_DIR"
     read CONFIRM || true
@@ -263,6 +290,15 @@ show_config() {
         echo ""
         echo "趋势数据：$TRENDS_FILE_PATH（$LINES 行，$SIZE）"
     fi
+    if [ -f "$SERVICE_PATH" ]; then
+        echo ""
+        echo "文件描述符限制：$(grep '^LimitNOFILE=' "$SERVICE_PATH" | cut -d= -f2 || echo '未设置')"
+    fi
+    if [ -f "$SYSCTL_PATH" ]; then
+        echo ""
+        echo "内核网络参数："
+        cat "$SYSCTL_PATH"
+    fi
 }
 
 show_admin_token() {
@@ -296,6 +332,7 @@ menu() {
         echo "7) 查看配置"
         echo "8) 修改配置"
         echo "9) 查看 Admin Token"
+        echo "10) 应用系统优化"
         echo "0) 退出"
         printf "请选择："
         read CHOICE || exit 0
@@ -310,6 +347,7 @@ menu() {
             7) show_config; pause ;;
             8) configure_app; pause ;;
             9) show_admin_token; pause ;;
+            10) need_root; apply_sysctl; apply_limits; echo "系统优化已应用。"; pause ;;
             0) exit 0 ;;
             *) echo "无效选择。"; pause ;;
         esac
@@ -326,9 +364,10 @@ case "${1:-menu}" in
     config) show_config ;;
     configure) configure_app ;;
     token) show_admin_token ;;
+    tune) need_root; apply_sysctl; apply_limits; echo "系统优化已应用。" ;;
     menu) menu ;;
     *)
-        echo "用法：sh install-linux.sh [menu|install|uninstall|start|stop|restart|status|config|configure|token]"
+        echo "用法：sh install-linux.sh [menu|install|uninstall|start|stop|restart|status|config|configure|token|tune]"
         exit 1
         ;;
 esac
