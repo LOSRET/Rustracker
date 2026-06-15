@@ -310,9 +310,9 @@
                 color: isDark() ? darkColors : ["#2563eb", "#475569", "#15803d", "#b45309"],
                 tooltip: {
                     trigger: "axis",
-                    backgroundColor: isDark() ? "#1e293b" : undefined,
-                    borderColor: isDark() ? "#334155" : undefined,
-                    textStyle: { color: isDark() ? "#e2e8f0" : undefined }
+                    backgroundColor: isDark() ? "#1e293b" : "#ffffff",
+                    borderColor: isDark() ? "#334155" : "#e2e8f0",
+                    textStyle: { color: isDark() ? "#e2e8f0" : "#1f2937" }
                 },
                 legend: {
                     type: "scroll",
@@ -435,9 +435,9 @@
                 color: resolvedColors,
                 tooltip: {
                     trigger: "axis",
-                    backgroundColor: isDark() ? "#1e293b" : undefined,
-                    borderColor: isDark() ? "#334155" : undefined,
-                    textStyle: { color: isDark() ? "#e2e8f0" : undefined }
+                    backgroundColor: isDark() ? "#1e293b" : "#ffffff",
+                    borderColor: isDark() ? "#334155" : "#e2e8f0",
+                    textStyle: { color: isDark() ? "#e2e8f0" : "#1f2937" }
                 },
                 legend: { type: "scroll", top: 0, left: "center", itemWidth: 16, itemGap: 14, textStyle: { fontSize: 11, color: cc.legend }, data: names },
                 grid: chartGrid(),
