@@ -15,6 +15,13 @@
         const chart = echarts.init($("trendChart"), null, { renderer: "canvas" });
         const clientChart = echarts.init($("clientChart"), null, { renderer: "canvas" });
 
+        const isDark = () => window.matchMedia("(prefers-color-scheme: dark)").matches;
+        function chartColors() {
+            return isDark()
+                ? { axis: "#94a3b8", line: "#334155", legend: "#cbd5e1" }
+                : { axis: "#64748b", line: "#e6ebf2", legend: undefined };
+        }
+
         const T = {
             zh: {
                 monitoring: "监控", overview: "Tracker 概览", running: "运行中",
@@ -297,8 +304,10 @@
                 minute: "2-digit",
                 hour12: false
             }));
+            const cc = chartColors();
+            const darkColors = ["#3b82f6", "#94a3b8", "#22c55e", "#f59e0b"];
             chart.setOption({
-                color: ["#2563eb", "#475569", "#15803d", "#b45309"],
+                color: isDark() ? darkColors : ["#2563eb", "#475569", "#15803d", "#b45309"],
                 tooltip: { trigger: "axis" },
                 legend: {
                     type: "scroll",
@@ -306,7 +315,7 @@
                     left: "center",
                     itemWidth: 16,
                     itemGap: 14,
-                    textStyle: { fontSize: 11 },
+                    textStyle: { fontSize: 11, color: cc.legend },
                     data: ["Torrents", "Peers", "Seeders", "Leechers"]
                 },
                 grid: chartGrid(),
@@ -314,14 +323,14 @@
                     type: "category",
                     boundaryGap: false,
                     data: labels,
-                    axisLine: { lineStyle: { color: "#d8dee8" } },
-                    axisLabel: { color: "#64748b" }
+                    axisLine: { lineStyle: { color: cc.line } },
+                    axisLabel: { color: cc.axis }
                 },
                 yAxis: {
                     type: "value",
                     minInterval: 1,
-                    axisLabel: { color: "#64748b" },
-                    splitLine: { lineStyle: { color: "#e6ebf2" } }
+                    axisLabel: { color: cc.axis },
+                    splitLine: { lineStyle: { color: cc.line } }
                 },
                 series: [
                     { name: "Torrents", type: "line", smooth: true, showSymbol: false, data: history.map((item) => item.torrents) },
@@ -384,6 +393,7 @@
             const names = d.clients || [];
             const topTags = d.tags || [];
             const history = d.history || [];
+            const cc = chartColors();
             if (!history.length || !names.length) {
                 clientChart.setOption({
                     title: {
@@ -419,17 +429,17 @@
                 title: { text: "" },
                 color: resolvedColors,
                 tooltip: { trigger: "axis" },
-                legend: { type: "scroll", top: 0, left: "center", itemWidth: 16, itemGap: 14, textStyle: { fontSize: 11 }, data: names },
+                legend: { type: "scroll", top: 0, left: "center", itemWidth: 16, itemGap: 14, textStyle: { fontSize: 11, color: cc.legend }, data: names },
                 grid: chartGrid(),
                 xAxis: {
                     type: "category", boundaryGap: false, data: labels,
-                    axisLine: { lineStyle: { color: "#d8dee8" } },
-                    axisLabel: { color: "#64748b" }
+                    axisLine: { lineStyle: { color: cc.line } },
+                    axisLabel: { color: cc.axis }
                 },
                 yAxis: {
                     type: "value", minInterval: 1,
-                    axisLabel: { color: "#64748b" },
-                    splitLine: { lineStyle: { color: "#e6ebf2" } }
+                    axisLabel: { color: cc.axis },
+                    splitLine: { lineStyle: { color: cc.line } }
                 },
                 series
             });
@@ -532,6 +542,12 @@
         window.addEventListener("resize", () => { clearTimeout(_resizeTimer); _resizeTimer = setTimeout(() => { chart.resize(); clientChart.resize(); }, 150); });
         setInterval(loadDashboard, 5000);
         setInterval(loadCharts, 600000);
+
+        /* ===== Theme change listener ===== */
+        window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+            renderChart();
+            renderClientChart();
+        });
 
         /* ===== Mobile sidebar toggle ===== */
         const side = $("side"), overlay = $("overlay"), hamburger = $("hamburger");
