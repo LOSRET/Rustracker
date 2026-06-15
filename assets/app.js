@@ -19,7 +19,7 @@
         function chartColors() {
             return isDark()
                 ? { axis: "#94a3b8", line: "#334155", legend: "#cbd5e1" }
-                : { axis: "#64748b", line: "#e6ebf2", legend: undefined };
+                : { axis: "#64748b", line: "#e6ebf2", legend: "#1f2937" };
         }
 
         const T = {
