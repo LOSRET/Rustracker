@@ -6,7 +6,7 @@ INSTALL_DIR="/opt/rustracker"
 BIN_PATH="$INSTALL_DIR/rustracker"
 ENV_PATH="/etc/rustracker.env"
 SERVICE_PATH="/etc/systemd/system/rustracker.service"
-DEFAULT_LISTEN="[::]:8080,0.0.0.0:8080"
+DEFAULT_LISTEN="[::]:8080"
 DEFAULT_INTERVAL="1800"
 DEFAULT_TIMEOUT="3000"
 DEFAULT_MALLOC_CONF="background_thread:true,dirty_decay_ms:5000,muzzy_decay_ms:5000,narenas:4"
@@ -42,7 +42,7 @@ normalize_listen() {
     case "$1" in
         *:*) printf '%s\n' "$1" ;;
         *[!0-9]*|'') printf '%s\n' "$1" ;;
-        *) printf '[::]:%s,0.0.0.0:%s\n' "$1" "$1" ;;
+        *) printf '[::]:%s\n' "$1" ;;
     esac
 }
 

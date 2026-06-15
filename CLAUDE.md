@@ -187,7 +187,7 @@ GitHub Actions workflows:
 ## CLI Configuration
 
 ```
---listen                  RUSTRACKER_LISTEN                  default: [::]:8080 (also binds 0.0.0.0:8080 for dual-stack)
+--listen                  RUSTRACKER_LISTEN                  default: [::]:8080 (Linux); [::]:8080 + 0.0.0.0:8080 (Windows)
 --interval-secs           RUSTRACKER_INTERVAL_SECS           default: 1800
 --peer-timeout-secs       RUSTRACKER_PEER_TIMEOUT_SECS       default: 3000
 --blacklist               RUSTRACKER_BLACKLIST               optional: path to blacklist file

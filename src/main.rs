@@ -13,13 +13,23 @@ use tracing_subscriber::EnvFilter;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
+#[cfg(target_os = "linux")]
+fn default_listen() -> Vec<SocketAddr> {
+    vec!["[::]:8080".parse().unwrap()]
+}
+
+#[cfg(not(target_os = "linux"))]
+fn default_listen() -> Vec<SocketAddr> {
+    vec!["[::]:8080".parse().unwrap(), "0.0.0.0:8080".parse().unwrap()]
+}
+
 #[derive(Debug, Parser)]
 #[command(version, about)]
 struct Args {
     #[arg(
         long,
         env = "RUSTRACKER_LISTEN",
-        default_values = &["[::]:8080", "0.0.0.0:8080"],
+        default_values_t = default_listen(),
         value_delimiter = ','
     )]
     listen: Vec<SocketAddr>,

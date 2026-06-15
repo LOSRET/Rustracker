@@ -63,7 +63,7 @@ cargo run --release -- --listen 127.0.0.1:8080
 
 | 参数 | 环境变量 | 默认值 | 说明 |
 |------|---------|--------|------|
-| `--listen` | `RUSTRACKER_LISTEN` | `[::]:8080` + `0.0.0.0:8080` | 监听地址（可重复指定，默认双栈） |
+| `--listen` | `RUSTRACKER_LISTEN` | `[::]:8080`（Linux）；`[::]:8080` + `0.0.0.0:8080`（Windows） | 监听地址（可重复指定，平台相关默认双栈） |
 | `--interval-secs` | `RUSTRACKER_INTERVAL_SECS` | `1800` | 通告间隔（秒） |
 | `--peer-timeout-secs` | `RUSTRACKER_PEER_TIMEOUT_SECS` | `3000` | Peer 过期超时（秒） |
 | `--blacklist` | `RUSTRACKER_BLACKLIST` | — | 种子黑名单文件路径 |
