@@ -222,6 +222,8 @@
             setMeta("meta[name='twitter:title']", "content", seo.seo_title);
             setMeta("meta[name='twitter:description']", "content", seo.seo_desc);
             if (state.data) render();
+            if (state.trendsData) renderChart();
+            if (state.clientData) renderClientChart();
             if (state.top100Data) renderTop100();
         }
 
@@ -243,7 +245,7 @@
                 render();
                 setStatus(`${t("last_update")} ${new Date().toLocaleTimeString(localeFor())}`);
             } catch (error) {
-                setStatus(`${t("read_error")}: ${escapeHtml(error.message)}`, true);
+                setStatus(`${t("read_error")}: ${error.message}`, true);
             }
         }
 
@@ -282,8 +284,6 @@
             $("configText").textContent = tf("config_fmt");
             $("footerVersion").textContent = data.version || "-";
             $("footerUptime").textContent = data.uptime_secs != null ? `Uptime: ${formatUptime(data.uptime_secs)}` : "-";
-            renderChart();
-            renderClientChart();
         }
 
         function filterHistory() {
@@ -297,6 +297,19 @@
 
         function renderChart() {
             const history = filterHistory();
+            const cc = chartColors();
+            if (!history.length) {
+                chart.setOption({
+                    title: {
+                        text: t("top100_empty"),
+                        left: "center",
+                        top: "center",
+                        textStyle: { color: "#94a3b8", fontSize: 14, fontWeight: "normal" }
+                    },
+                    series: []
+                });
+                return;
+            }
             const labels = history.map((item) => new Date(item.timestamp * 1000).toLocaleString(localeFor(), {
                 month: "2-digit",
                 day: "2-digit",
@@ -304,7 +317,6 @@
                 minute: "2-digit",
                 hour12: false
             }));
-            const cc = chartColors();
             const darkColors = ["#3b82f6", "#94a3b8", "#22c55e", "#f59e0b"];
             chart.setOption({
                 color: isDark() ? darkColors : ["#2563eb", "#475569", "#15803d", "#b45309"],
@@ -402,7 +414,7 @@
             if (!history.length || !names.length) {
                 clientChart.setOption({
                     title: {
-                        text: state.lang === "zh" ? "暂无数据" : "No data",
+                        text: t("top100_empty"),
                         left: "center",
                         top: "center",
                         textStyle: { color: "#94a3b8", fontSize: 14, fontWeight: "normal" }
@@ -498,7 +510,7 @@
         /* ===== Top 100 ===== */
         async function loadTop100() {
             $("top100Refresh").disabled = true;
-            $("top100Status").textContent = state.lang === "zh" ? "加载中..." : "Loading...";
+            $("top100Status").textContent = t("top100_loading");
             try {
                 const res = await fetch(`/api/top100?limit=100`, { cache: "no-store" });
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
