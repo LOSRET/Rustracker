@@ -21,7 +21,7 @@ A lightweight, high-performance HTTP BitTorrent tracker with a real-time dashboa
 - ECharts trend charts: Torrents, Peers, Seeders, Leechers over 24h / 3d / 7d
 - Top 100 Torrents page ranked by Peers / Seeders / Leechers / Downloaded
 - Top 15 client distribution chart over time
-- Bilingual UI (中文 / English) with auto-detection
+- Multilingual UI (中文 / English / 日本語 / Русский / Deutsch / Українська) with auto-detection
 
 **Operations**
 - 64-shard concurrent tracker pool for high throughput
@@ -144,7 +144,10 @@ Returns JSON:
   "peers": 128,
   "seeders": 85,
   "leechers": 43,
-  "completed": 310
+  "completed": 310,
+  "rps": 12.5,
+  "version": "0.2.21",
+  "uptime_secs": 3600
 }
 ```
 
@@ -213,7 +216,7 @@ The tracker serves a full-featured dashboard at `/` on the same port:
 - **Client chart** — top 15 BitTorrent clients by peer count over time
 - **Top 100 page** — sortable table of the most active torrents
 - **Disclaimer** — built-in legal disclaimer for public-facing deployments
-- **i18n** — automatic Chinese / English detection with manual toggle
+- **i18n** — automatic detection across 6 languages (中文 / English / 日本語 / Русский / Deutsch / Українська) with manual toggle
 
 Static assets (`style.css`, `app.js`) are cached for 1 hour by the server.
 
@@ -330,12 +333,14 @@ rustracker/
 │   ├── server.rs                  # HTTP server module declaration
 │   └── server/                    # HTTP server layer (axum + tokio)
 │       ├── handlers.rs            # HTTP handlers: announce, scrape, healthz, dashboard, APIs
+│       ├── admin.rs               # Authenticated admin API (blacklist GET/POST)
+│       ├── pool.rs                # 64-shard TrackerPool with per-shard RwLock
 │       ├── blacklist.rs           # Torrent blacklist with 5-sec hot-reload file watcher
 │       └── trends.rs              # Trend data collection, 7-day JSONL persistence, history API
 │
 ├── assets/                        # Web dashboard static files
-│   ├── index.html                 # Dashboard HTML (production, inlined CSS/JS)
-│   ├── index-build.html           # Dashboard HTML (development, external assets)
+│   ├── index.html                 # Dashboard HTML (with <!-- CONTACT --> placeholder)
+│   ├── contact.html               # Optional contact block injected by build.rs (personal-contact feature)
 │   ├── style.css                  # Dashboard styles
 │   └── app.js                     # Dashboard logic: ECharts charts, i18n, API calls
 │
@@ -344,6 +349,8 @@ rustracker/
 │   ├── load_test.rs               # Advanced load test (Zipf distribution, peer lifecycle)
 │   ├── rps_bench.rs               # Requests-per-second benchmark
 │   ├── unified_bench.rs           # Unified benchmark suite
+│   ├── shrink_bench.rs            # Swarm shrink-strategy benchmark
+│   ├── memory_bench_common/       # Shared helpers for memory benchmarks
 │   ├── memory_tracker_bench.rs    # Memory usage benchmark
 │   ├── memory_jemalloc_bench.rs   # Memory benchmark with jemalloc allocator
 │   ├── memory_mimalloc_bench.rs   # Memory benchmark with mimalloc allocator
@@ -360,13 +367,15 @@ rustracker/
 | Layer | Module | Responsibility |
 |-------|--------|---------------|
 | `core` | `types.rs` | `InfoHash` (20 bytes), `PeerId` (20 bytes), `PeerState`, `TorrentStats` |
-| `core` | `tracker.rs` | 64-shard `TrackerPool` — per-shard `RwLock<BTreeMap<InfoHash, Swarm>>` |
+| `core` | `tracker.rs` | Single-shard `Tracker` — `BTreeMap<InfoHash, Swarm>`, announce/scrape, snapshots |
 | `core` | `swarm.rs` | Per-torrent peer collection — packed binary IPv4 (6B) / IPv6 (18B) per peer |
 | `core` | `counters.rs` | Incremental counters for O(1) snapshots (no full traversal) |
 | `protocol` | `bencode.rs` | Minimal bencode serializer — no external crate dependency |
 | `protocol` | `announce.rs` | BEP 3 compliant bencode response builder, compact peer encoding |
 | `protocol` | `client_id.rs` | Compile-time 256×256 lookup table for `-XX####-` Azureus peer ID prefixes |
+| `server` | `pool.rs` | 64-shard `TrackerPool` — per-shard `RwLock<Tracker>` selected by `DefaultHasher(info_hash) % 64` |
 | `server` | `handlers.rs` | Request handlers for `/announce`, `/scrape`, `/healthz`, `/api/*`, `/` |
+| `server` | `admin.rs` | Authenticated admin endpoints (`GET`/`POST /api/blacklist`) |
 | `server` | `blacklist.rs` | `HashSet<InfoHash>` hot-reload via 5-second file polling |
 | `server` | `trends.rs` | In-memory ring buffer + optional JSONL persistence, 7-day retention |
 

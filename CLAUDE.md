@@ -146,11 +146,11 @@ cargo run --release --example memory_tracker_btree
 
 Three-layer design with clear separation of concerns:
 
-- **`core/`** — Pure tracker engine, no I/O. `Tracker` holds a `BTreeMap<InfoHash, Swarm>` where each `Swarm` stores peers in packed binary format (6 bytes/IPv4 peer, 18 bytes/IPv6 peer). `TrackerPool` wraps 64 shards with per-shard `RwLock` for concurrency. `counters.rs` provides O(1) incremental snapshots; `topk.rs` does 4-way top-K ranking.
+- **`core/`** — Pure tracker engine, no I/O. `Tracker` holds a `BTreeMap<InfoHash, Swarm>` where each `Swarm` stores peers in packed binary format (6 bytes/IPv4 peer, 18 bytes/IPv6 peer). `counters.rs` provides O(1) incremental snapshots; `topk.rs` does 4-way top-K ranking.
 
 - **`protocol/`** — BitTorrent protocol encoding, no network dependency. Custom bencode serializer (`bencode.rs`), BEP 3 announce/scrape query parsing (`announce.rs`), and compile-time 256×256 lookup table for Azureus-style peer ID client identification (`client_id.rs`).
 
-- **`server/`** — Axum HTTP layer. `handlers.rs` routes `/announce`, `/scrape`, `/healthz`, `/api/*`, and dashboard static files. `blacklist.rs` hot-reloads a torrent blacklist file every 5 seconds. `trends.rs` manages a 7-day ring buffer with optional JSONL persistence (10-min sampling).
+- **`server/`** — Axum HTTP layer. `pool.rs` defines `TrackerPool`, which wraps 64 `Tracker` shards with per-shard `RwLock` (shard selected via `DefaultHasher(info_hash) % 64`) to minimize contention. `handlers.rs` routes `/announce`, `/scrape`, `/healthz`, `/api/*`, and dashboard static files. `admin.rs` implements the authenticated `GET`/`POST /api/blacklist` endpoints. `blacklist.rs` hot-reloads a torrent blacklist file every 5 seconds. `trends.rs` manages a 7-day ring buffer with optional JSONL persistence (10-min sampling).
 
 `AppState` (in `server.rs`) is the shared state clone passed to all handlers, containing `Arc<TrackerPool>`, `Arc<RwLock<TrendStore>>`, `Arc<RwLock<Arc<HashSet<InfoHash>>>>` for the blacklist, and `Arc<AtomicU64>` for the real-time RPS counter updated on every announce/scrape request.
 

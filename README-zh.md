@@ -21,7 +21,7 @@
 - ECharts 趋势图表：种子数、Peer 数、做种数、下载数，支持 24小时 / 3天 / 7天 时间范围
 - Top 100 种子页面，支持按 Peers / Seeders / Leechers / Downloaded 排序
 - Top 15 客户端分布趋势图
-- 中英文双语界面，自动检测语言
+- 多语言界面（中文 / English / 日本語 / Русский / Deutsch / Українська），自动检测语言
 
 **运维特性**
 - 64 分片并发 Tracker 池，高吞吐低争用
@@ -144,7 +144,10 @@ GET /api/stats
   "peers": 128,
   "seeders": 85,
   "leechers": 43,
-  "completed": 310
+  "completed": 310,
+  "rps": 12.5,
+  "version": "0.2.21",
+  "uptime_secs": 3600
 }
 ```
 
@@ -213,7 +216,7 @@ Tracker 在同一端口的 `/` 路径提供功能完整的监控面板：
 - **客户端图表** — Top 15 BitTorrent 客户端的 peer 数量趋势
 - **Top 100 页面** — 最活跃种子的可排序表格
 - **免责声明** — 面向公众部署时的内置法律声明
-- **国际化** — 自动检测中文/英文，支持手动切换
+- **国际化** — 自动检测 6 种语言（中文 / English / 日本語 / Русский / Deutsch / Українська），支持手动切换
 
 静态资源（`style.css`、`app.js`）由服务器缓存 1 小时。
 
@@ -330,12 +333,14 @@ rustracker/
 │   ├── server.rs                  # HTTP 服务层模块声明
 │   └── server/                    # HTTP 服务层（axum + tokio）
 │       ├── handlers.rs            # HTTP 处理器：announce、scrape、healthz、面板、API
+│       ├── admin.rs               # 鉴权管理 API（黑名单 GET/POST）
+│       ├── pool.rs                # 64 分片 TrackerPool，按分片加 RwLock
 │       ├── blacklist.rs           # 种子黑名单，5 秒热重载文件监视
 │       └── trends.rs              # 趋势数据采集、7 天 JSONL 持久化、历史 API
 │
 ├── assets/                        # Web 监控面板静态文件
-│   ├── index.html                 # 面板 HTML（生产版，内联 CSS/JS）
-│   ├── index-build.html           # 面板 HTML（开发版，外部引用资源）
+│   ├── index.html                 # 面板 HTML（含 <!-- CONTACT --> 占位符）
+│   ├── contact.html               # 可选联系信息块（personal-contact 特性，由 build.rs 注入）
 │   ├── style.css                  # 面板样式
 │   └── app.js                     # 面板逻辑：ECharts 图表、国际化、API 调用
 │
@@ -344,6 +349,8 @@ rustracker/
 │   ├── load_test.rs               # 高级负载测试（Zipf 分布、Peer 生命周期）
 │   ├── rps_bench.rs               # 每秒请求数基准
 │   ├── unified_bench.rs           # 统一基准测试套件
+│   ├── shrink_bench.rs            # Swarm 收缩策略基准
+│   ├── memory_bench_common/       # 内存基准的共用辅助代码
 │   ├── memory_tracker_bench.rs    # 内存占用基准
 │   ├── memory_jemalloc_bench.rs   # jemalloc 分配器内存基准
 │   ├── memory_mimalloc_bench.rs   # mimalloc 分配器内存基准
@@ -360,13 +367,15 @@ rustracker/
 | 层级 | 模块 | 职责 |
 |------|------|------|
 | `core` | `types.rs` | `InfoHash`（20 字节）、`PeerId`（20 字节）、`PeerState`、`TorrentStats` |
-| `core` | `tracker.rs` | 64 分片 `TrackerPool` — 每分片 `RwLock<BTreeMap<InfoHash, Swarm>>` |
+| `core` | `tracker.rs` | 单分片 `Tracker` — `BTreeMap<InfoHash, Swarm>`，announce/scrape、快照 |
 | `core` | `swarm.rs` | 每种子 Peer 集合 — IPv4 每 peer 6 字节、IPv6 每 peer 18 字节紧凑存储 |
 | `core` | `counters.rs` | 增量计数器，O(1) 快照（无需全量遍历） |
 | `protocol` | `bencode.rs` | 最小化 Bencode 序列化器 — 无外部 crate 依赖 |
 | `protocol` | `announce.rs` | BEP 3 规范 Bencode 响应构建、紧凑 Peer 编码 |
 | `protocol` | `client_id.rs` | 编译时 256×256 查找表，匹配 `-XX####-` Azureus 风格 Peer ID 前缀 |
+| `server` | `pool.rs` | 64 分片 `TrackerPool` — 每分片 `RwLock<Tracker>`，按 `DefaultHasher(info_hash) % 64` 选片 |
 | `server` | `handlers.rs` | `/announce`、`/scrape`、`/healthz`、`/api/*`、`/` 请求处理 |
+| `server` | `admin.rs` | 鉴权管理端点（`GET`/`POST /api/blacklist`） |
 | `server` | `blacklist.rs` | `HashSet<InfoHash>` 通过 5 秒轮询实现热重载 |
 | `server` | `trends.rs` | 内存环形缓冲 + 可选 JSONL 持久化，7 天保留 |
 
