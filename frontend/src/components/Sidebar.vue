@@ -25,8 +25,8 @@ function scrollToDisclaimer() {
     ]"
   >
     <div class="flex items-center gap-2.5 text-xl font-bold mb-7">
-      <span class="w-7 h-7 bg-accent grid place-items-center text-white text-[15px] font-extrabold font-display">B</span>
-      <span>BitTorrent Tracker</span>
+      <span class="w-7 h-7 leading-none bg-accent grid place-items-center text-white text-[15px] font-bold font-display shrink-0">B</span>
+      <span class="whitespace-nowrap">BitTorrent Tracker</span>
     </div>
 
     <div class="mb-5 flex items-center gap-2">

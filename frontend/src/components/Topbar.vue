@@ -30,7 +30,7 @@ function lastUpdateText() {
 <template>
   <section class="flex justify-between items-start gap-5 mb-6 max-[900px]:flex-col max-[900px]:items-stretch">
     <div>
-      <h1 class="m-0 mb-1.5 text-[28px] leading-tight max-[560px]:text-[24px]">{{ t.title }}</h1>
+      <h1 class="m-0 mb-1.5 text-[28px] leading-tight font-bold max-[560px]:text-[24px]">{{ t.title }}</h1>
       <p class="m-0 text-muted text-sm leading-relaxed">{{ t.subtitle }}</p>
       <p :class="['text-xs mt-1.5', error ? 'text-bad' : 'text-muted']">
         {{ error ? t.error : lastUpdateText() }}
