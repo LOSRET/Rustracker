@@ -87,5 +87,4 @@ fn main() {
 
     println!("cargo:rerun-if-env-changed=CARGO_FEATURE_DASHBOARD");
     println!("cargo:rerun-if-env-changed=CARGO_FEATURE_PERSONAL_CONTACT");
-    println!("cargo:rerun-if-changed=assets/contact.html");
 }

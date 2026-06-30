@@ -6,4 +6,4 @@ declare module "*.vue" {
   export default component;
 }
 
-declare const __CONTACT_HTML__: string;
+declare const __CONTACT__: { blogUrl: string; email: string } | null;

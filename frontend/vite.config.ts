@@ -1,22 +1,14 @@
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-const contactEnabled = process.env.VITE_PERSONAL_CONTACT === "true";
-let contactHtml = "";
-if (contactEnabled) {
-  const contactPath = path.resolve(__dirname, "../assets/contact.html");
-  contactHtml = fs.readFileSync(contactPath, "utf-8");
-}
+const contact = process.env.VITE_PERSONAL_CONTACT === "true"
+  ? { blogUrl: "https://blog.7471.top/", email: "tracker@mail.7471.top" }
+  : null;
 
 export default defineConfig({
   plugins: [vue()],
   define: {
-    __CONTACT_HTML__: JSON.stringify(contactHtml),
+    __CONTACT__: JSON.stringify(contact),
   },
   build: {
     outDir: "../dist",
