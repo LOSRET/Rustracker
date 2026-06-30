@@ -93,21 +93,28 @@ watch(() => [props.data, range.value], render, { deep: true });
 </script>
 
 <template>
-  <section class="rounded-lg bg-white dark:bg-slate-900 p-6 shadow-sm mb-6">
-    <div class="flex flex-wrap items-center gap-3 mb-4">
-      <h2 class="text-lg font-display font-bold">{{ t.chart_title }}</h2>
-      <span class="text-sm text-slate-500">{{ t.chart_note }}</span>
-      <div class="flex gap-1 ml-auto">
+  <section class="bg-panel border border-line p-4 mb-5">
+    <div class="flex items-baseline justify-between gap-4 mb-3 max-[900px]:flex-col max-[900px]:items-stretch">
+      <div class="flex items-center flex-wrap gap-3">
+        <h2 class="m-0 text-base leading-relaxed">{{ t.chart_title }}</h2>
+        <span class="text-muted text-xs">{{ t.chart_note }}</span>
+      </div>
+      <div class="flex shrink-0">
         <button
-          v-for="r in (['24h', '3d', '7d'] as RangeKey[])"
+          v-for="(r, i) in (['24h', '3d', '7d'] as RangeKey[])"
           :key="r"
-          :class="['px-3 py-1 text-sm rounded transition-colors', range === r ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700']"
+          :class="[
+            'border border-line bg-panel text-muted px-3 text-xs cursor-pointer min-h-7 transition-colors',
+            i === 0 ? 'rounded-l' : 'border-l-0',
+            i === 2 ? 'rounded-r' : '',
+            range === r ? 'bg-accent border-accent text-white' : 'hover:bg-hover-soft',
+          ]"
           @click="range = r"
         >
           {{ t[`range_${r}` as keyof typeof t] }}
         </button>
       </div>
     </div>
-    <div ref="chartEl" class="w-full h-80" />
+    <div ref="chartEl" class="w-full h-[440px] max-[900px]:h-[330px] max-[560px]:h-[275px]" />
   </section>
 </template>

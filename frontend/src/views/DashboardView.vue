@@ -17,15 +17,33 @@ const { number } = useI18n();
   <div>
     <Topbar :stats="stats" :error="error" />
 
-    <section class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
-      <MetricCard variant="peers" :label="'Peers'" :value="number(stats?.peers ?? 0)" />
-      <MetricCard variant="seeders" :label="'Seeders'" :value="number(stats?.seeders ?? 0)" />
-      <MetricCard variant="leechers" :label="'Leechers'" :value="number(stats?.leechers ?? 0)" />
-      <MetricCard variant="torrents" :label="'Torrents'" :value="number(stats?.torrents ?? 0)" />
-      <MetricCard variant="completed" :label="'Completed'" :value="number(stats?.completed ?? 0)" />
+    <section
+      class="grid gap-3 mb-5"
+      style="grid-template-columns: repeat(5, minmax(140px, 1fr))"
+    >
+      <div class="max-[900px]:col-span-1" style="grid-column: span 1">
+        <MetricCard variant="peers" label="Peers" :value="number(stats?.peers ?? 0)" />
+      </div>
+      <MetricCard variant="seeders" label="Seeders" :value="number(stats?.seeders ?? 0)" />
+      <MetricCard variant="leechers" label="Leechers" :value="number(stats?.leechers ?? 0)" />
+      <MetricCard variant="torrents" label="Torrents" :value="number(stats?.torrents ?? 0)" />
+      <MetricCard variant="completed" label="Completed" :value="number(stats?.completed ?? 0)" />
     </section>
 
     <TrendChart :data="trends" />
     <ClientChart :data="clients" />
   </div>
 </template>
+
+<style scoped>
+@media (max-width: 900px) {
+  section {
+    grid-template-columns: repeat(2, minmax(130px, 1fr)) !important;
+  }
+}
+@media (max-width: 560px) {
+  section {
+    grid-template-columns: 1fr !important;
+  }
+}
+</style>

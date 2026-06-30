@@ -24,7 +24,7 @@ onMounted(() => setLang("zh"));
 
 <template>
   <button
-    class="fixed top-4 left-4 z-50 md:hidden p-2 rounded bg-slate-800 text-white"
+    class="hidden max-[900px]:block fixed top-[14px] left-[14px] z-[999] bg-side text-[#f8fafc] border-0 p-2 cursor-pointer rounded-md leading-none"
     @click="sidebarOpen = !sidebarOpen"
     aria-label="Menu"
   >
@@ -37,13 +37,13 @@ onMounted(() => setLang("zh"));
 
   <div
     v-if="sidebarOpen"
-    class="fixed inset-0 bg-black/50 z-40 md:hidden"
+    class="hidden max-[900px]:block fixed inset-0 bg-black/45 z-[999]"
     @click="sidebarOpen = false"
   />
 
-  <div class="flex min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
-    <Sidebar :page="page" @switch="switchPage" :open="sidebarOpen" />
-    <main class="flex-1 min-w-0 p-4 md:p-8 max-w-7xl">
+  <div class="min-h-screen grid max-[900px]:grid-cols-1" style="grid-template-columns: 248px minmax(0, 1fr)">
+    <Sidebar :page="page" :open="sidebarOpen" @switch="switchPage" />
+    <main class="min-w-0 p-7 max-[900px]:pt-[60px] max-[900px]:px-[18px] max-[900px]:pb-[18px]">
       <DashboardView v-if="page === 'dashboard'" :stats="stats" :error="error" />
       <Top100Page v-else-if="page === 'top100'" />
       <Disclaimer />

@@ -14,10 +14,10 @@ function formatUptime(secs: number): string {
 </script>
 
 <template>
-  <footer class="mt-8 py-6 border-t border-slate-200 dark:border-slate-800 text-sm text-slate-500 flex flex-wrap justify-between gap-2">
+  <footer class="flex justify-end items-center flex-wrap gap-6 py-4 text-muted text-xs">
     <span>
       Powered by
-      <a href="https://github.com/LOSRET/Rustracker" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Rustracker</a>
+      <a href="https://github.com/LOSRET/Rustracker" target="_blank" rel="noopener noreferrer" class="text-accent no-underline font-semibold hover:underline">Rustracker</a>
       v{{ stats?.version ?? "-" }}
     </span>
     <span v-if="stats?.uptime_secs != null">Uptime: {{ formatUptime(stats.uptime_secs) }}</span>

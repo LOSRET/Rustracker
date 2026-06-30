@@ -106,11 +106,13 @@ watch(() => props.data, render, { deep: true });
 </script>
 
 <template>
-  <section class="rounded-lg bg-white dark:bg-slate-900 p-6 shadow-sm">
-    <div class="mb-4">
-      <h2 class="text-lg font-display font-bold">{{ t.client_chart_title }}</h2>
-      <span class="text-sm text-slate-500">{{ t.client_chart_note }}</span>
+  <section class="bg-panel border border-line p-4 mb-5">
+    <div class="flex items-baseline justify-between gap-4 mb-3">
+      <div>
+        <h2 class="m-0 text-base leading-relaxed">{{ t.client_chart_title }}</h2>
+        <span class="text-muted text-xs">{{ t.client_chart_note }}</span>
+      </div>
     </div>
-    <div ref="chartEl" class="w-full h-80" />
+    <div ref="chartEl" class="w-full h-[440px] max-[900px]:h-[330px] max-[560px]:h-[275px]" />
   </section>
 </template>
