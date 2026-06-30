@@ -41,16 +41,20 @@
 ### 前置要求
 
 - [Rust](https://www.rust-lang.org/tools/install) 1.85+（edition 2021）
+- [Node.js](https://nodejs.org/) 20+ 及 npm（仅在使用默认的 `dashboard` feature 构建时需要）
 
 ### 从源码构建并运行
 
 ```bash
 git clone https://github.com/LOSRET/Rustracker.git
 cd rustracker
+npm install --prefix frontend   # 仅首次需要，安装面板构建依赖
 cargo run --release -- --listen 127.0.0.1:8080
 ```
 
 在浏览器中打开 `http://127.0.0.1:8080` 即可查看监控面板。
+
+> 若使用 `cargo build --release --no-default-features` 关闭面板构建，则无需 Node.js/npm。
 
 ### 预编译二进制
 
@@ -146,7 +150,7 @@ GET /api/stats
   "leechers": 43,
   "completed": 310,
   "rps": 12.5,
-  "version": "0.2.21",
+  "version": "0.2.24",
   "uptime_secs": 3600
 }
 ```
@@ -218,7 +222,7 @@ Tracker 在同一端口的 `/` 路径提供功能完整的监控面板：
 - **免责声明** — 面向公众部署时的内置法律声明
 - **国际化** — 自动检测 6 种语言（中文 / English / 日本語 / Русский / Deutsch / Українська），支持手动切换
 
-静态资源（`style.css`、`app.js`）由服务器缓存 1 小时。
+`/assets/*` 下的哈希资源（Vite 产出的 JS/CSS/字体，文件名按内容寻址）由服务器以 `Cache-Control: public, max-age=31536000, immutable` 缓存；`index.html` 入口随每次发布重建。
 
 ## 种子黑名单
 
@@ -338,11 +342,21 @@ rustracker/
 │       ├── blacklist.rs           # 种子黑名单，5 秒热重载文件监视
 │       └── trends.rs              # 趋势数据采集、7 天 JSONL 持久化、历史 API
 │
-├── assets/                        # Web 监控面板静态文件
-│   ├── index.html                 # 面板 HTML（含 <!-- CONTACT --> 占位符）
-│   ├── contact.html               # 可选联系信息块（personal-contact 特性，由 build.rs 注入）
-│   ├── style.css                  # 面板样式
-│   └── app.js                     # 面板逻辑：ECharts 图表、国际化、API 调用
+├── build.rs                        # 构建脚本：在 frontend/ 中执行 `npm run build`，将 dist/ 内嵌进二进制
+├── frontend/                       # Vue 3 + Vite + Tailwind 面板 SPA（编译时内嵌进二进制）
+│   ├── package.json                # Node 依赖与构建脚本
+│   ├── vite.config.ts              # Vite 配置；通过 VITE_PERSONAL_CONTACT 环境变量内联联系信息
+│   ├── tailwind.config.js          # Tailwind CSS 配置
+│   ├── index.html                  # SPA 入口 HTML
+│   └── src/
+│       ├── main.ts                 # 应用启动（Vue、ECharts、i18n）
+│       ├── App.vue                 # 根组件（Sidebar + Topbar + 路由视图）
+│       ├── style.css               # Tailwind 入口与全局样式
+│       ├── views/                  # DashboardView.vue（概览 + 图表）
+│       ├── components/             # MetricCard、TrendChart、ClientChart、Top100Page、Disclaimer、Sidebar、Topbar、AppFooter
+│       ├── composables/            # useStats、useTrends、useTop100、useI18n（响应式 API 钩子）
+│       ├── i18n/                   # 中文 / English / 日本語 / Русский / Deutsch / Українська 翻译
+│       └── types/                  # TypeScript API 类型定义
 │
 ├── examples/                      # 负载测试与性能基准
 │   ├── announce_load.rs           # 简单并发通告负载测试
@@ -406,21 +420,29 @@ sudo sh install-linux.sh
 
 1. 安装或更新
 2. 卸载
-3. 启动 / 停止 / 重启服务
-4. 查看状态
-5. 查看配置
-6. 修改配置（监听地址、通告间隔、超时时间）
-7. 查看自动生成的 Admin Token
+3. 启动服务
+4. 停止服务
+5. 重启服务
+6. 查看状态
+7. 查看配置
+8. 修改配置（监听地址、通告间隔、超时时间）
+9. 查看自动生成的 Admin Token
+10. 应用系统优化（sysctl 与文件句柄上限）
+0. 退出
 
 非交互式命令：
 
 ```bash
 sudo sh install-linux.sh install
+sudo sh install-linux.sh uninstall
+sudo sh install-linux.sh start
+sudo sh install-linux.sh stop
+sudo sh install-linux.sh restart
 sudo sh install-linux.sh status
+sudo sh install-linux.sh config
 sudo sh install-linux.sh configure
 sudo sh install-linux.sh token
-sudo sh install-linux.sh restart
-sudo sh install-linux.sh uninstall
+sudo sh install-linux.sh tune
 ```
 
 **安装后的默认文件布局：**
@@ -523,7 +545,7 @@ cargo build --release
 cargo build --release --no-default-features
 ```
 
-此模式关闭 `dashboard` feature——`/`、`/style.css`、`/app.js` 路由在编译时排除。所有 Tracker 协议端点（`/announce`、`/scrape`、`/healthz`、`/api/*`）功能完整。
+此模式关闭 `dashboard` feature——`/` 和 `/assets/{*name}` 路由在编译时排除。所有 Tracker 协议端点（`/announce`、`/scrape`、`/healthz`、`/api/*`）功能完整。
 
 ### 测试
 

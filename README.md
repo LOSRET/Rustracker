@@ -41,16 +41,20 @@ A lightweight, high-performance HTTP BitTorrent tracker with a real-time dashboa
 ### Prerequisites
 
 - [Rust](https://www.rust-lang.org/tools/install) 1.85+ (edition 2021)
+- [Node.js](https://nodejs.org/) 20+ and npm (only needed when building with the `dashboard` feature, which is on by default)
 
 ### Build & Run
 
 ```bash
 git clone https://github.com/LOSRET/Rustracker.git
 cd rustracker
+npm install --prefix frontend   # first time only — installs dashboard build dependencies
 cargo run --release -- --listen 127.0.0.1:8080
 ```
 
 Open `http://127.0.0.1:8080` in your browser to see the dashboard.
+
+> Building without the dashboard (`cargo build --release --no-default-features`) does not require Node.js/npm.
 
 ### Pre-built Binaries
 
@@ -146,7 +150,7 @@ Returns JSON:
   "leechers": 43,
   "completed": 310,
   "rps": 12.5,
-  "version": "0.2.21",
+  "version": "0.2.24",
   "uptime_secs": 3600
 }
 ```
@@ -218,7 +222,7 @@ The tracker serves a full-featured dashboard at `/` on the same port:
 - **Disclaimer** — built-in legal disclaimer for public-facing deployments
 - **i18n** — automatic detection across 6 languages (中文 / English / 日本語 / Русский / Deutsch / Українська) with manual toggle
 
-Static assets (`style.css`, `app.js`) are cached for 1 hour by the server.
+Hashed assets under `/assets/*` (JS/CSS/fonts emitted by Vite, content-addressed by filename) are served with `Cache-Control: public, max-age=31536000, immutable`. The `index.html` entry is rebuilt on every release.
 
 ## Torrent Blacklist
 
@@ -338,11 +342,21 @@ rustracker/
 │       ├── blacklist.rs           # Torrent blacklist with 5-sec hot-reload file watcher
 │       └── trends.rs              # Trend data collection, 7-day JSONL persistence, history API
 │
-├── assets/                        # Web dashboard static files
-│   ├── index.html                 # Dashboard HTML (with <!-- CONTACT --> placeholder)
-│   ├── contact.html               # Optional contact block injected by build.rs (personal-contact feature)
-│   ├── style.css                  # Dashboard styles
-│   └── app.js                     # Dashboard logic: ECharts charts, i18n, API calls
+├── build.rs                        # Build script: runs `npm run build` in frontend/, embeds dist/ into the binary
+├── frontend/                       # Vue 3 + Vite + Tailwind dashboard SPA (compiled into the binary)
+│   ├── package.json                # Node dependencies and build scripts
+│   ├── vite.config.ts              # Vite config; inlines contact info via VITE_PERSONAL_CONTACT env var
+│   ├── tailwind.config.js          # Tailwind CSS config
+│   ├── index.html                  # SPA entry HTML
+│   └── src/
+│       ├── main.ts                 # App bootstrap (Vue, ECharts, i18n)
+│       ├── App.vue                 # Root component (Sidebar + Topbar + routed view)
+│       ├── style.css               # Tailwind entry + global styles
+│       ├── views/                  # DashboardView.vue (overview + charts)
+│       ├── components/             # MetricCard, TrendChart, ClientChart, Top100Page, Disclaimer, Sidebar, Topbar, AppFooter
+│       ├── composables/            # useStats, useTrends, useTop100, useI18n (reactive API hooks)
+│       ├── i18n/                   # Translations for 中文 / English / 日本語 / Русский / Deutsch / Українська
+│       └── types/                  # TypeScript API types
 │
 ├── examples/                      # Load testing and benchmarking tools
 │   ├── announce_load.rs           # Simple concurrent announce load test
@@ -406,21 +420,29 @@ The installer provides a Chinese interactive menu for:
 
 1. Install or update
 2. Uninstall
-3. Start / Stop / Restart service
-4. View status
-5. View configuration
-6. Modify configuration (listen address, interval, timeout)
-7. View the generated Admin Token
+3. Start service
+4. Stop service
+5. Restart service
+6. View status
+7. View configuration
+8. Modify configuration (listen address, interval, timeout)
+9. View the generated Admin Token
+10. Apply system tuning (sysctl + open-file limits)
+0. Exit
 
 Non-interactive commands:
 
 ```bash
 sudo sh install-linux.sh install
+sudo sh install-linux.sh uninstall
+sudo sh install-linux.sh start
+sudo sh install-linux.sh stop
+sudo sh install-linux.sh restart
 sudo sh install-linux.sh status
+sudo sh install-linux.sh config
 sudo sh install-linux.sh configure
 sudo sh install-linux.sh token
-sudo sh install-linux.sh restart
-sudo sh install-linux.sh uninstall
+sudo sh install-linux.sh tune
 ```
 
 **Default file layout after installation:**
@@ -523,7 +545,7 @@ To compile a pure tracker binary without the embedded web UI (smaller binary, no
 cargo build --release --no-default-features
 ```
 
-This disables the `dashboard` feature — the `/`, `/style.css`, and `/app.js` routes are excluded at compile time. All tracker protocol endpoints (`/announce`, `/scrape`, `/healthz`, `/api/*`) remain fully functional.
+This disables the `dashboard` feature — the `/` and `/assets/{*name}` routes are excluded at compile time. All tracker protocol endpoints (`/announce`, `/scrape`, `/healthz`, `/api/*`) remain fully functional.
 
 ### Test
 
