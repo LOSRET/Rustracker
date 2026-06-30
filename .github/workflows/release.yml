@@ -72,6 +72,19 @@ jobs:
         with:
           key: ${{ matrix.target }}-${{ matrix.cargo_flags }}
 
+      - name: Setup Node
+        if: matrix.cargo_flags == ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        if: matrix.cargo_flags == ''
+        working-directory: frontend
+        run: npm ci
+
       - name: Build (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: RUSTFLAGS="-C target-cpu=x86-64-v2" cargo build --release --target ${{ matrix.target }} ${{ matrix.cargo_flags }}

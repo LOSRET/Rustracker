@@ -29,34 +29,13 @@ use crate::protocol::client_id;
 
 #[cfg(feature = "dashboard")]
 pub(crate) const INDEX_HTML: &str = include_str!(concat!(env!("OUT_DIR"), "/index.html"));
+
 #[cfg(feature = "dashboard")]
-pub(crate) const STYLE_CSS: &str = include_str!("../../assets/style.css");
-#[cfg(feature = "dashboard")]
-pub(crate) const APP_JS: &str = include_str!("../../assets/app.js");
+include!(concat!(env!("OUT_DIR"), "/assets_manifest.rs"));
 
 #[cfg(feature = "dashboard")]
 pub(crate) fn make_versioned_index() -> axum::body::Bytes {
-    let hash = fnv1a_hash(STYLE_CSS.as_bytes(), APP_JS.as_bytes());
-    let v = format!("{hash:08x}");
-    let s = INDEX_HTML
-        .replace("/style.css", &format!("/style.css?v={v}"))
-        .replace("/app.js", &format!("/app.js?v={v}"));
-    axum::body::Bytes::from(s)
-}
-
-/// FNV-1a hash over two byte slices, computed once at startup.
-#[cfg(feature = "dashboard")]
-fn fnv1a_hash(a: &[u8], b: &[u8]) -> u32 {
-    let mut h: u32 = 0x811c_9dc5;
-    for &byte in a {
-        h ^= byte as u32;
-        h = h.wrapping_mul(0x0100_0193);
-    }
-    for &byte in b {
-        h ^= byte as u32;
-        h = h.wrapping_mul(0x0100_0193);
-    }
-    h
+    axum::body::Bytes::from(INDEX_HTML)
 }
 
 // ── Route handlers ───────────────────────────────────────────────────────────
@@ -67,29 +46,43 @@ pub(crate) async fn index(State(state): State<AppState>) -> Html<axum::body::Byt
 }
 
 #[cfg(feature = "dashboard")]
-pub(crate) async fn style() -> Response<Body> {
-    match Response::builder()
-        .header(header::CONTENT_TYPE, "text/css; charset=utf-8")
-        .header(header::CACHE_CONTROL, "public, max-age=3600")
-        .body(Body::from(STYLE_CSS))
-    {
-        Ok(resp) => resp,
-        Err(_) => Response::new(Body::empty()),
+pub(crate) async fn asset(
+    axum::extract::Path(name): axum::extract::Path<String>,
+) -> Response<Body> {
+    let bytes = ASSETS.iter().find(|(n, _)| *n == name).map(|(_, b)| *b);
+    match bytes {
+        Some(data) => {
+            let ct = content_type_for(&name);
+            match Response::builder()
+                .header(header::CONTENT_TYPE, ct)
+                .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
+                .body(Body::from(data))
+            {
+                Ok(resp) => resp,
+                Err(_) => Response::new(Body::empty()),
+            }
+        }
+        None => Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(Body::empty())
+            .unwrap_or_else(|_| Response::new(Body::empty())),
     }
 }
 
 #[cfg(feature = "dashboard")]
-pub(crate) async fn app_js() -> Response<Body> {
-    match Response::builder()
-        .header(
-            header::CONTENT_TYPE,
-            "application/javascript; charset=utf-8",
-        )
-        .header(header::CACHE_CONTROL, "public, max-age=3600")
-        .body(Body::from(APP_JS))
-    {
-        Ok(resp) => resp,
-        Err(_) => Response::new(Body::empty()),
+fn content_type_for(name: &str) -> &'static str {
+    if name.ends_with(".js") {
+        "application/javascript; charset=utf-8"
+    } else if name.ends_with(".css") {
+        "text/css; charset=utf-8"
+    } else if name.ends_with(".woff2") {
+        "font/woff2"
+    } else if name.ends_with(".png") {
+        "image/png"
+    } else if name.ends_with(".svg") {
+        "image/svg+xml"
+    } else {
+        "application/octet-stream"
     }
 }
 

@@ -234,8 +234,7 @@ pub fn router(state: AppState) -> Router {
     #[cfg(feature = "dashboard")]
     let r = r
         .route("/", get(handlers::index))
-        .route("/style.css", get(handlers::style))
-        .route("/app.js", get(handlers::app_js));
+        .route("/assets/{*name}", get(handlers::asset));
 
     r.fallback(handlers::not_found).with_state(state)
 }
