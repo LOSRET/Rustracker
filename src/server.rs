@@ -57,7 +57,7 @@ const BLACKLIST_WATCH_INTERVAL: Duration = Duration::from_secs(5);
 pub struct AppState {
     pub(crate) tracker: Arc<TrackerPool>,
     pub(crate) trends: Arc<RwLock<TrendStore>>,
-    pub(crate) blacklist: Arc<RwLock<Arc<HashSet<InfoHash>>>>,
+    pub(crate) blacklist: Arc<RwLock<HashSet<InfoHash>>>,
     pub(crate) blacklist_path: Option<PathBuf>,
     pub(crate) admin_token: Option<String>,
     pub(crate) started_at: Instant,
@@ -72,7 +72,7 @@ impl AppState {
         Self {
             tracker: Arc::new(TrackerPool::single(tracker)),
             trends: Arc::new(RwLock::new(load_trends(&trends_file))),
-            blacklist: Arc::new(RwLock::new(Arc::new(HashSet::new()))),
+            blacklist: Arc::new(RwLock::new(HashSet::new())),
             blacklist_path: None,
             admin_token: None,
             started_at: Instant::now(),
@@ -109,7 +109,7 @@ impl AppState {
         let state = Self {
             tracker: Arc::new(TrackerPool::new(interval, peer_timeout, shards)),
             trends: Arc::new(RwLock::new(load_trends(&trends_file))),
-            blacklist: Arc::new(RwLock::new(Arc::new(initial))),
+            blacklist: Arc::new(RwLock::new(initial)),
             blacklist_path: blacklist_path.clone(),
             admin_token,
             started_at: Instant::now(),
@@ -205,7 +205,7 @@ impl AppState {
                 match blacklist::load_blacklist(&path) {
                     Ok(new_set) => {
                         let count = new_set.len();
-                        *blacklist.write().await = Arc::new(new_set);
+                        *blacklist.write().await = new_set;
                         tracing::info!(count, "blacklist reloaded");
                     }
                     Err(err) => {

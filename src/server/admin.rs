@@ -1,5 +1,4 @@
 use std::path::Path;
-use std::sync::Arc;
 
 use axum::extract::State;
 use axum::http::{header, HeaderMap, StatusCode};
@@ -110,9 +109,7 @@ pub(crate) async fn add_blacklist(
     }
 
     let mut blacklist = state.blacklist.write().await;
-    let mut next = (**blacklist).clone();
-    next.insert(info_hash);
-    *blacklist = Arc::new(next);
+    blacklist.insert(info_hash);
 
     blacklist_success(info_hash, true)
 }
