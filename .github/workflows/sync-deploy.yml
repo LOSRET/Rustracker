@@ -51,8 +51,21 @@ jobs:
         with:
           targets: x86_64-unknown-linux-gnu
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
       - name: Build
         run: RUSTFLAGS="-C target-cpu=x86-64-v2" cargo build --release --target x86_64-unknown-linux-gnu --features personal-contact
+        env:
+          VITE_PERSONAL_CONTACT: "true"
 
       - name: Package
         run: |
@@ -77,8 +90,21 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
       - name: Build
         run: cargo build --release --features personal-contact
+        env:
+          VITE_PERSONAL_CONTACT: "true"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7

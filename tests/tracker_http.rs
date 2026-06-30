@@ -67,19 +67,13 @@ async fn index_returns_dashboard_html() {
 
     assert_eq!(response.status(), StatusCode::OK);
     let body = response.into_body().collect().await.unwrap().to_bytes();
-    assert!(body.windows(b"Tracker".len()).any(|w| w == b"Tracker"));
-    assert!(body.windows(b"/app.js".len()).any(|w| w == b"/app.js"));
-    assert!(body.windows(b"echarts".len()).any(|w| w == b"echarts"));
     assert!(body
-        .windows(b"trendChart".len())
-        .any(|w| w == b"trendChart"));
+        .windows(b"<div id=\"app\">".len())
+        .any(|w| w == b"<div id=\"app\">"));
+    assert!(body.windows(b"/assets/".len()).any(|w| w == b"/assets/"));
     assert!(body
-        .windows("Tracker 免责说明".as_bytes().len())
-        .any(|w| w == "Tracker 免责说明".as_bytes()));
-    assert!(!body.windows(b"peerTable".len()).any(|w| w == b"peerTable"));
-    assert!(!body
-        .windows(b"torrentTable".len())
-        .any(|w| w == b"torrentTable"));
+        .windows(b".js\"></script>".len())
+        .any(|w| w == b".js\"></script>"));
 }
 
 #[tokio::test]

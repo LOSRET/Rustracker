@@ -1,0 +1,253 @@
+import type { LangKey } from "../types/api";
+
+export interface Translation {
+  monitoring: string;
+  overview: string;
+  running: string;
+  error: string;
+  paused_state: string;
+  disc_link: string;
+  view: string;
+  side_note: string;
+  title: string;
+  subtitle: string;
+  loading: string;
+  last_update: string;
+  read_error: string;
+  chart_title: string;
+  chart_note: string;
+  client_chart_title: string;
+  client_chart_note: string;
+  range_24h: string;
+  range_3d: string;
+  range_7d: string;
+  top100_link: string;
+  top100_title: string;
+  top100_subtitle: string;
+  sort_peers: string;
+  sort_seeders: string;
+  sort_leechers: string;
+  sort_downloaded: string;
+  col_hash: string;
+  top100_loading: string;
+  top100_empty: string;
+  top100_error: string;
+  refresh: string;
+  tracker_addr_label: string;
+  config_fmt: () => string;
+  copied: string;
+  disc_title: string;
+  disc_p1: string;
+  disc_p2: string;
+  disc_p3: string;
+  disc_p4: string;
+  disc_p5: string;
+  blog_label: string;
+  contact_label: string;
+  seo_title: string;
+  seo_desc: string;
+}
+
+const zh: Translation = {
+  monitoring: "监控", overview: "Tracker 概览", running: "运行中",
+  error: "异常", paused_state: "已暂停", disc_link: "Tracker 免责说明",
+  view: "查看", side_note: "HTTP tracker 的连接、做种、下载和完成统计。",
+  title: "Tracker 控制台", subtitle: "查看当前端口上的 peer、做种和下载状态。",
+  loading: "正在加载...", last_update: "最后更新", read_error: "读取失败",
+  chart_title: "Tracker 趋势",
+  chart_note: "Torrents、Peers、Seeders 和 Leechers 随时间变化",
+  client_chart_title: "客户端分布",
+  client_chart_note: "前 15 客户端的 Peer 数量随时间变化",
+  range_24h: "24小时", range_3d: "3天", range_7d: "7天",
+  top100_link: "Top 100 Torrents", top100_title: "🏆 Top 100 Torrents",
+  top100_subtitle: "按 Peers / Seeders / Leechers 数量排序",
+  sort_peers: "Peers", sort_seeders: "Seeders", sort_leechers: "Leechers", sort_downloaded: "Downloaded",
+  col_hash: "Info Hash", top100_loading: "加载中...", top100_empty: "暂无数据", top100_error: "读取失败",
+  refresh: "刷新",
+  tracker_addr_label: "Tracker 地址：",
+  config_fmt: () => `${window.location.origin}/announce`,
+  copied: "已复制",
+  disc_title: "Tracker 免责说明",
+  disc_p1: "本站 Tracker 仅提供连接协调、状态记录与统计展示，不存储、不托管、不分发任何实际资源内容。",
+  disc_p2: "页面中的 torrents、peers、seeders、leechers、客户端类型及趋势数据，来源于客户端上报与系统采样，可能存在延迟、缺失、偏差或伪造，不代表资源真实状态。",
+  disc_p3: "本页面信息不代表任何资源的真实性、完整性、可用性、安全性或合法性，也不构成任何服务承诺或结果保证。",
+  disc_p4: "对于第三方客户端行为、资源内容、传输结果及由此产生的任何直接或间接后果，本站不承担责任，使用者应自行判断并承担相关风险。",
+  disc_p5: "受 Tracker 工作机制限制，本站不保留可用于长期识别、追踪或还原单个连接历史的完整日志，也无法对既往连接行为提供持续、完整或可验证的回溯记录。",
+  blog_label: "Blog", contact_label: "如有问题请联系",
+  seo_title: "BitTorrent Tracker – HTTP Tracker 实时监控面板",
+  seo_desc: "BitTorrent HTTP Tracker 实时监控面板，查看 Peers、Seeders、Leechers、客户端分布与趋势图表。提供 announce/scrape 接口，支持 IPv4/IPv6。",
+};
+
+const en: Translation = {
+  monitoring: "Monitoring", overview: "Tracker Overview", running: "Running",
+  error: "Error", paused_state: "Paused", disc_link: "Disclaimer",
+  view: "View", side_note: "HTTP tracker connection, seeding, downloading and completion statistics.",
+  title: "Tracker Console", subtitle: "View peer, seeding and download status on the current port.",
+  loading: "Loading...", last_update: "Last updated", read_error: "Read failed",
+  chart_title: "Tracker Trends",
+  chart_note: "Torrents, Peers, Seeders and Leechers over time",
+  client_chart_title: "Client Distribution",
+  client_chart_note: "Top 15 clients by peer count over time",
+  range_24h: "24h", range_3d: "3D", range_7d: "7D",
+  top100_link: "Top 100 Torrents", top100_title: "🏆 Top 100 Torrents",
+  top100_subtitle: "Sorted by Peers / Seeders / Leechers count",
+  sort_peers: "Peers", sort_seeders: "Seeders", sort_leechers: "Leechers", sort_downloaded: "Downloaded",
+  col_hash: "Info Hash", top100_loading: "Loading...", top100_empty: "No data", top100_error: "Read failed",
+  refresh: "Refresh",
+  tracker_addr_label: "Tracker URL: ",
+  config_fmt: () => `${window.location.origin}/announce`,
+  copied: "Copied!",
+  disc_title: "Disclaimer",
+  disc_p1: "This tracker only provides connection coordination, status recording and statistical display. It does not store, host or distribute any actual resource content.",
+  disc_p2: "Torrents, peers, seeders, leechers, client types and trend data displayed on this page are derived from client reports and system sampling. They may contain delays, omissions, deviations or falsification, and do not represent the true state of resources.",
+  disc_p3: "The information on this page does not represent the authenticity, completeness, availability, security or legality of any resource, nor does it constitute any service commitment or result guarantee.",
+  disc_p4: "This site assumes no responsibility for third-party client behavior, resource content, transmission results, or any direct or indirect consequences arising therefrom. Users should exercise their own judgment and bear associated risks.",
+  disc_p5: "Due to tracker operational limitations, this site does not retain complete logs that could be used for long-term identification, tracking or reconstruction of individual connection histories, and cannot provide continuous, complete or verifiable retrospective records of past connection activity.",
+  blog_label: "Blog", contact_label: "Contact",
+  seo_title: "BitTorrent Tracker – Real-time HTTP Tracker Dashboard",
+  seo_desc: "BitTorrent HTTP Tracker dashboard. Monitor Peers, Seeders, Leechers, client distribution and trend charts. Supports announce/scrape with IPv4/IPv6.",
+};
+
+const ja: Translation = {
+  monitoring: "モニタリング", overview: "Tracker概要", running: "稼働中",
+  error: "エラー", paused_state: "一時停止", disc_link: "免責事項",
+  view: "表示", side_note: "HTTP trackerの接続、シード、ダウンロード、完了の統計。",
+  title: "Trackerコンソール", subtitle: "現在のポートのピア、シード、ダウンロードの状態を表示。",
+  loading: "読み込み中...", last_update: "最終更新", read_error: "読み込み失敗",
+  chart_title: "Trackerトレンド",
+  chart_note: "Torrents、Peers、Seeders、Leechersの推移",
+  client_chart_title: "クライアント分布",
+  client_chart_note: "上位15クライアントのピア数の推移",
+  range_24h: "24時間", range_3d: "3日", range_7d: "7日",
+  top100_link: "Top 100 Torrents", top100_title: "🏆 Top 100 Torrents",
+  top100_subtitle: "Peers / Seeders / Leechers数でソート",
+  sort_peers: "Peers", sort_seeders: "Seeders", sort_leechers: "Leechers", sort_downloaded: "Downloaded",
+  col_hash: "Info Hash", top100_loading: "読み込み中...", top100_empty: "データなし", top100_error: "読み込み失敗",
+  refresh: "更新",
+  tracker_addr_label: "Trackerアドレス：",
+  config_fmt: () => `${window.location.origin}/announce`,
+  copied: "コピーしました",
+  disc_title: "免責事項",
+  disc_p1: "本Trackerは接続調整、状態記録、統計表示のみを提供し、実際のリソースコンテンツの保存、ホスト、配信は行いません。",
+  disc_p2: "ページに表示されるtorrents、peers、seeders、leechers、クライアントタイプ、トレンドデータは、クライアントの報告とシステムサンプリングから取得したものであり、遅延、欠落、偏差、偽造が含まれる可能性があり、リソースの真実の状態を表すものではありません。",
+  disc_p3: "本ページの情報は、いかなるリソースの真正性、完全性、可用性、安全性、合法性を表すものではなく、サービスコミットメントや結果の保証を構成するものでもありません。",
+  disc_p4: "サードパーティのクライアント行動、リソースコンテンツ、送信結果、およびそれらから生じる直接的または間接的な結果について、本サイトは一切の責任を負いません。利用者は自己の判断で関連するリスクを負担してください。",
+  disc_p5: "Trackerの動作上の制限により、本サイトは個々の接続履歴の長期的な識別、追跡、復元に使用できる完全なログを保持せず、過去の接続活動に対する連続的、完全、または検証可能な遡及記録を提供できません。",
+  blog_label: "ブログ", contact_label: "お問い合わせ",
+  seo_title: "BitTorrent Tracker – リアルタイムHTTP Trackerダッシュボード",
+  seo_desc: "BitTorrent HTTP Trackerダッシュボード。Peers、Seeders、Leechers、クライアント分布、トレンドチャートを監視。announce/scrape対応、IPv4/IPv6サポート。",
+};
+
+const ru: Translation = {
+  monitoring: "Мониторинг", overview: "Обзор трекера", running: "Работает",
+  error: "Ошибка", paused_state: "Приостановлен", disc_link: "Отказ от ответственности",
+  view: "Просмотр", side_note: "Статистика подключений, сидирования, загрузки и завершений HTTP-трекера.",
+  title: "Консоль трекера", subtitle: "Просмотр состояния пиров, сидирования и загрузки на текущем порту.",
+  loading: "Загрузка...", last_update: "Последнее обновление", read_error: "Ошибка чтения",
+  chart_title: "Тренды трекера",
+  chart_note: "Torrents, Peers, Seeders и Leechers во времени",
+  client_chart_title: "Распределение клиентов",
+  client_chart_note: "Топ-15 клиентов по количеству пиров во времени",
+  range_24h: "24 часа", range_3d: "3 дня", range_7d: "7 дней",
+  top100_link: "Top 100 Torrents", top100_title: "🏆 Top 100 Torrents",
+  top100_subtitle: "Сортировка по Peers / Seeders / Leechers",
+  sort_peers: "Peers", sort_seeders: "Seeders", sort_leechers: "Leechers", sort_downloaded: "Downloaded",
+  col_hash: "Info Hash", top100_loading: "Загрузка...", top100_empty: "Нет данных", top100_error: "Ошибка чтения",
+  refresh: "Обновить",
+  tracker_addr_label: "Адрес трекера: ",
+  config_fmt: () => `${window.location.origin}/announce`,
+  copied: "Скопировано",
+  disc_title: "Отказ от ответственности",
+  disc_p1: "Данный трекер предоставляет только координацию подключений, запись состояния и отображение статистики. Он не хранит, не размещает и не распространяет какой-либо контент ресурсов.",
+  disc_p2: "Данные о торрентах, пирах, сидах, личах, типах клиентов и трендах на этой странице получены из отчётов клиентов и системной выборки. Они могут содержать задержки, пропуски, отклонения или подделку и не отражают истинное состояние ресурсов.",
+  disc_p3: "Информация на этой странице не представляет подлинность, полноту, доступность, безопасность или законность какого-либо ресурса и не является гарантией сервиса или результата.",
+  disc_p4: "Данный сайт не несёт ответственности за поведение сторонних клиентов, содержание ресурсов, результаты передачи и любые прямые или косвенные последствия, возникающие из этого. Пользователи должны самостоятельно оценивать риски.",
+  disc_p5: "В связи с ограничениями работы трекера, сайт не хранит полные журналы, которые могут быть использованы для долгосрочной идентификации, отслеживания или восстановления истории отдельных подключений, и не может предоставить непрерывные, полные или проверяемые записи о прошлой активности.",
+  blog_label: "Блог", contact_label: "Контакт",
+  seo_title: "BitTorrent Tracker – Панель мониторинга HTTP-трекера",
+  seo_desc: "Панель мониторинга BitTorrent HTTP-трекера. Отслеживание Peers, Seeders, Leechers, распределения клиентов и графиков трендов. Поддержка announce/scrape, IPv4/IPv6.",
+};
+
+const de: Translation = {
+  monitoring: "Überwachung", overview: "Tracker-Übersicht", running: "Läuft",
+  error: "Fehler", paused_state: "Pausiert", disc_link: "Haftungsausschluss",
+  view: "Ansehen", side_note: "HTTP-Tracker-Statistiken zu Verbindungen, Seeding, Downloads und Abschlüssen.",
+  title: "Tracker-Konsole", subtitle: "Peer-, Seeding- und Download-Status auf dem aktuellen Port anzeigen.",
+  loading: "Wird geladen...", last_update: "Letzte Aktualisierung", read_error: "Lesefehler",
+  chart_title: "Tracker-Trends",
+  chart_note: "Torrents, Peers, Seeders und Leechers im Zeitverlauf",
+  client_chart_title: "Client-Verteilung",
+  client_chart_note: "Top-15 Clients nach Peer-Anzahl im Zeitverlauf",
+  range_24h: "24h", range_3d: "3T", range_7d: "7T",
+  top100_link: "Top 100 Torrents", top100_title: "🏆 Top 100 Torrents",
+  top100_subtitle: "Sortiert nach Peers / Seeders / Leechers",
+  sort_peers: "Peers", sort_seeders: "Seeders", sort_leechers: "Leechers", sort_downloaded: "Downloaded",
+  col_hash: "Info Hash", top100_loading: "Wird geladen...", top100_empty: "Keine Daten", top100_error: "Lesefehler",
+  refresh: "Aktualisieren",
+  tracker_addr_label: "Tracker-Adresse: ",
+  config_fmt: () => `${window.location.origin}/announce`,
+  copied: "Kopiert",
+  disc_title: "Haftungsausschluss",
+  disc_p1: "Dieser Tracker bietet nur Verbindungskoordination, Statusaufzeichnung und statistische Anzeige. Er speichert, hostet oder verteilt keine tatsächlichen Ressourceninhalte.",
+  disc_p2: "Die auf dieser Seite angezeigten Daten zu Torrents, Peers, Seedern, Leechern, Client-Typen und Trends stammen aus Client-Berichten und Systemstichproben. Sie können Verzögerungen, Auslassungen, Abweichungen oder Fälschungen enthalten und stellen nicht den tatsächlichen Zustand der Ressourcen dar.",
+  disc_p3: "Die Informationen auf dieser Seite repräsentieren nicht die Echtheit, Vollständigkeit, Verfügbarkeit, Sicherheit oder Rechtmäßigkeit einer Ressource und stellen keine Servicezusicherung oder Ergebnisgarantie dar.",
+  disc_p4: "Diese Website übernimmt keine Verantwortung für das Verhalten von Drittanbieter-Clients, Ressourceninhalte, Übertragungsergebnisse oder daraus entstehende direkte oder indirekte Folgen. Nutzer sollten eigenständig urteilen und die damit verbundenen Risiken tragen.",
+  disc_p5: "Aufgrund der betrieblichen Einschränkungen des Trackers speichert diese Website keine vollständigen Protokolle, die zur langfristigen Identifizierung, Nachverfolgung oder Rekonstruktion einzelner Verbindungsverläufe verwendet werden könnten, und kann keine lückenlosen, vollständigen oder überprüfbaren Aufzeichnungen vergangener Verbindungsaktivitäten bereitstellen.",
+  blog_label: "Blog", contact_label: "Kontakt",
+  seo_title: "BitTorrent Tracker – Echtzeit-HTTP-Tracker-Dashboard",
+  seo_desc: "BitTorrent HTTP-Tracker-Dashboard. Überwachung von Peers, Seeders, Leechers, Client-Verteilung und Trenddiagrammen. Unterstützt announce/scrape mit IPv4/IPv6.",
+};
+
+const uk: Translation = {
+  monitoring: "Моніторинг", overview: "Огляд трекера", running: "Працює",
+  error: "Помилка", paused_state: "Призупинено", disc_link: "Відмова від відповідальності",
+  view: "Перегляд", side_note: "Статистика підключень, сідування, завантаження та завершень HTTP-трекера.",
+  title: "Консоль трекера", subtitle: "Перегляд стану пірів, сідування та завантаження на поточному порту.",
+  loading: "Завантаження...", last_update: "Останнє оновлення", read_error: "Помилка читання",
+  chart_title: "Тренди трекера",
+  chart_note: "Torrents, Peers, Seeders та Leechers у часі",
+  client_chart_title: "Розподіл клієнтів",
+  client_chart_note: "Топ-15 клієнтів за кількістю пірів у часі",
+  range_24h: "24 години", range_3d: "3 дні", range_7d: "7 днів",
+  top100_link: "Top 100 Torrents", top100_title: "🏆 Top 100 Torrents",
+  top100_subtitle: "Сортування за Peers / Seeders / Leechers",
+  sort_peers: "Peers", sort_seeders: "Seeders", sort_leechers: "Leechers", sort_downloaded: "Downloaded",
+  col_hash: "Info Hash", top100_loading: "Завантаження...", top100_empty: "Немає даних", top100_error: "Помилка читання",
+  refresh: "Оновити",
+  tracker_addr_label: "Адреса трекера: ",
+  config_fmt: () => `${window.location.origin}/announce`,
+  copied: "Скопійовано",
+  disc_title: "Відмова від відповідальності",
+  disc_p1: "Цей трекер надає лише координацію підключень, запис стану та відображення статистики. Він не зберігає, не розміщує та не поширює жодний вміст ресурсів.",
+  disc_p2: "Дані про торренти, піри, сіди, лічі, типи клієнтів та тренди на цій сторінці отримано зі звітів клієнтів та системної вибірки. Вони можуть містити затримки, пропуски, відхилення або підробку і не відображають справжній стан ресурсів.",
+  disc_p3: "Інформація на цій сторінці не представляє автентичність, повноту, доступність, безпеку чи законність будь-якого ресурсу і не є гарантією сервісу чи результату.",
+  disc_p4: "Цей сайт не несе відповідальності за поведінку сторонніх клієнтів, вміст ресурсів, результати передачі та будь-які прямі чи непрямі наслідки, що виникають з цього. Користувачі повинні самостійно оцінювати ризики.",
+  disc_p5: "У зв'язку з обмеженнями роботи трекера, сайт не зберігає повні журнали, які можуть бути використані для довгострокової ідентифікації, відстеження або відновлення історії окремих підключень, і не може надати безперервні, повні або звіряні записи про минулу активність.",
+  blog_label: "Блог", contact_label: "Контакт",
+  seo_title: "BitTorrent Tracker – Панель моніторингу HTTP-трекера",
+  seo_desc: "Панель моніторингу BitTorrent HTTP-трекера. Відстеження Peers, Seeders, Leechers, розподілу клієнтів та графіків трендів. Підтримка announce/scrape, IPv4/IPv6.",
+};
+
+export const translations: Record<LangKey, Translation> = { zh, en, ja, ru, de, uk };
+
+export const LANG_LOCALE: Record<LangKey, string> = {
+  zh: "zh-CN", en: "en", ja: "ja", ru: "ru", de: "de", uk: "uk",
+};
+
+export const OG_LOCALE: Record<LangKey, string> = {
+  zh: "zh_CN", en: "en_US", ja: "ja_JP", ru: "ru_RU", de: "de_DE", uk: "uk_UA",
+};
+
+export const NUM_LOCALE: Record<LangKey, string> = {
+  zh: "zh-CN", en: "en-US", ja: "ja-JP", ru: "ru-RU", de: "de-DE", uk: "uk-UA",
+};
+
+export function detectLang(): LangKey {
+  const nav = navigator.language || "";
+  if (nav.startsWith("zh")) return "zh";
+  if (nav.startsWith("ja")) return "ja";
+  if (nav.startsWith("ru")) return "ru";
+  if (nav.startsWith("de")) return "de";
+  if (nav.startsWith("uk")) return "uk";
+  return "en";
+}
