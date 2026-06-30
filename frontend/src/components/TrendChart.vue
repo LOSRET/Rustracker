@@ -104,10 +104,12 @@ watch(() => [props.data, range.value], render, { deep: true });
           v-for="(r, i) in (['24h', '3d', '7d'] as RangeKey[])"
           :key="r"
           :class="[
-            'border border-line bg-panel text-muted px-3 text-xs cursor-pointer min-h-7 transition-colors',
+            'border text-muted px-3 text-xs cursor-pointer min-h-7 transition-colors',
             i === 0 ? 'rounded-l' : 'border-l-0',
             i === 2 ? 'rounded-r' : '',
-            range === r ? 'bg-accent border-accent text-white' : 'hover:bg-hover-soft',
+            range === r
+              ? 'bg-accent border-accent text-white'
+              : 'bg-panel border-line hover:bg-hover-soft',
           ]"
           @click="range = r"
         >

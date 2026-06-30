@@ -36,10 +36,12 @@ const sortLabel: Record<SortKey, string> = {
           v-for="(s, i) in sortOptions"
           :key="s"
           :class="[
-            'border border-line bg-panel text-muted px-4 text-[13px] cursor-pointer min-h-8 transition-colors',
+            'border text-muted px-4 text-[13px] cursor-pointer min-h-8 transition-colors',
             i === 0 ? 'rounded-l' : 'border-l-0',
             i === 3 ? 'rounded-r' : '',
-            sort === s ? 'bg-accent border-accent text-white' : 'hover:bg-hover-soft',
+            sort === s
+              ? 'bg-accent border-accent text-white'
+              : 'bg-panel border-line hover:bg-hover-soft',
           ]"
           @click="sort = s"
         >
