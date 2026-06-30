@@ -5,6 +5,7 @@
 //! trends and one for per-client top-N trends.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::UNIX_EPOCH;
 
 use serde::{Deserialize, Serialize};
@@ -32,15 +33,15 @@ pub(crate) struct StatsResponse {
 
 #[derive(Debug, Serialize)]
 pub(crate) struct TrendsResponse {
-    pub history: Vec<TrendPointResponse>,
+    pub history: Arc<Vec<TrendPointResponse>>,
 }
 
 #[derive(Debug, Serialize)]
 pub(crate) struct ClientsResponse {
     pub timestamp: u64,
-    pub clients: Vec<String>,
-    pub tags: Vec<u8>,
-    pub history: Vec<ClientTrendPoint>,
+    pub clients: Arc<Vec<String>>,
+    pub tags: Arc<Vec<u8>>,
+    pub history: Arc<Vec<ClientTrendPoint>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
@@ -55,15 +56,15 @@ pub(crate) struct TrendPointResponse {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct ClientTrendPoint {
     pub timestamp: u64,
-    pub tags: Vec<u8>,
+    pub tags: Arc<Vec<u8>>,
     pub counts: Vec<u32>,
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
 pub(crate) struct ClientTrendData {
-    pub top_tags: Vec<u8>,
-    pub top_clients: Vec<String>,
-    pub history: Vec<ClientTrendPoint>,
+    pub top_tags: Arc<Vec<u8>>,
+    pub top_clients: Arc<Vec<String>>,
+    pub history: Arc<Vec<ClientTrendPoint>>,
 }
 
 // ── TrendStore ───────────────────────────────────────────────────────────────
@@ -71,7 +72,7 @@ pub(crate) struct ClientTrendData {
 #[derive(Debug, Default)]
 pub(crate) struct TrendStore {
     points: Vec<TrendPointResponse>,
-    filled_cache: Vec<TrendPointResponse>,
+    filled_cache: Arc<Vec<TrendPointResponse>>,
     cache_start: u64,
     cache_end: u64,
     // Client trend tracking: store full distribution per snapshot
@@ -106,7 +107,7 @@ impl TrendStore {
         &mut self,
         now: u64,
         snapshot: &TrackerSnapshot,
-    ) -> Vec<TrendPointResponse> {
+    ) -> Arc<Vec<TrendPointResponse>> {
         let bucket = now - (now % Self::SAMPLE_SECS);
 
         // 已有该 bucket 的点则直接返回缓存，不再覆盖（写入即冻结）
@@ -127,7 +128,7 @@ impl TrendStore {
         let min_timestamp = bucket.saturating_sub(Self::RETENTION_SECS);
         self.points.retain(|point| point.timestamp >= min_timestamp);
 
-        self.filled_cache = self.filled_points(min_timestamp, bucket);
+        self.filled_cache = Arc::new(self.filled_points(min_timestamp, bucket));
         self.cache_start = min_timestamp;
         self.cache_end = bucket;
         self.filled_cache.clone()
@@ -213,7 +214,8 @@ impl TrendStore {
                 .collect();
 
             // Build filled history
-            let num = top.len();
+            let top_arc = Arc::new(top);
+            let num = top_arc.len();
             let mut history = Vec::with_capacity(
                 ((bucket.saturating_sub(min_timestamp)) / Self::SAMPLE_SECS + 1) as usize,
             );
@@ -230,7 +232,7 @@ impl TrendStore {
                 }
 
                 let counts = match self.client_points.get(idx) {
-                    Some((ts, dist)) if *ts == timestamp => top
+                    Some((ts, dist)) if *ts == timestamp => top_arc
                         .iter()
                         .map(|tag| {
                             dist.iter()
@@ -244,19 +246,20 @@ impl TrendStore {
 
                 history.push(ClientTrendPoint {
                     timestamp,
-                    tags: top.clone(),
+                    tags: top_arc.clone(),
                     counts,
                 });
                 timestamp = timestamp.saturating_add(Self::SAMPLE_SECS);
             }
 
+            let top_clients = top_arc
+                .iter()
+                .map(|t| client_id::client_name(*t).to_string())
+                .collect();
             self.client_cache = ClientTrendData {
-                top_tags: top.clone(),
-                top_clients: top
-                    .iter()
-                    .map(|t| client_id::client_name(*t).to_string())
-                    .collect(),
-                history,
+                top_tags: top_arc,
+                top_clients: Arc::new(top_clients),
+                history: Arc::new(history),
             };
         }
 
@@ -383,7 +386,7 @@ pub(crate) fn load_trends_from_file(
     if let Some(last_point) = store.points.last() {
         let bucket = last_point.timestamp;
         let min_t = bucket.saturating_sub(retention);
-        store.filled_cache = store.filled_points(min_t, bucket);
+        store.filled_cache = Arc::new(store.filled_points(min_t, bucket));
         store.cache_start = min_t;
         store.cache_end = bucket;
     }
@@ -404,7 +407,8 @@ pub(crate) fn load_trends_from_file(
             .collect();
 
         let min_t = bucket.saturating_sub(retention);
-        let num = top.len();
+        let top_arc = Arc::new(top);
+        let num = top_arc.len();
         let mut history = Vec::with_capacity(
             ((bucket.saturating_sub(min_t)) / TrendStore::SAMPLE_SECS + 1) as usize,
         );
@@ -419,7 +423,7 @@ pub(crate) fn load_trends_from_file(
                 idx += 1;
             }
             let counts = match store.client_points.get(idx) {
-                Some((ts, dist)) if *ts == timestamp => top
+                Some((ts, dist)) if *ts == timestamp => top_arc
                     .iter()
                     .map(|tag| {
                         dist.iter()
@@ -432,18 +436,19 @@ pub(crate) fn load_trends_from_file(
             };
             history.push(ClientTrendPoint {
                 timestamp,
-                tags: top.clone(),
+                tags: top_arc.clone(),
                 counts,
             });
             timestamp = timestamp.saturating_add(TrendStore::SAMPLE_SECS);
         }
+        let top_clients = top_arc
+            .iter()
+            .map(|t| client_id::client_name(*t).to_string())
+            .collect();
         store.client_cache = ClientTrendData {
-            top_tags: top.clone(),
-            top_clients: top
-                .iter()
-                .map(|t| client_id::client_name(*t).to_string())
-                .collect(),
-            history,
+            top_tags: top_arc,
+            top_clients: Arc::new(top_clients),
+            history: Arc::new(history),
         };
         store.client_cache_dirty = false;
     }

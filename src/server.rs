@@ -64,7 +64,7 @@ pub struct AppState {
     pub(crate) rps_counter: Arc<AtomicU64>,
     pub(crate) current_rps: Arc<AtomicU64>,
     #[cfg(feature = "dashboard")]
-    pub(crate) versioned_index: String,
+    pub(crate) versioned_index: axum::body::Bytes,
 }
 
 impl AppState {

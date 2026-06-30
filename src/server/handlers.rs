@@ -35,12 +35,13 @@ pub(crate) const STYLE_CSS: &str = include_str!("../../assets/style.css");
 pub(crate) const APP_JS: &str = include_str!("../../assets/app.js");
 
 #[cfg(feature = "dashboard")]
-pub(crate) fn make_versioned_index() -> String {
+pub(crate) fn make_versioned_index() -> axum::body::Bytes {
     let hash = fnv1a_hash(STYLE_CSS.as_bytes(), APP_JS.as_bytes());
     let v = format!("{hash:08x}");
-    INDEX_HTML
+    let s = INDEX_HTML
         .replace("/style.css", &format!("/style.css?v={v}"))
-        .replace("/app.js", &format!("/app.js?v={v}"))
+        .replace("/app.js", &format!("/app.js?v={v}"));
+    axum::body::Bytes::from(s)
 }
 
 /// FNV-1a hash over two byte slices, computed once at startup.
@@ -61,7 +62,7 @@ fn fnv1a_hash(a: &[u8], b: &[u8]) -> u32 {
 // ── Route handlers ───────────────────────────────────────────────────────────
 
 #[cfg(feature = "dashboard")]
-pub(crate) async fn index(State(state): State<AppState>) -> Html<String> {
+pub(crate) async fn index(State(state): State<AppState>) -> Html<axum::body::Bytes> {
     Html(state.versioned_index.clone())
 }
 
