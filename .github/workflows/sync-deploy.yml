@@ -64,6 +64,8 @@ jobs:
 
       - name: Build
         run: RUSTFLAGS="-C target-cpu=x86-64-v2" cargo build --release --target x86_64-unknown-linux-gnu --features personal-contact
+        env:
+          VITE_PERSONAL_CONTACT: "true"
 
       - name: Package
         run: |
@@ -101,6 +103,8 @@ jobs:
 
       - name: Build
         run: cargo build --release --features personal-contact
+        env:
+          VITE_PERSONAL_CONTACT: "true"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7

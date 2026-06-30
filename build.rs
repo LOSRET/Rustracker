@@ -9,7 +9,6 @@ fn main() {
     let out_path = Path::new(&out_dir);
 
     let has_dashboard = env::var("CARGO_FEATURE_DASHBOARD").is_ok();
-    let has_contact = env::var("CARGO_FEATURE_PERSONAL_CONTACT").is_ok();
 
     if has_dashboard {
         let frontend_dir = Path::new(&manifest_dir).join("frontend");
@@ -32,19 +31,11 @@ fn main() {
             }
         }
 
-        // Copy dist/index.html → OUT_DIR/index.html (after optional contact injection).
-        let mut index_html =
+        // Copy dist/index.html → OUT_DIR/index.html.
+        // Contact info injection is handled by Vite at build time via the
+        // VITE_PERSONAL_CONTACT env var, so no post-processing needed here.
+        let index_html =
             fs::read_to_string(dist_dir.join("index.html")).expect("dist/index.html not found");
-
-        if has_contact {
-            let contact_path = Path::new(&manifest_dir).join("assets/contact.html");
-            if contact_path.exists() {
-                let contact_html = fs::read_to_string(&contact_path).unwrap_or_default();
-                index_html = index_html.replace("<!-- CONTACT -->", &contact_html);
-            }
-        } else {
-            index_html = index_html.replace("<!-- CONTACT -->\n", "");
-        }
 
         fs::write(out_path.join("index.html"), &index_html)
             .expect("failed to write OUT_DIR/index.html");

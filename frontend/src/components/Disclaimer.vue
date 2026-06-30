@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useI18n } from "../composables/useI18n";
 const { t } = useI18n();
+const contactHtml = __CONTACT_HTML__;
 </script>
 
 <template>
@@ -11,5 +12,6 @@ const { t } = useI18n();
     <p class="mb-2 text-slate-600 dark:text-slate-400">{{ t.disc_p3 }}</p>
     <p class="mb-2 text-slate-600 dark:text-slate-400">{{ t.disc_p4 }}</p>
     <p class="text-slate-600 dark:text-slate-400">{{ t.disc_p5 }}</p>
+    <div v-if="contactHtml" v-html="contactHtml" class="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400"></div>
   </section>
 </template>
