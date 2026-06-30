@@ -76,9 +76,11 @@ Rustracker is a lightweight, high-performance HTTP BitTorrent tracker written in
 
 ```bash
 # Build (release, includes embedded dashboard)
+# NOTE: dashboard feature triggers `npm run build` in frontend/ via build.rs.
+# Requires Node 20+ and frontend/node_modules installed (run `npm install` in frontend/ first).
 cargo build --release
 
-# Build without dashboard (smaller binary, no HTML/CSS/JS bundled)
+# Build without dashboard (smaller binary, no frontend bundled, no Node needed)
 cargo build --release --no-default-features
 
 # Run
@@ -101,6 +103,26 @@ RUST_LOG=rustracker=trace cargo run --release
 cargo fmt --check                          # style check
 cargo clippy --all-targets --all-features  # lints
 ```
+
+### Frontend (Vue 3 + Vite + Tailwind)
+
+The dashboard SPA lives in `frontend/`. It is built by Vite into `dist/` and embedded into the Rust binary at compile time by `build.rs`.
+
+```bash
+# Install dependencies (first time only)
+cd frontend && npm install
+
+# Development server with hot reload (proxies /api, /announce, /scrape to 127.0.0.1:8080)
+cd frontend && npm run dev
+
+# Production build (outputs to ../dist/)
+cd frontend && npm run build
+
+# Type check
+cd frontend && npm run typecheck
+```
+
+> **Note:** `cargo build --release` with the `dashboard` feature will automatically run `npm run build` in `frontend/`. Ensure `frontend/node_modules/` exists (run `npm install` once after cloning). CI workflows handle this automatically via `setup-node` + `npm ci`.
 
 > **Note:** `.githooks/commit-msg` strips solitary `@` lines from commit messages (PowerShell here-string artifact). Enable with `git config core.hooksPath .githooks` after cloning.
 
@@ -160,8 +182,8 @@ Three-layer design with clear separation of concerns:
 - **Peer storage**: Packed binary, no heap allocation per peer — stored inline in `Vec<u8>`
 - **Shrink strategy (`shrink_if_idle`)**: After peer expiry sweeps, each `Swarm`'s `Vec<u8>` checks if `cap > floor * entry_size` (skip tiny vecs), then computes `target = next_power_of_two(entries).max(floor) * entry_size`. Shrinks to target only if `target < cap`, yielding 50–100% post-shrink utilization. This is tighter than opentracker's approach (waits until <25% utilization, then halves).
 - **Background tasks**: Peer expiry sweeps every 1s, trend sampling every 10min, blacklist file watch every 5s
-- **build.rs**: Reads `assets/index.html` and injects `assets/contact.html` content at the `<!-- CONTACT -->` placeholder when `personal-contact` feature is enabled; outputs the result to `$OUT_DIR/index.html`
-- **Features**: `dashboard` (default) enables web UI routes and embeds the HTML at compile time; `personal-contact` injects contact info into the HTML
+- **build.rs**: When the `dashboard` feature is on, runs `npm run build` in `frontend/`, then copies `dist/index.html` to `$OUT_DIR/index.html` and `dist/assets/*` to `$OUT_DIR/assets/`, generating an `assets_manifest.rs` of `include_bytes!` calls. The `personal-contact` feature is handled at Vite build time via the `VITE_PERSONAL_CONTACT=true` env var — `vite.config.ts` reads `assets/contact.html` and inlines it into the JS bundle via `define: { __CONTACT_HTML__: ... }`; the `Disclaimer.vue` component renders it with `v-if`/`v-html` when non-empty. This means the contact info distinction is compile-time (public releases have no contact info in the binary at all), controlled by whether CI sets the env var.
+- **Features**: `dashboard` (default) enables web UI routes and embeds the Vue SPA at compile time; `personal-contact` injects contact info into the frontend bundle via `VITE_PERSONAL_CONTACT` env var (set by `sync-deploy.yml`, not set by `release.yml`)
 
 ## Testing Pattern
 
@@ -180,8 +202,8 @@ cargo test --doc              # doctests only
 
 GitHub Actions workflows:
 
-- **`release.yml`** — Triggers on pushes to `main` that modify `Cargo.toml`. Compares the version field between the push commit and its parent — if changed, builds Linux/Windows binaries and creates a GitHub Release with the new version tag. Bump `version` in `Cargo.toml` to trigger a release.
-- **`sync-deploy.yml`** — Personal deployment workflow triggered on version bumps or manual dispatch. Builds Linux (musl) and Windows artifacts without creating a GitHub Release.
+- **`release.yml`** — Triggers on pushes to `main` that modify `Cargo.toml`. Compares the version field between the push commit and its parent — if changed, builds Linux/Windows binaries and creates a GitHub Release with the new version tag. Bump `version` in `Cargo.toml` to trigger a release. Dashboard builds run `setup-node` + `npm ci` before `cargo build`; the no-dashboard matrix entry skips Node.
+- **`sync-deploy.yml`** — Personal deployment workflow triggered on version bumps or manual dispatch. Builds Linux (musl) and Windows artifacts without creating a GitHub Release. Sets `VITE_PERSONAL_CONTACT=true` on `cargo build` so contact info is embedded in the frontend bundle.
 - **`memory-benchmark.yml`** — Manual dispatch workflow that runs `unified_bench` and system-vs-jemalloc allocator comparisons.
 
 ## CLI Configuration
