@@ -27,7 +27,7 @@ function lastUpdateText() {
 <template>
   <section class="flex justify-between items-start gap-5 mb-6 max-[900px]:flex-col max-[900px]:items-stretch">
     <div>
-      <h1 class="m-0 mb-1.5 text-[28px] leading-tight max-[560px]:text-6xl">{{ t.title }}</h1>
+      <h1 class="m-0 mb-1.5 text-[28px] leading-tight max-[560px]:text-[24px]">{{ t.title }}</h1>
       <p class="m-0 text-muted text-sm leading-relaxed">{{ t.subtitle }}</p>
       <p :class="['text-xs mt-1.5', error ? 'text-bad' : 'text-muted']">
         {{ error ? t.error : lastUpdateText() }}
@@ -36,8 +36,8 @@ function lastUpdateText() {
         <span class="text-muted text-sm font-normal whitespace-nowrap">{{ t.tracker_addr_label }}</span>
         <span
           :class="[
-            'text-base font-bold break-all cursor-pointer relative border-b border-dashed border-line transition-colors',
-            copied ? 'text-good' : 'text-ink hover:text-accent',
+            'tracker-addr text-base font-bold break-all cursor-pointer relative border-b border-dashed border-line transition-colors',
+            copied ? 'tracker-addr-copied text-good' : 'text-ink hover:text-accent',
           ]"
           :data-tooltip="t.copied"
           @click="copyAddr"
@@ -55,3 +55,27 @@ function lastUpdateText() {
     </div>
   </section>
 </template>
+
+<style scoped>
+.tracker-addr-copied::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1f2937;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+@media (prefers-color-scheme: dark) {
+  .tracker-addr-copied::after {
+    background: #e2e8f0;
+    color: #0f172a;
+  }
+}
+</style>
