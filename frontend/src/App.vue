@@ -45,8 +45,10 @@ onMounted(() => setLang(detectLang()));
   <div class="min-h-screen grid grid-cols-[248px_minmax(0,1fr)] max-[900px]:grid-cols-1">
     <Sidebar :page="page" :open="sidebarOpen" :error="error" @switch="switchPage" />
     <main class="min-w-0 p-7 max-[900px]:pt-[60px] max-[900px]:px-[18px] max-[900px]:pb-[18px]">
-      <DashboardView v-if="page === 'dashboard'" :stats="stats" :error="error" :last-updated="lastUpdated" />
-      <Top100Page v-else-if="page === 'top100'" />
+      <KeepAlive>
+        <DashboardView v-if="page === 'dashboard'" :stats="stats" :error="error" :last-updated="lastUpdated" />
+        <Top100Page v-else-if="page === 'top100'" />
+      </KeepAlive>
       <Disclaimer />
       <AppFooter :stats="stats" />
     </main>

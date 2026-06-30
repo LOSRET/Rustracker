@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted } from "vue";
+import { ref, watch, onMounted, onActivated, onUnmounted } from "vue";
 import * as echarts from "echarts";
 import type { TrendsResponse, RangeKey } from "../types/api";
 import { useI18n } from "../composables/useI18n";
@@ -95,6 +95,8 @@ onMounted(() => {
   mediaMql = window.matchMedia("(prefers-color-scheme: dark)");
   mediaMql.addEventListener("change", render);
 });
+
+onActivated(() => chart?.resize());
 
 onUnmounted(() => {
   window.removeEventListener("resize", onResize);
