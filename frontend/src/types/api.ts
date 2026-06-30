@@ -21,20 +21,16 @@ export interface TrendsResponse {
   history: TrendPoint[];
 }
 
-export interface ClientEntry {
-  name: string;
-  count: number;
-}
-
 export interface ClientHistoryPoint {
   timestamp: number;
-  counts: Record<string, number>;
+  tags: number[];
+  counts: number[];
 }
 
 export interface ClientsResponse {
   timestamp: number;
-  tags: string[];
-  clients: ClientEntry[];
+  tags: number[];
+  clients: string[];
   history: ClientHistoryPoint[];
 }
 

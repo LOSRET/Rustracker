@@ -51,9 +51,10 @@ function render() {
       month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false,
     }),
   );
-
   const tr = t.value;
+
   chart.setOption({
+    title: { text: "" },
     color: dark ? ["#3b82f6", "#94a3b8", "#22c55e", "#f59e0b"] : ["#2563eb", "#475569", "#15803d", "#b45309"],
     tooltip: {
       trigger: "axis",

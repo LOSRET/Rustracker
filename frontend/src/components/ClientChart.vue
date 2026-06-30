@@ -74,7 +74,7 @@ function render() {
     return;
   }
 
-  const tags = props.data?.tags ?? [];
+  const names = props.data?.clients ?? [];
   const cutoff = Math.floor(Date.now() / 1000) - RANGE_SECS[props.range];
   const history = historyAll.filter((item) => item.timestamp >= cutoff);
   const labels = history.map((item) =>
@@ -84,6 +84,7 @@ function render() {
   );
 
   chart.setOption({
+    title: { text: "" },
     tooltip: {
       trigger: "axis",
       backgroundColor: dark ? "#1e293b" : "#ffffff",
@@ -93,18 +94,18 @@ function render() {
     legend: {
       type: "scroll", top: 0, left: "center", itemWidth: 16, itemGap: 14,
       textStyle: { fontSize: 11, color: cc.legend },
-      data: tags,
+      data: names,
     },
     grid: { left: 4, right: 4, top: 52, bottom: 36, containLabel: true },
     xAxis: { type: "category", boundaryGap: false, data: labels, axisLine: { lineStyle: { color: cc.line } }, axisLabel: { color: cc.axis } },
     yAxis: { type: "value", minInterval: 1, axisLabel: { color: cc.axis }, splitLine: { lineStyle: { color: cc.line } } },
-    series: tags.map((tag) => ({
-      name: tag,
+    series: names.map((name, j) => ({
+      name,
       type: "line",
       smooth: true,
       showSymbol: false,
-      itemStyle: { color: brandColor(tag) },
-      data: history.map((item) => item.counts[tag] ?? 0),
+      itemStyle: { color: brandColor(name) },
+      data: history.map((item) => item.counts[j] ?? 0),
     })),
   });
 }
