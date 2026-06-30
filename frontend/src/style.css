@@ -3,6 +3,7 @@
 @tailwind utilities;
 
 :root {
+  color-scheme: light dark;
   --color-ink: #1f2937;
   --color-muted: #64748b;
   --color-line: #d8dee8;
@@ -50,17 +51,4 @@
     --color-bad: #ef4444;
     --color-peers: #475569;
   }
-}
-
-@keyframes rps-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.35; }
-}
-
-body {
-  margin: 0;
-  background: var(--color-soft);
-  color: var(--color-ink);
-  font-family: Inter, "Segoe UI", Arial, sans-serif;
-  letter-spacing: 0;
 }

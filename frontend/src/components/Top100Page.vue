@@ -1,15 +1,25 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onMounted } from "vue";
 import type { SortKey } from "../types/api";
 import { useTop100 } from "../composables/useTop100";
 import { useI18n } from "../composables/useI18n";
 
-const { t, number } = useI18n();
-const { data, loading, error, sort, load } = useTop100();
+const { t, number, localeFor } = useI18n();
+const { data, loading, error, sort, lastUpdated, load } = useTop100();
+
+onMounted(load);
 
 const rows = computed(() => {
   if (!data.value) return [];
   return data.value[sort.value] ?? [];
+});
+
+const statusText = computed(() => {
+  if (loading.value) return t.value.top100_loading;
+  if (error.value) return t.value.top100_error;
+  if (lastUpdated.value)
+    return `${t.value.last_update} ${new Date(lastUpdated.value).toLocaleTimeString(localeFor())}`;
+  return "";
 });
 
 const sortOptions: SortKey[] = ["peers", "seeders", "leechers", "downloaded"];
@@ -24,7 +34,7 @@ const sortLabel: Record<SortKey, string> = {
 <template>
   <section class="flex justify-between items-start gap-5 mb-6 max-[900px]:flex-col max-[900px]:items-stretch">
     <div>
-      <h1 class="m-0 mb-1.5 text-[28px] leading-tight">{{ t.top100_title }}</h1>
+      <h1 class="m-0 mb-1.5 text-[28px] leading-tight max-[560px]:text-[24px]">{{ t.top100_title }}</h1>
       <p class="m-0 text-muted text-sm leading-relaxed">{{ t.top100_subtitle }}</p>
     </div>
   </section>
@@ -49,9 +59,13 @@ const sortLabel: Record<SortKey, string> = {
         </button>
       </div>
       <div class="flex items-center gap-3 max-[900px]:justify-between">
-        <span class="text-muted text-xs whitespace-nowrap"></span>
+        <span class="text-muted text-xs whitespace-nowrap">{{ statusText }}</span>
         <button
-          class="border border-line bg-panel text-ink px-4 text-[13px] cursor-pointer min-h-8 rounded hover:bg-hover-soft"
+          :disabled="loading"
+          :class="[
+            'border border-line bg-panel text-ink px-4 text-[13px] cursor-pointer min-h-8 rounded hover:bg-hover-soft',
+            loading ? 'opacity-50 cursor-not-allowed' : '',
+          ]"
           @click="load"
         >
           {{ t.refresh }}
@@ -65,10 +79,10 @@ const sortLabel: Record<SortKey, string> = {
           <tr>
             <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap w-12 text-center">#</th>
             <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap">{{ t.col_hash }}</th>
-            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap text-right">Peers</th>
-            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap text-right">Seeders</th>
-            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap text-right">Leechers</th>
-            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap text-right">Downloaded</th>
+            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap text-right">{{ t.sort_peers }}</th>
+            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap text-right">{{ t.sort_seeders }}</th>
+            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap text-right">{{ t.sort_leechers }}</th>
+            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap text-right">{{ t.sort_downloaded }}</th>
           </tr>
         </thead>
         <tbody>

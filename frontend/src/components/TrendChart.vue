@@ -6,12 +6,15 @@ import { useI18n } from "../composables/useI18n";
 
 const props = defineProps<{
   data: TrendsResponse | null;
+  range: RangeKey;
 }>();
+const emit = defineEmits<{ "update:range": [range: RangeKey] }>();
 
-const { t, localeFor } = useI18n();
-const range = ref<RangeKey>("24h");
+const { t, localeFor, lang } = useI18n();
 const chartEl = ref<HTMLElement | null>(null);
 let chart: echarts.ECharts | null = null;
+let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+let mediaMql: MediaQueryList | null = null;
 
 const RANGE_SECS: Record<RangeKey, number> = {
   "24h": 86400,
@@ -26,7 +29,7 @@ function isDark() {
 function filterHistory() {
   const history = props.data?.history ?? [];
   if (!history.length) return history;
-  const cutoff = Math.floor(Date.now() / 1000) - RANGE_SECS[range.value];
+  const cutoff = Math.floor(Date.now() / 1000) - RANGE_SECS[props.range];
   return history.filter((item) => item.timestamp >= cutoff);
 }
 
@@ -49,6 +52,7 @@ function render() {
     }),
   );
 
+  const tr = t.value;
   chart.setOption({
     color: dark ? ["#3b82f6", "#94a3b8", "#22c55e", "#f59e0b"] : ["#2563eb", "#475569", "#15803d", "#b45309"],
     tooltip: {
@@ -60,36 +64,45 @@ function render() {
     legend: {
       type: "scroll", top: 0, left: "center", itemWidth: 16, itemGap: 14,
       textStyle: { fontSize: 11, color: cc.legend },
-      data: ["Torrents", "Peers", "Seeders", "Leechers"],
+      data: [tr.torrents, tr.sort_peers, tr.sort_seeders, tr.sort_leechers],
     },
     grid: { left: 4, right: 4, top: 52, bottom: 36, containLabel: true },
     xAxis: { type: "category", boundaryGap: false, data: labels, axisLine: { lineStyle: { color: cc.line } }, axisLabel: { color: cc.axis } },
     yAxis: { type: "value", minInterval: 1, axisLabel: { color: cc.axis }, splitLine: { lineStyle: { color: cc.line } } },
     series: [
-      { name: "Torrents", type: "line", smooth: true, showSymbol: false, data: history.map((i) => i.torrents) },
-      { name: "Peers", type: "line", smooth: true, showSymbol: false, data: history.map((i) => i.peers) },
-      { name: "Seeders", type: "line", smooth: true, showSymbol: false, data: history.map((i) => i.seeders) },
-      { name: "Leechers", type: "line", smooth: true, showSymbol: false, data: history.map((i) => i.leechers) },
+      { name: tr.torrents, type: "line", smooth: true, showSymbol: false, data: history.map((i) => i.torrents) },
+      { name: tr.sort_peers, type: "line", smooth: true, showSymbol: false, data: history.map((i) => i.peers) },
+      { name: tr.sort_seeders, type: "line", smooth: true, showSymbol: false, data: history.map((i) => i.seeders) },
+      { name: tr.sort_leechers, type: "line", smooth: true, showSymbol: false, data: history.map((i) => i.leechers) },
     ],
   });
 }
 
 function onResize() {
-  chart?.resize();
+  if (resizeTimer) clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => chart?.resize(), 150);
+}
+
+function setRange(r: RangeKey) {
+  emit("update:range", r);
 }
 
 onMounted(() => {
   if (chartEl.value) chart = echarts.init(chartEl.value);
   render();
   window.addEventListener("resize", onResize);
+  mediaMql = window.matchMedia("(prefers-color-scheme: dark)");
+  mediaMql.addEventListener("change", render);
 });
 
 onUnmounted(() => {
   window.removeEventListener("resize", onResize);
+  mediaMql?.removeEventListener("change", render);
+  if (resizeTimer) clearTimeout(resizeTimer);
   chart?.dispose();
 });
 
-watch(() => [props.data, range.value], render, { deep: true });
+watch(() => [props.data, props.range, lang.value], render, { deep: true });
 </script>
 
 <template>
@@ -111,7 +124,7 @@ watch(() => [props.data, range.value], render, { deep: true });
               ? 'bg-accent border-accent text-white'
               : 'bg-panel border-line hover:bg-hover-soft',
           ]"
-          @click="range = r"
+          @click="setRange(r)"
         >
           {{ t[`range_${r}` as keyof typeof t] }}
         </button>

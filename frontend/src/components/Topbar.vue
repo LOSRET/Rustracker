@@ -6,6 +6,7 @@ import { useI18n } from "../composables/useI18n";
 const props = defineProps<{
   stats: StatsResponse | null;
   error: string | null;
+  lastUpdated: number | null;
 }>();
 
 const { t, number, localeFor } = useI18n();
@@ -20,7 +21,9 @@ function copyAddr() {
 }
 
 function lastUpdateText() {
-  return `${t.value.last_update} ${new Date().toLocaleTimeString(localeFor())}`;
+  const ts = props.lastUpdated;
+  if (ts == null) return t.value.loading;
+  return `${t.value.last_update} ${new Date(ts).toLocaleTimeString(localeFor())}`;
 }
 </script>
 

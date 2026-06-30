@@ -1,7 +1,7 @@
 import { ref, type Ref } from "vue";
 import type { TrendsResponse, ClientsResponse } from "../types/api";
 
-export function useTrends(intervalMs = 30000): {
+export function useTrends(intervalMs = 600000): {
   trends: Ref<TrendsResponse | null>;
   clients: Ref<ClientsResponse | null>;
   refresh: () => Promise<void>;

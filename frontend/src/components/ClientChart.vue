@@ -1,16 +1,19 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted } from "vue";
 import * as echarts from "echarts";
-import type { ClientsResponse } from "../types/api";
+import type { ClientsResponse, RangeKey } from "../types/api";
 import { useI18n } from "../composables/useI18n";
 
 const props = defineProps<{
   data: ClientsResponse | null;
+  range: RangeKey;
 }>();
 
-const { t, localeFor } = useI18n();
+const { t, localeFor, lang } = useI18n();
 const chartEl = ref<HTMLElement | null>(null);
 let chart: echarts.ECharts | null = null;
+let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+let mediaMql: MediaQueryList | null = null;
 
 const CLIENT_BRAND: Record<string, string> = {
   Xunlei: "#1976D2", "迅雷": "#1976D2",
@@ -28,13 +31,30 @@ const CLIENT_BRAND: Record<string, string> = {
   Tixati: "#E65100",
   WebTorrent: "#00ACC1",
   FrostWire: "#0097A7",
+  ktorrent: "#1E88E5",
+  LibreTorrent: "#43A047",
+  Flud: "#26A69A",
+  Motrix: "#6D28D9",
+  Picotorrent: "#66BB6A",
+};
+const UNKNOWN_GRAY = "#9E9E9E";
+
+const RANGE_SECS: Record<RangeKey, number> = {
+  "24h": 86400,
+  "3d": 259200,
+  "7d": 604800,
 };
 
 function brandColor(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed || /^unknown$/i.test(trimmed)) return UNKNOWN_GRAY;
+  const lower = trimmed.toLowerCase();
   for (const [key, color] of Object.entries(CLIENT_BRAND)) {
-    if (name.includes(key)) return color;
+    if (lower.includes(key.toLowerCase())) return color;
   }
-  return "#9E9E9E";
+  let h = 0;
+  for (let i = 0; i < trimmed.length; i++) h = ((h << 5) - h + trimmed.charCodeAt(i)) | 0;
+  return `hsl(${Math.abs(h) % 360}, 65%, 50%)`;
 }
 
 function isDark() {
@@ -43,18 +63,20 @@ function isDark() {
 
 function render() {
   if (!chart) return;
-  const history = props.data?.history ?? [];
+  const historyAll = props.data?.history ?? [];
   const dark = isDark();
   const cc = dark
     ? { axis: "#94a3b8", line: "#334155", legend: "#cbd5e1" }
     : { axis: "#64748b", line: "#e6ebf2", legend: "#1f2937" };
 
-  if (!history.length) {
+  if (!historyAll.length) {
     chart.setOption({ title: { text: t.value.top100_empty, left: "center", top: "center", textStyle: { color: "#94a3b8", fontSize: 14 } }, series: [] });
     return;
   }
 
   const tags = props.data?.tags ?? [];
+  const cutoff = Math.floor(Date.now() / 1000) - RANGE_SECS[props.range];
+  const history = historyAll.filter((item) => item.timestamp >= cutoff);
   const labels = history.map((item) =>
     new Date(item.timestamp * 1000).toLocaleString(localeFor(), {
       month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false,
@@ -88,21 +110,26 @@ function render() {
 }
 
 function onResize() {
-  chart?.resize();
+  if (resizeTimer) clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => chart?.resize(), 150);
 }
 
 onMounted(() => {
   if (chartEl.value) chart = echarts.init(chartEl.value);
   render();
   window.addEventListener("resize", onResize);
+  mediaMql = window.matchMedia("(prefers-color-scheme: dark)");
+  mediaMql.addEventListener("change", render);
 });
 
 onUnmounted(() => {
   window.removeEventListener("resize", onResize);
+  mediaMql?.removeEventListener("change", render);
+  if (resizeTimer) clearTimeout(resizeTimer);
   chart?.dispose();
 });
 
-watch(() => props.data, render, { deep: true });
+watch(() => [props.data, props.range, lang.value], render, { deep: true });
 </script>
 
 <template>

@@ -3,6 +3,7 @@ import { ref, onMounted } from "vue";
 import type { PageKey } from "./types/api";
 import { useI18n } from "./composables/useI18n";
 import { useStats } from "./composables/useStats";
+import { detectLang } from "./i18n";
 import Sidebar from "./components/Sidebar.vue";
 import AppFooter from "./components/AppFooter.vue";
 import Disclaimer from "./components/Disclaimer.vue";
@@ -10,7 +11,7 @@ import DashboardView from "./views/DashboardView.vue";
 import Top100Page from "./components/Top100Page.vue";
 
 const { setLang } = useI18n();
-const { stats, error } = useStats();
+const { stats, error, lastUpdated } = useStats();
 const page = ref<PageKey>("dashboard");
 const sidebarOpen = ref(false);
 
@@ -19,7 +20,7 @@ function switchPage(p: PageKey) {
   sidebarOpen.value = false;
 }
 
-onMounted(() => setLang("zh"));
+onMounted(() => setLang(detectLang()));
 </script>
 
 <template>
@@ -41,10 +42,10 @@ onMounted(() => setLang("zh"));
     @click="sidebarOpen = false"
   />
 
-  <div class="min-h-screen grid max-[900px]:grid-cols-1" style="grid-template-columns: 248px minmax(0, 1fr)">
-    <Sidebar :page="page" :open="sidebarOpen" @switch="switchPage" />
+  <div class="min-h-screen grid grid-cols-[248px_minmax(0,1fr)] max-[900px]:grid-cols-1">
+    <Sidebar :page="page" :open="sidebarOpen" :error="error" @switch="switchPage" />
     <main class="min-w-0 p-7 max-[900px]:pt-[60px] max-[900px]:px-[18px] max-[900px]:pb-[18px]">
-      <DashboardView v-if="page === 'dashboard'" :stats="stats" :error="error" />
+      <DashboardView v-if="page === 'dashboard'" :stats="stats" :error="error" :last-updated="lastUpdated" />
       <Top100Page v-else-if="page === 'top100'" />
       <Disclaimer />
       <AppFooter :stats="stats" />

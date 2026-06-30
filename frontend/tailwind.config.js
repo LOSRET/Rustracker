@@ -35,6 +35,12 @@ export default {
       animation: {
         "rps-pulse": "rps-pulse 2s ease-in-out infinite",
       },
+      keyframes: {
+        "rps-pulse": {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.35" },
+        },
+      },
     },
   },
   plugins: [],

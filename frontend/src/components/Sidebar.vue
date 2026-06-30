@@ -2,7 +2,7 @@
 import type { PageKey, LangKey } from "../types/api";
 import { useI18n } from "../composables/useI18n";
 
-defineProps<{ page: PageKey; open: boolean }>();
+const props = defineProps<{ page: PageKey; open: boolean; error?: string | null }>();
 const emit = defineEmits<{ switch: [page: PageKey] }>();
 
 const { lang, t, setLang } = useI18n();
@@ -10,13 +10,18 @@ const { lang, t, setLang } = useI18n();
 function onLangChange(e: Event) {
   setLang((e.target as HTMLSelectElement).value as LangKey);
 }
+
+function scrollToDisclaimer() {
+  document.getElementById("disclaimer")?.scrollIntoView({ behavior: "smooth" });
+  emit("switch", props.page);
+}
 </script>
 
 <template>
   <aside
     :class="[
-      'bg-side text-[#f8fafc] sticky top-0 h-screen overflow-y-auto p-6 max-[900px]:fixed max-[900px]:top-0 max-[900px]:left-[-280px] max-[900px]:w-[260px] max-[900px]:h-screen max-[900px]:p-5 max-[900px]:z-[1000] max-[900px]:transition-[left] max-[900px]:duration-200',
-      open ? 'max-[900px]:left-0' : '',
+      'bg-side text-[#f8fafc] sticky top-0 h-screen overflow-y-auto p-6 max-[900px]:fixed max-[900px]:top-0 max-[900px]:w-[260px] max-[900px]:h-screen max-[900px]:p-5 max-[900px]:z-[1000] max-[900px]:transition-[left] max-[900px]:duration-200',
+      open ? 'max-[900px]:left-0' : 'max-[900px]:left-[-280px]',
     ]"
   >
     <div class="flex items-center gap-2.5 text-xl font-bold mb-7">
@@ -54,7 +59,7 @@ function onLangChange(e: Event) {
         @click="emit('switch', 'dashboard')"
       >
         <span>{{ t.overview }}</span>
-        <span>{{ page === 'dashboard' ? t.running : '' }}</span>
+        <span>{{ page === 'dashboard' ? (error ? t.error : t.running) : '' }}</span>
       </button>
       <button
         :class="[
@@ -68,6 +73,14 @@ function onLangChange(e: Event) {
         <span>🏆 {{ t.top100_link }}</span>
         <span>→</span>
       </button>
+      <a
+        class="flex items-center justify-between px-3 py-2.5 text-white text-sm border-l-4 border-transparent hover:bg-side-hover mt-2.5 no-underline cursor-pointer max-[900px]:cursor-pointer"
+        href="#disclaimer"
+        @click.prevent="scrollToDisclaimer"
+      >
+        <span>{{ t.disc_link }}</span>
+        <span>{{ t.view }}</span>
+      </a>
     </nav>
 
     <p class="mt-6 text-[#cbd5e1] text-[13px] leading-relaxed">{{ t.side_note }}</p>
