@@ -21,9 +21,7 @@ const { number } = useI18n();
       class="grid gap-3 mb-5"
       style="grid-template-columns: repeat(5, minmax(140px, 1fr))"
     >
-      <div class="max-[900px]:col-span-1" style="grid-column: span 1">
-        <MetricCard variant="peers" label="Peers" :value="number(stats?.peers ?? 0)" />
-      </div>
+      <MetricCard variant="peers" label="Peers" :value="number(stats?.peers ?? 0)" />
       <MetricCard variant="seeders" label="Seeders" :value="number(stats?.seeders ?? 0)" />
       <MetricCard variant="leechers" label="Leechers" :value="number(stats?.leechers ?? 0)" />
       <MetricCard variant="torrents" label="Torrents" :value="number(stats?.torrents ?? 0)" />

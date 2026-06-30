@@ -107,7 +107,7 @@ watch(() => props.data, render, { deep: true });
 
 <template>
   <section class="bg-panel border border-line p-4 mb-5">
-    <div class="flex items-baseline justify-between gap-4 mb-3">
+    <div class="flex items-baseline justify-between gap-4 mb-3 max-[900px]:flex-col max-[900px]:items-stretch">
       <div>
         <h2 class="m-0 text-base leading-relaxed">{{ t.client_chart_title }}</h2>
         <span class="text-muted text-xs">{{ t.client_chart_note }}</span>
