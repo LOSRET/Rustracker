@@ -6,7 +6,7 @@ const contact = __CONTACT__;
 
 <template>
   <section id="disclaimer" class="bg-panel border border-line p-[18px] mb-1">
-    <h2 class="m-0 mb-3 text-base leading-relaxed">{{ t.disc_title }}</h2>
+    <h2 class="m-0 mb-3 text-base leading-relaxed font-bold">{{ t.disc_title }}</h2>
     <p class="m-0 mb-2.5 text-muted leading-[1.7]">{{ t.disc_p1 }}</p>
     <p class="m-0 mb-2.5 text-muted leading-[1.7]">{{ t.disc_p2 }}</p>
     <p class="m-0 mb-2.5 text-muted leading-[1.7]">{{ t.disc_p3 }}</p>
