@@ -13,6 +13,14 @@ export default defineConfig({
   build: {
     outDir: "../dist",
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules/vue")) return "vue";
+          if (id.includes("node_modules/echarts")) return "echarts";
+        },
+      },
+    },
   },
   server: {
     proxy: {
