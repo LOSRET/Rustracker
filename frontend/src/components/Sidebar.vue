@@ -59,7 +59,7 @@ function scrollToDisclaimer() {
         @click="emit('switch', 'dashboard')"
       >
         <span>{{ t.overview }}</span>
-        <span>{{ page === 'dashboard' ? (error ? t.error : t.running) : '' }}</span>
+        <span>{{ error ? t.error : t.running }}</span>
       </button>
       <button
         :class="[
@@ -71,6 +71,18 @@ function scrollToDisclaimer() {
         @click="emit('switch', 'top100')"
       >
         <span>🏆 {{ t.top100_link }}</span>
+        <span>→</span>
+      </button>
+      <button
+        :class="[
+          'flex items-center justify-between px-3 py-2.5 text-white text-sm border-l-4 max-[900px]:cursor-pointer',
+          page === 'clients'
+            ? 'bg-side-active border-accent'
+            : 'border-transparent hover:bg-side-hover',
+        ]"
+        @click="emit('switch', 'clients')"
+      >
+        <span>📊 {{ t.clients_link }}</span>
         <span>→</span>
       </button>
       <a

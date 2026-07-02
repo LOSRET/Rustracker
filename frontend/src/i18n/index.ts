@@ -32,6 +32,11 @@ export interface Translation {
   top100_loading: string;
   top100_empty: string;
   top100_error: string;
+  clients_link: string;
+  clients_title: string;
+  clients_subtitle: string;
+  clients_col_name: string;
+  clients_col_share: string;
   refresh: string;
   tracker_addr_label: string;
   config_fmt: () => string;
@@ -67,6 +72,9 @@ const zh: Translation = {
   top100_subtitle: "按 Peers / Seeders / Leechers 数量排序",
   sort_peers: "Peers", sort_seeders: "Seeders", sort_leechers: "Leechers", sort_downloaded: "Downloaded",
   col_hash: "Info Hash", top100_loading: "加载中...", top100_empty: "暂无数据", top100_error: "读取失败",
+  clients_link: "客户端排行", clients_title: "📊 客户端排行",
+  clients_subtitle: "按 Peer 数量排序的全部客户端",
+  clients_col_name: "客户端", clients_col_share: "占比",
   refresh: "刷新",
   tracker_addr_label: "Tracker 地址：",
   config_fmt: () => `${window.location.origin}/announce`,
@@ -98,6 +106,9 @@ const en: Translation = {
   top100_subtitle: "Sorted by Peers / Seeders / Leechers count",
   sort_peers: "Peers", sort_seeders: "Seeders", sort_leechers: "Leechers", sort_downloaded: "Downloaded",
   col_hash: "Info Hash", top100_loading: "Loading...", top100_empty: "No data", top100_error: "Read failed",
+  clients_link: "Client Ranking", clients_title: "📊 Client Ranking",
+  clients_subtitle: "All clients sorted by peer count",
+  clients_col_name: "Client", clients_col_share: "Share",
   refresh: "Refresh",
   tracker_addr_label: "Tracker URL: ",
   config_fmt: () => `${window.location.origin}/announce`,
@@ -129,6 +140,9 @@ const ja: Translation = {
   top100_subtitle: "Peers / Seeders / Leechers数でソート",
   sort_peers: "Peers", sort_seeders: "Seeders", sort_leechers: "Leechers", sort_downloaded: "Downloaded",
   col_hash: "Info Hash", top100_loading: "読み込み中...", top100_empty: "データなし", top100_error: "読み込み失敗",
+  clients_link: "クライアントランキング", clients_title: "📊 クライアントランキング",
+  clients_subtitle: "ピア数でソートされた全クライアント",
+  clients_col_name: "クライアント", clients_col_share: "シェア",
   refresh: "更新",
   tracker_addr_label: "Trackerアドレス：",
   config_fmt: () => `${window.location.origin}/announce`,
@@ -160,6 +174,9 @@ const ru: Translation = {
   top100_subtitle: "Сортировка по Peers / Seeders / Leechers",
   sort_peers: "Peers", sort_seeders: "Seeders", sort_leechers: "Leechers", sort_downloaded: "Downloaded",
   col_hash: "Info Hash", top100_loading: "Загрузка...", top100_empty: "Нет данных", top100_error: "Ошибка чтения",
+  clients_link: "Рейтинг клиентов", clients_title: "📊 Рейтинг клиентов",
+  clients_subtitle: "Все клиенты, отсортированные по количеству пиров",
+  clients_col_name: "Клиент", clients_col_share: "Доля",
   refresh: "Обновить",
   tracker_addr_label: "Адрес трекера: ",
   config_fmt: () => `${window.location.origin}/announce`,
@@ -191,6 +208,9 @@ const de: Translation = {
   top100_subtitle: "Sortiert nach Peers / Seeders / Leechers",
   sort_peers: "Peers", sort_seeders: "Seeders", sort_leechers: "Leechers", sort_downloaded: "Downloaded",
   col_hash: "Info Hash", top100_loading: "Wird geladen...", top100_empty: "Keine Daten", top100_error: "Lesefehler",
+  clients_link: "Client-Rangliste", clients_title: "📊 Client-Rangliste",
+  clients_subtitle: "Alle Clients sortiert nach Peer-Anzahl",
+  clients_col_name: "Client", clients_col_share: "Anteil",
   refresh: "Aktualisieren",
   tracker_addr_label: "Tracker-Adresse: ",
   config_fmt: () => `${window.location.origin}/announce`,
@@ -222,6 +242,9 @@ const uk: Translation = {
   top100_subtitle: "Сортування за Peers / Seeders / Leechers",
   sort_peers: "Peers", sort_seeders: "Seeders", sort_leechers: "Leechers", sort_downloaded: "Downloaded",
   col_hash: "Info Hash", top100_loading: "Завантаження...", top100_empty: "Немає даних", top100_error: "Помилка читання",
+  clients_link: "Рейтинг клієнтів", clients_title: "📊 Рейтинг клієнтів",
+  clients_subtitle: "Усі клієнти, відсортовані за кількістю пірів",
+  clients_col_name: "Клієнт", clients_col_share: "Частка",
   refresh: "Оновити",
   tracker_addr_label: "Адреса трекера: ",
   config_fmt: () => `${window.location.origin}/announce`,

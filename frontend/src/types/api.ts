@@ -52,4 +52,13 @@ export interface Top100Response {
 export type SortKey = "peers" | "seeders" | "leechers" | "downloaded";
 export type RangeKey = "24h" | "3d" | "7d";
 export type LangKey = "zh" | "en" | "ja" | "ru" | "de" | "uk";
-export type PageKey = "dashboard" | "top100";
+export type PageKey = "dashboard" | "top100" | "clients";
+
+export interface ClientListEntry {
+  name: string;
+  peers: number;
+}
+
+export interface ClientListResponse {
+  clients: ClientListEntry[];
+}

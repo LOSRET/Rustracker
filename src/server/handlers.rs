@@ -172,6 +172,34 @@ fn top100_map(entries: Vec<(InfoHash, usize, usize, u64)>) -> Vec<Top100Entry> {
         .collect()
 }
 
+// ── clients list ─────────────────────────────────────────────────────────────
+
+#[derive(Debug, Serialize)]
+pub(crate) struct ClientListEntry {
+    pub name: String,
+    pub peers: u64,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct ClientListResponse {
+    pub clients: Vec<ClientListEntry>,
+}
+
+pub(crate) async fn clients_list(State(state): State<AppState>) -> Json<ClientListResponse> {
+    let snapshot = state.tracker.snapshot().await;
+    let mut clients: Vec<ClientListEntry> = snapshot
+        .clients
+        .iter()
+        .filter(|(_, c)| *c > 0)
+        .map(|(tag, c)| ClientListEntry {
+            name: client_id::client_name(*tag).to_string(),
+            peers: *c,
+        })
+        .collect();
+    clients.sort_by(|a, b| b.peers.cmp(&a.peers));
+    Json(ClientListResponse { clients })
+}
+
 // ── BitTorrent announce / scrape ─────────────────────────────────────────────
 
 pub(crate) async fn announce(

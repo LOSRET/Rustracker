@@ -222,6 +222,7 @@ pub fn router(state: AppState) -> Router {
         .route("/api/stats", get(handlers::stats))
         .route("/api/trends", get(handlers::trends))
         .route("/api/clients", get(handlers::clients))
+        .route("/api/clients/list", get(handlers::clients_list))
         .route("/api/top100", get(handlers::top100))
         .route(
             "/api/blacklist",

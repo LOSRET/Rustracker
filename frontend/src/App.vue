@@ -9,6 +9,7 @@ import AppFooter from "./components/AppFooter.vue";
 import Disclaimer from "./components/Disclaimer.vue";
 import DashboardView from "./views/DashboardView.vue";
 import Top100Page from "./components/Top100Page.vue";
+import ClientsPage from "./components/ClientsPage.vue";
 
 const { setLang } = useI18n();
 const { stats, error, lastUpdated } = useStats();
@@ -48,6 +49,7 @@ onMounted(() => setLang(detectLang()));
       <KeepAlive>
         <DashboardView v-if="page === 'dashboard'" :stats="stats" :error="error" :last-updated="lastUpdated" />
         <Top100Page v-else-if="page === 'top100'" />
+        <ClientsPage v-else-if="page === 'clients'" />
       </KeepAlive>
       <Disclaimer />
       <AppFooter :stats="stats" />
