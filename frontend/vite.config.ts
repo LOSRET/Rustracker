@@ -14,7 +14,7 @@ export default defineConfig({
     vue(),
     analytics && {
       name: "inject-analytics",
-      transformIndexHtml(html) {
+      transformIndexHtml(html: string) {
         const tag = `<script defer src="${analytics.src}" data-website-id="${analytics.id}"></script>`;
         return html.replace("</head>", `  ${tag}\n</head>`);
       },
