@@ -146,7 +146,7 @@ jobs:
         run: |
           version="${{ needs.check-version.outputs.version }}"
           old_version="${{ needs.check-version.outputs.old_version }}"
-          if [ -n "$old_version" ]; then
+          if [ -n "$old_version" ] && git rev-parse "v${old_version}" >/dev/null 2>&1; then
             prev_tag="v${old_version}"
           else
             prev_tag=$(git tag --sort=-v:refname | head -1 || true)
