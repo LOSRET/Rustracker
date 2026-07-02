@@ -190,6 +190,23 @@ GET /api/clients
 }
 ```
 
+### 客户端列表
+
+```
+GET /api/clients/list
+```
+
+返回 JSON，包含当前所有已连接的客户端类型，按 peer 数降序排列（过滤掉计数为 0 的客户端）。此接口为面板的「客户端页面」提供数据，与提供时序历史的 `/api/clients` 互补。
+
+```json
+{
+  "clients": [
+    {"name": "qBittorrent", "peers": 50},
+    {"name": "Transmission", "peers": 30}
+  ]
+}
+```
+
 ### Top 100 种子
 
 ```
@@ -218,6 +235,7 @@ Tracker 在同一端口的 `/` 路径提供功能完整的监控面板：
 - **概览页面** — Peers、Seeders、Leechers、Torrents 和 Completed 实时计数
 - **趋势图表** — 交互式 ECharts 图表，支持 24小时 / 3天 / 7天 时间范围切换
 - **客户端图表** — Top 15 BitTorrent 客户端的 peer 数量趋势
+- **客户端页面** — 所有已连接客户端类型及其当前 peer 数量的可排序表格（由 `/api/clients/list` 提供数据）
 - **Top 100 页面** — 最活跃种子的可排序表格
 - **免责声明** — 面向公众部署时的内置法律声明
 - **国际化** — 自动检测 6 种语言（中文 / English / 日本語 / Русский / Deutsch / Українська），支持手动切换
@@ -353,8 +371,8 @@ rustracker/
 │       ├── App.vue                 # 根组件（Sidebar + Topbar + 路由视图）
 │       ├── style.css               # Tailwind 入口与全局样式
 │       ├── views/                  # DashboardView.vue（概览 + 图表）
-│       ├── components/             # MetricCard、TrendChart、ClientChart、Top100Page、Disclaimer、Sidebar、Topbar、AppFooter
-│       ├── composables/            # useStats、useTrends、useTop100、useI18n（响应式 API 钩子）
+│       ├── components/             # MetricCard、TrendChart、ClientChart、ClientsPage、Top100Page、Disclaimer、Sidebar、Topbar、AppFooter
+│       ├── composables/            # useStats、useTrends、useTop100、useClientsList、useI18n（响应式 API 钩子）
 │       ├── i18n/                   # 中文 / English / 日本語 / Русский / Deutsch / Українська 翻译
 │       └── types/                  # TypeScript API 类型定义
 │
@@ -528,6 +546,20 @@ cargo run --release --example memory_staircase_test
 # CI 内存回归对比
 cargo run --release --example memory_ci_compare
 ```
+
+### 收缩/再增长基准
+
+```bash
+cargo run --release --example shrink_bench
+```
+
+在重复的 grow→shrink→regrow 周期后测量 RSS 开销，验证 swarm 的 `shrink_if_idle` 策略是否将内存归还给操作系统。向 stdout 输出 CSV（`cycle,torrents,rss_build_mb,peers_after_expire,rss_shrink_mb,rss_regrow_mb,overhead_mb`），向 stderr 输出进度日志。通过环境变量配置：
+
+| 环境变量 | 默认值 | 说明 |
+|---------|--------|------|
+| `SHRINK_TORRENTS` | `30000` | 种子数量 |
+| `SHRINK_BULK` | `300` | 每种子批量 peer 数（每周期过期） |
+| `SHRINK_CYCLES` | `10` | grow→shrink→regrow 周期数 |
 
 ## 开发指南
 

@@ -190,6 +190,23 @@ Returns JSON with the top 15 client types and their historical peer counts:
 }
 ```
 
+### Client List
+
+```
+GET /api/clients/list
+```
+
+Returns JSON with all client types currently connected, sorted by peer count descending (zero-count clients excluded). This backs the dashboard's Clients page and complements `/api/clients`, which provides time-series history.
+
+```json
+{
+  "clients": [
+    {"name": "qBittorrent", "peers": 50},
+    {"name": "Transmission", "peers": 30}
+  ]
+}
+```
+
 ### Top 100 Torrents
 
 ```
@@ -218,6 +235,7 @@ The tracker serves a full-featured dashboard at `/` on the same port:
 - **Overview page** — live counts of Peers, Seeders, Leechers, Torrents, and Completed downloads
 - **Trend chart** — interactive ECharts graph with 24h / 3d / 7d range selector
 - **Client chart** — top 15 BitTorrent clients by peer count over time
+- **Clients page** — sortable table of all connected client types and their current peer counts (powered by `/api/clients/list`)
 - **Top 100 page** — sortable table of the most active torrents
 - **Disclaimer** — built-in legal disclaimer for public-facing deployments
 - **i18n** — automatic detection across 6 languages (中文 / English / 日本語 / Русский / Deutsch / Українська) with manual toggle
@@ -353,8 +371,8 @@ rustracker/
 │       ├── App.vue                 # Root component (Sidebar + Topbar + routed view)
 │       ├── style.css               # Tailwind entry + global styles
 │       ├── views/                  # DashboardView.vue (overview + charts)
-│       ├── components/             # MetricCard, TrendChart, ClientChart, Top100Page, Disclaimer, Sidebar, Topbar, AppFooter
-│       ├── composables/            # useStats, useTrends, useTop100, useI18n (reactive API hooks)
+│       ├── components/             # MetricCard, TrendChart, ClientChart, ClientsPage, Top100Page, Disclaimer, Sidebar, Topbar, AppFooter
+│       ├── composables/            # useStats, useTrends, useTop100, useClientsList, useI18n (reactive API hooks)
 │       ├── i18n/                   # Translations for 中文 / English / 日本語 / Русский / Deutsch / Українська
 │       └── types/                  # TypeScript API types
 │
@@ -528,6 +546,20 @@ cargo run --release --example memory_staircase_test
 # CI memory regression comparison
 cargo run --release --example memory_ci_compare
 ```
+
+### Shrink/Regrow Benchmark
+
+```bash
+cargo run --release --example shrink_bench
+```
+
+Measures RSS overhead after repeated grow→shrink→regrow cycles to verify that the swarm `shrink_if_idle` strategy returns memory to the OS. Emits a CSV (`cycle,torrents,rss_build_mb,peers_after_expire,rss_shrink_mb,rss_regrow_mb,overhead_mb`) to stdout and a progress log to stderr. Config via env vars:
+
+| Env | Default | Description |
+|-----|---------|-------------|
+| `SHRINK_TORRENTS` | `30000` | Number of torrents |
+| `SHRINK_BULK` | `300` | Bulk peers per torrent (expired each cycle) |
+| `SHRINK_CYCLES` | `10` | Number of grow→shrink→regrow cycles |
 
 ## Development
 
