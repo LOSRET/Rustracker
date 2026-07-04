@@ -5,6 +5,7 @@ export function useTrends(intervalMs = 600000): {
   trends: Ref<TrendsResponse | null>;
   clients: Ref<ClientsResponse | null>;
   refresh: () => Promise<void>;
+  start: () => void;
   stop: () => void;
 } {
   const trends = ref<TrendsResponse | null>(null);
@@ -25,14 +26,18 @@ export function useTrends(intervalMs = 600000): {
   }
 
   function start() {
+    if (timer) clearInterval(timer);
     void refresh();
     timer = setInterval(refresh, intervalMs);
   }
 
   function stop() {
-    if (timer) clearInterval(timer);
+    if (timer) {
+      clearInterval(timer);
+      timer = null;
+    }
   }
 
   start();
-  return { trends, clients, refresh, stop };
+  return { trends, clients, refresh, start, stop };
 }

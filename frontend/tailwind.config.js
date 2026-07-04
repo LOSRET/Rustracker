@@ -1,7 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ["./index.html", "./src/**/*.{vue,ts}"],
-  darkMode: "media",
   theme: {
     extend: {
       colors: {
@@ -28,7 +27,7 @@ export default {
         peers: "var(--color-peers)",
       },
       fontFamily: {
-        sans: ['Inter', '"Segoe UI"', 'Arial', 'sans-serif'],
+        sans: ['"Segoe UI"', 'Arial', 'sans-serif'],
         display: ['Sora', 'sans-serif'],
         mono: ['"SFMono-Regular"', 'Consolas', 'monospace'],
       },

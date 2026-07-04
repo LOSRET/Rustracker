@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, onActivated, onDeactivated } from "vue";
 import type { StatsResponse, RangeKey } from "../types/api";
 import { useTrends } from "../composables/useTrends";
 import { useI18n } from "../composables/useI18n";
@@ -10,9 +10,12 @@ import ClientChart from "../components/ClientChart.vue";
 
 defineProps<{ stats: StatsResponse | null; error: string | null; lastUpdated: number | null }>();
 
-const { trends, clients } = useTrends();
+const { trends, clients, start, stop } = useTrends();
 const { t, number } = useI18n();
 const range = ref<RangeKey>("24h");
+
+onActivated(start);
+onDeactivated(stop);
 </script>
 
 <template>

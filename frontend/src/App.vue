@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onUnmounted } from "vue";
 import type { PageKey } from "./types/api";
 import { useI18n } from "./composables/useI18n";
 import { useStats } from "./composables/useStats";
@@ -12,7 +12,7 @@ import Top100Page from "./components/Top100Page.vue";
 import ClientsPage from "./components/ClientsPage.vue";
 
 const { setLang } = useI18n();
-const { stats, error, lastUpdated } = useStats();
+const { stats, error, lastUpdated, stop } = useStats();
 const page = ref<PageKey>("dashboard");
 const sidebarOpen = ref(false);
 
@@ -22,6 +22,7 @@ function switchPage(p: PageKey) {
 }
 
 onMounted(() => setLang(detectLang()));
+onUnmounted(stop);
 </script>
 
 <template>
