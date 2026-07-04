@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref } from "vue";
 import type { StatsResponse } from "../types/api";
+import { useClipboard } from "@vueuse/core";
 import { useI18n } from "../composables/useI18n";
 
 const props = defineProps<{
@@ -10,14 +10,10 @@ const props = defineProps<{
 }>();
 
 const { t, number, localeFor } = useI18n();
-const copied = ref(false);
+const { copied, copy } = useClipboard({ copiedDuring: 1500 });
 
 function copyAddr() {
-  const text = t.value.config_fmt();
-  navigator.clipboard.writeText(text).then(() => {
-    copied.value = true;
-    setTimeout(() => (copied.value = false), 1500);
-  });
+  copy(t.value.config_fmt());
 }
 
 function lastUpdateText() {

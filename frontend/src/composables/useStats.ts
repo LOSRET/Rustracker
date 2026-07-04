@@ -1,4 +1,5 @@
 import { ref, type Ref } from "vue";
+import { useIntervalFn } from "@vueuse/core";
 import type { StatsResponse } from "../types/api";
 
 export function useStats(intervalMs = 5000): {
@@ -13,7 +14,6 @@ export function useStats(intervalMs = 5000): {
   const error = ref<string | null>(null);
   const loading = ref(true);
   const lastUpdated = ref<number | null>(null);
-  let timer: ReturnType<typeof setInterval> | null = null;
 
   async function refresh() {
     try {
@@ -29,15 +29,11 @@ export function useStats(intervalMs = 5000): {
     }
   }
 
-  function start() {
-    void refresh();
-    timer = setInterval(refresh, intervalMs);
-  }
+  const { pause } = useIntervalFn(refresh, intervalMs, { immediateCallback: true });
 
   function stop() {
-    if (timer) clearInterval(timer);
+    pause();
   }
 
-  start();
   return { stats, error, loading, lastUpdated, refresh, stop };
 }

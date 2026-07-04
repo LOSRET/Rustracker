@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onActivated, onUnmounted } from "vue";
-import * as echarts from "echarts";
+import { computed } from "vue";
+import VChart from "vue-echarts";
+import "echarts";
+import { usePreferredDark } from "@vueuse/core";
 import type { TrendsResponse, RangeKey } from "../types/api";
 import { useI18n } from "../composables/useI18n";
 
@@ -10,21 +12,14 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ "update:range": [range: RangeKey] }>();
 
-const { t, localeFor, lang } = useI18n();
-const chartEl = ref<HTMLElement | null>(null);
-let chart: echarts.ECharts | null = null;
-let resizeTimer: ReturnType<typeof setTimeout> | null = null;
-let mediaMql: MediaQueryList | null = null;
+const { t, localeFor } = useI18n();
+const isDark = usePreferredDark();
 
 const RANGE_SECS: Record<RangeKey, number> = {
   "24h": 86400,
   "3d": 259200,
   "7d": 604800,
 };
-
-function isDark() {
-  return window.matchMedia("(prefers-color-scheme: dark)").matches;
-}
 
 function filterHistory() {
   const history = props.data?.history ?? [];
@@ -33,17 +28,19 @@ function filterHistory() {
   return history.filter((item) => item.timestamp >= cutoff);
 }
 
-function render() {
-  if (!chart) return;
+const option = computed(() => {
   const history = filterHistory();
-  const dark = isDark();
+  const dark = isDark.value;
   const cc = dark
     ? { axis: "#94a3b8", line: "#334155", legend: "#cbd5e1" }
     : { axis: "#64748b", line: "#e6ebf2", legend: "#1f2937" };
+  const tr = t.value;
 
   if (!history.length) {
-    chart.setOption({ title: { text: t.value.top100_empty, left: "center", top: "center", textStyle: { color: "#94a3b8", fontSize: 14 } }, series: [] });
-    return;
+    return {
+      title: { text: tr.top100_empty, left: "center", top: "center", textStyle: { color: "#94a3b8", fontSize: 14 } },
+      series: [],
+    };
   }
 
   const labels = history.map((item) =>
@@ -51,9 +48,8 @@ function render() {
       month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false,
     }),
   );
-  const tr = t.value;
 
-  chart.setOption({
+  return {
     title: { text: "" },
     color: dark ? ["#3b82f6", "#94a3b8", "#22c55e", "#f59e0b"] : ["#2563eb", "#475569", "#15803d", "#b45309"],
     tooltip: {
@@ -76,36 +72,12 @@ function render() {
       { name: tr.sort_seeders, type: "line", smooth: true, showSymbol: false, data: history.map((i) => i.seeders) },
       { name: tr.sort_leechers, type: "line", smooth: true, showSymbol: false, data: history.map((i) => i.leechers) },
     ],
-  });
-}
-
-function onResize() {
-  if (resizeTimer) clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => chart?.resize(), 150);
-}
+  };
+});
 
 function setRange(r: RangeKey) {
   emit("update:range", r);
 }
-
-onMounted(() => {
-  if (chartEl.value) chart = echarts.init(chartEl.value);
-  render();
-  window.addEventListener("resize", onResize);
-  mediaMql = window.matchMedia("(prefers-color-scheme: dark)");
-  mediaMql.addEventListener("change", render);
-});
-
-onActivated(() => chart?.resize());
-
-onUnmounted(() => {
-  window.removeEventListener("resize", onResize);
-  mediaMql?.removeEventListener("change", render);
-  if (resizeTimer) clearTimeout(resizeTimer);
-  chart?.dispose();
-});
-
-watch(() => [props.data, props.range, lang.value], render, { deep: true });
 </script>
 
 <template>
@@ -133,6 +105,8 @@ watch(() => [props.data, props.range, lang.value], render, { deep: true });
         </button>
       </div>
     </div>
-    <div ref="chartEl" class="w-full h-[440px] max-[900px]:h-[330px] max-[560px]:h-[275px]" />
+    <div class="w-full h-[440px] max-[900px]:h-[330px] max-[560px]:h-[275px]">
+      <v-chart :option="option" autoresize />
+    </div>
   </section>
 </template>

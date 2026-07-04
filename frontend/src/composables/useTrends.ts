@@ -1,4 +1,5 @@
 import { ref, type Ref } from "vue";
+import { useIntervalFn } from "@vueuse/core";
 import type { TrendsResponse, ClientsResponse } from "../types/api";
 
 export function useTrends(intervalMs = 600000): {
@@ -10,7 +11,6 @@ export function useTrends(intervalMs = 600000): {
 } {
   const trends = ref<TrendsResponse | null>(null);
   const clients = ref<ClientsResponse | null>(null);
-  let timer: ReturnType<typeof setInterval> | null = null;
 
   async function refresh() {
     try {
@@ -25,17 +25,15 @@ export function useTrends(intervalMs = 600000): {
     }
   }
 
+  const { pause, resume } = useIntervalFn(refresh, intervalMs, { immediate: false });
+
   function start() {
-    if (timer) clearInterval(timer);
     void refresh();
-    timer = setInterval(refresh, intervalMs);
+    resume();
   }
 
   function stop() {
-    if (timer) {
-      clearInterval(timer);
-      timer = null;
-    }
+    pause();
   }
 
   start();

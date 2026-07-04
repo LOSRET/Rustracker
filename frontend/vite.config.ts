@@ -29,8 +29,8 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
+          if (id.includes("node_modules/echarts") || id.includes("node_modules/vue-echarts")) return "echarts";
           if (id.includes("node_modules/vue")) return "vue";
-          if (id.includes("node_modules/echarts")) return "echarts";
         },
       },
     },

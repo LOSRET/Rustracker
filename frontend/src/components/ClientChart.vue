@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onActivated, onUnmounted } from "vue";
-import * as echarts from "echarts";
+import { computed } from "vue";
+import VChart from "vue-echarts";
+import "echarts";
+import { usePreferredDark } from "@vueuse/core";
 import type { ClientsResponse, RangeKey } from "../types/api";
 import { useI18n } from "../composables/useI18n";
 
@@ -9,11 +11,8 @@ const props = defineProps<{
   range: RangeKey;
 }>();
 
-const { t, localeFor, lang } = useI18n();
-const chartEl = ref<HTMLElement | null>(null);
-let chart: echarts.ECharts | null = null;
-let resizeTimer: ReturnType<typeof setTimeout> | null = null;
-let mediaMql: MediaQueryList | null = null;
+const { t, localeFor } = useI18n();
+const isDark = usePreferredDark();
 
 const CLIENT_BRAND: Record<string, string> = {
   Xunlei: "#1976D2", "迅雷": "#1976D2",
@@ -57,21 +56,18 @@ function brandColor(name: string): string {
   return `hsl(${Math.abs(h) % 360}, 65%, 50%)`;
 }
 
-function isDark() {
-  return window.matchMedia("(prefers-color-scheme: dark)").matches;
-}
-
-function render() {
-  if (!chart) return;
+const option = computed(() => {
   const historyAll = props.data?.history ?? [];
-  const dark = isDark();
+  const dark = isDark.value;
   const cc = dark
     ? { axis: "#94a3b8", line: "#334155", legend: "#cbd5e1" }
     : { axis: "#64748b", line: "#e6ebf2", legend: "#1f2937" };
 
   if (!historyAll.length) {
-    chart.setOption({ title: { text: t.value.top100_empty, left: "center", top: "center", textStyle: { color: "#94a3b8", fontSize: 14 } }, series: [] });
-    return;
+    return {
+      title: { text: t.value.top100_empty, left: "center", top: "center", textStyle: { color: "#94a3b8", fontSize: 14 } },
+      series: [],
+    };
   }
 
   const names = props.data?.clients ?? [];
@@ -83,7 +79,7 @@ function render() {
     }),
   );
 
-  chart.setOption({
+  return {
     title: { text: "" },
     tooltip: {
       trigger: "axis",
@@ -107,32 +103,8 @@ function render() {
       itemStyle: { color: brandColor(name) },
       data: history.map((item) => item.counts[j] ?? 0),
     })),
-  });
-}
-
-function onResize() {
-  if (resizeTimer) clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => chart?.resize(), 150);
-}
-
-onMounted(() => {
-  if (chartEl.value) chart = echarts.init(chartEl.value);
-  render();
-  window.addEventListener("resize", onResize);
-  mediaMql = window.matchMedia("(prefers-color-scheme: dark)");
-  mediaMql.addEventListener("change", render);
+  };
 });
-
-onActivated(() => chart?.resize());
-
-onUnmounted(() => {
-  window.removeEventListener("resize", onResize);
-  mediaMql?.removeEventListener("change", render);
-  if (resizeTimer) clearTimeout(resizeTimer);
-  chart?.dispose();
-});
-
-watch(() => [props.data, props.range, lang.value], render, { deep: true });
 </script>
 
 <template>
@@ -143,6 +115,8 @@ watch(() => [props.data, props.range, lang.value], render, { deep: true });
         <span class="text-muted text-xs">{{ t.client_chart_note }}</span>
       </div>
     </div>
-    <div ref="chartEl" class="w-full h-[440px] max-[900px]:h-[330px] max-[560px]:h-[275px]" />
+    <div class="w-full h-[440px] max-[900px]:h-[330px] max-[560px]:h-[275px]">
+      <v-chart :option="option" autoresize />
+    </div>
   </section>
 </template>
