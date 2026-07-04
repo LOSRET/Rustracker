@@ -106,7 +106,7 @@ function setRange(r: RangeKey) {
       </div>
     </div>
     <div class="w-full h-[440px] max-[900px]:h-[330px] max-[560px]:h-[275px]">
-      <v-chart :option="option" autoresize />
+      <v-chart :option="option" :init-options="{ renderer: 'svg' }" autoresize />
     </div>
   </section>
 </template>
