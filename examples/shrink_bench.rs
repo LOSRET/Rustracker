@@ -33,9 +33,16 @@ mod mem {
     use std::mem;
     #[repr(C)]
     struct PMC {
-        cb: u32, pfc: u32, pws: usize, ws: usize,
-        qppp: usize, qpp: usize, qpnp: usize, qnp: usize,
-        pf: usize, ppf: usize,
+        cb: u32,
+        pfc: u32,
+        pws: usize,
+        ws: usize,
+        qppp: usize,
+        qpp: usize,
+        qpnp: usize,
+        qnp: usize,
+        pf: usize,
+        ppf: usize,
     }
     #[link(name = "psapi")]
     extern "system" {
@@ -135,7 +142,10 @@ fn main() {
 
     eprintln!(
         "shrink_bench: torrents={} bulk/torrent={} cycles={} peer_timeout={}s",
-        n_torrents, bulk_per_torrent, n_cycles, peer_timeout.as_secs(),
+        n_torrents,
+        bulk_per_torrent,
+        n_cycles,
+        peer_timeout.as_secs(),
     );
     eprintln!();
 
@@ -147,17 +157,24 @@ fn main() {
     for t in 0..n_torrents {
         // Insert anchor peer (1 per torrent, survives expiry via re-announce)
         announce(
-            &mut tracker, t as u64, t as u64,
-            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)), anchor_port, build_time,
+            &mut tracker,
+            t as u64,
+            t as u64,
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
+            anchor_port,
+            build_time,
         );
         // Insert bulk peers (will be expired each cycle)
         for j in 0..bulk_per_torrent {
             let seed = (t * bulk_per_torrent + j) as u64;
             let ip_octet = 2 + (seed % 253) as u8;
             announce(
-                &mut tracker, t as u64, seed + 1_000_000_000,
+                &mut tracker,
+                t as u64,
+                seed + 1_000_000_000,
                 IpAddr::V4(Ipv4Addr::new(10, 0, ip_octet, (seed >> 8) as u8)),
-                6881u16.wrapping_add((seed % 60000) as u16), build_time,
+                6881u16.wrapping_add((seed % 60000) as u16),
+                build_time,
             );
         }
     }
@@ -171,7 +188,9 @@ fn main() {
     eprintln!();
 
     // ── CSV header ─────────────────────────────────────────────
-    println!("cycle,torrents,rss_build_mb,peers_after_expire,rss_shrink_mb,rss_regrow_mb,overhead_mb");
+    println!(
+        "cycle,torrents,rss_build_mb,peers_after_expire,rss_shrink_mb,rss_regrow_mb,overhead_mb"
+    );
 
     let mut prev_regrow_rss = rss_build;
 
@@ -186,8 +205,12 @@ fn main() {
         let now = Instant::now();
         for t in 0..n_torrents {
             announce(
-                &mut tracker, t as u64, t as u64,
-                IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)), anchor_port, now,
+                &mut tracker,
+                t as u64,
+                t as u64,
+                IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
+                anchor_port,
+                now,
             );
         }
         tracker.expire_due(now);
@@ -199,9 +222,12 @@ fn main() {
         let expected = n_torrents;
         if snap.totals.peers != expected {
             eprintln!();
-            eprintln!("  ⚠️  expire left {} peers (expected {}), diff={}",
-                snap.totals.peers, expected,
-                snap.totals.peers.saturating_sub(expected));
+            eprintln!(
+                "  ⚠️  expire left {} peers (expected {}), diff={}",
+                snap.totals.peers,
+                expected,
+                snap.totals.peers.saturating_sub(expected)
+            );
         }
 
         // Let jemalloc / glibc decay freed pages
@@ -214,13 +240,15 @@ fn main() {
         let regrow_time = Instant::now();
         for t in 0..n_torrents {
             for j in 0..bulk_per_torrent {
-                let seed = (cycle as u64) * 10_000_000_000
-                    + (t * bulk_per_torrent + j) as u64;
+                let seed = (cycle as u64) * 10_000_000_000 + (t * bulk_per_torrent + j) as u64;
                 let ip_octet = 2 + (seed % 253) as u8;
                 announce(
-                    &mut tracker, t as u64, seed + 2_000_000_000,
+                    &mut tracker,
+                    t as u64,
+                    seed + 2_000_000_000,
                     IpAddr::V4(Ipv4Addr::new(10, 1, ip_octet, (seed >> 8) as u8)),
-                    6881u16.wrapping_add((seed % 60000) as u16), regrow_time,
+                    6881u16.wrapping_add((seed % 60000) as u16),
+                    regrow_time,
                 );
             }
         }
@@ -235,8 +263,10 @@ fn main() {
             ",{},{:.1},{},{:.1},{:.1},{:.1}",
             n_torrents, rss_build, snap.totals.peers, rss_shrink, rss_regrow, overhead,
         );
-        eprintln!("  {:.1}→{:.1}→{:.1} overhead={:.1}",
-            rss_build, rss_shrink, rss_regrow, overhead);
+        eprintln!(
+            "  {:.1}→{:.1}→{:.1} overhead={:.1}",
+            rss_build, rss_shrink, rss_regrow, overhead
+        );
 
         // Wait for regrow peers to age past peer_timeout=1s.
         // This + next cycle's re-anchor overhead gives >1s gap.

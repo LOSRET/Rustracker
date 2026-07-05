@@ -20,7 +20,10 @@ fn default_listen() -> Vec<SocketAddr> {
 
 #[cfg(not(target_os = "linux"))]
 fn default_listen() -> Vec<SocketAddr> {
-    vec!["[::]:8080".parse().unwrap(), "0.0.0.0:8080".parse().unwrap()]
+    vec![
+        "[::]:8080".parse().unwrap(),
+        "0.0.0.0:8080".parse().unwrap(),
+    ]
 }
 
 #[derive(Debug, Parser)]
