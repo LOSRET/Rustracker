@@ -17,7 +17,10 @@ const page = ref<PageKey>("dashboard");
 const sidebarOpen = ref(false);
 
 function switchPage(p: PageKey) {
-  page.value = p;
+  if (p !== page.value) {
+    page.value = p;
+    window.scrollTo(0, 0);
+  }
   sidebarOpen.value = false;
 }
 
