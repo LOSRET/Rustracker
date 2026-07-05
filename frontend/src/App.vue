@@ -41,14 +41,8 @@ onUnmounted(stop);
     </svg>
   </button>
 
-  <div
-    v-if="sidebarOpen"
-    class="hidden max-[900px]:block fixed inset-0 bg-black/45 z-[999]"
-    @click="sidebarOpen = false"
-  />
-
   <div class="min-h-screen grid grid-cols-[248px_minmax(0,1fr)] max-[900px]:grid-cols-1">
-    <Sidebar :page="page" :open="sidebarOpen" :error="error" @switch="switchPage" />
+    <Sidebar :page="page" :open="sidebarOpen" :error="error" @switch="switchPage" @close="sidebarOpen = false" />
     <main class="min-w-0 p-7 max-[900px]:pt-[60px] max-[900px]:px-[18px] max-[900px]:pb-[18px]">
       <KeepAlive>
         <DashboardView v-if="page === 'dashboard'" :stats="stats" :error="error" :last-updated="lastUpdated" />

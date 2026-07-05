@@ -1,6 +1,12 @@
 @import "tailwindcss";
 @config "../tailwind.config.js";
 
+.flag-svg svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 :root {
   color-scheme: light dark;
   --color-ink: #1f2937;
