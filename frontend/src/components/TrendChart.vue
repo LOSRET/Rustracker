@@ -34,11 +34,10 @@ const option = computed(() => {
   const cc = dark
     ? { axis: "#94a3b8", line: "#334155", legend: "#cbd5e1" }
     : { axis: "#64748b", line: "#e6ebf2", legend: "#1f2937" };
-  const tr = t.value;
 
   if (!history.length) {
     return {
-      title: { text: tr.top100_empty, left: "center", top: "center", textStyle: { color: "#94a3b8", fontSize: 14 } },
+      title: { text: t("top100_empty"), left: "center", top: "center", textStyle: { color: "#94a3b8", fontSize: 14 } },
       series: [],
     };
   }
@@ -61,16 +60,16 @@ const option = computed(() => {
     legend: {
       type: "scroll", top: 0, left: "center", itemWidth: 16, itemGap: 14,
       textStyle: { fontSize: 11, color: cc.legend },
-      data: [tr.torrents, tr.sort_peers, tr.sort_seeders, tr.sort_leechers],
+      data: [t("torrents"), t("sort_peers"), t("sort_seeders"), t("sort_leechers")],
     },
     grid: { left: 4, right: 4, top: 52, bottom: 36, containLabel: true },
     xAxis: { type: "category", boundaryGap: false, data: labels, axisLine: { lineStyle: { color: cc.line } }, axisLabel: { color: cc.axis } },
     yAxis: { type: "value", minInterval: 1, axisLabel: { color: cc.axis }, splitLine: { lineStyle: { color: cc.line } } },
     series: [
-      { name: tr.torrents, type: "line", smooth: true, showSymbol: false, data: history.map((i) => i.torrents) },
-      { name: tr.sort_peers, type: "line", smooth: true, showSymbol: false, data: history.map((i) => i.peers) },
-      { name: tr.sort_seeders, type: "line", smooth: true, showSymbol: false, data: history.map((i) => i.seeders) },
-      { name: tr.sort_leechers, type: "line", smooth: true, showSymbol: false, data: history.map((i) => i.leechers) },
+      { name: t("torrents"), type: "line", smooth: true, showSymbol: false, data: history.map((i) => i.torrents) },
+      { name: t("sort_peers"), type: "line", smooth: true, showSymbol: false, data: history.map((i) => i.peers) },
+      { name: t("sort_seeders"), type: "line", smooth: true, showSymbol: false, data: history.map((i) => i.seeders) },
+      { name: t("sort_leechers"), type: "line", smooth: true, showSymbol: false, data: history.map((i) => i.leechers) },
     ],
   };
 });
@@ -84,8 +83,8 @@ function setRange(r: RangeKey) {
   <section class="bg-panel border border-line p-4 mb-5">
     <div class="flex items-baseline justify-between gap-4 mb-3 max-[900px]:flex-col max-[900px]:items-stretch">
       <div>
-        <h2 class="m-0 text-base leading-relaxed font-bold">{{ t.chart_title }}</h2>
-        <span class="text-muted text-xs">{{ t.chart_note }}</span>
+        <h2 class="m-0 text-base leading-relaxed font-bold">{{ t('chart_title') }}</h2>
+        <span class="text-muted text-xs">{{ t('chart_note') }}</span>
       </div>
       <div class="flex shrink-0">
         <button
@@ -101,7 +100,7 @@ function setRange(r: RangeKey) {
           ]"
           @click="setRange(r)"
         >
-          {{ t[`range_${r}` as keyof typeof t] }}
+          {{ t(`range_${r}`) }}
         </button>
       </div>
     </div>

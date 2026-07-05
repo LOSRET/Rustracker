@@ -15,10 +15,10 @@ const rows = computed(() => {
 });
 
 const statusText = computed(() => {
-  if (loading.value) return t.value.top100_loading;
-  if (error.value) return t.value.top100_error;
+  if (loading.value) return t("top100_loading");
+  if (error.value) return t("top100_error");
   if (lastUpdated.value)
-    return `${t.value.last_update} ${new Date(lastUpdated.value).toLocaleTimeString(localeFor())}`;
+    return `${t("last_update")} ${new Date(lastUpdated.value).toLocaleTimeString(localeFor())}`;
   return "";
 });
 
@@ -34,8 +34,8 @@ const sortLabel: Record<SortKey, string> = {
 <template>
   <section class="flex justify-between items-start gap-5 mb-6 max-[900px]:flex-col max-[900px]:items-stretch">
     <div>
-      <h1 class="m-0 mb-1.5 text-[28px] leading-tight max-[560px]:text-[24px] font-bold">{{ t.top100_title }}</h1>
-      <p class="m-0 text-muted text-sm leading-relaxed">{{ t.top100_subtitle }}</p>
+      <h1 class="m-0 mb-1.5 text-[28px] leading-tight max-[560px]:text-[24px] font-bold">{{ t('top100_title') }}</h1>
+      <p class="m-0 text-muted text-sm leading-relaxed">{{ t('top100_subtitle') }}</p>
     </div>
   </section>
 
@@ -55,7 +55,7 @@ const sortLabel: Record<SortKey, string> = {
           ]"
           @click="sort = s"
         >
-          {{ t[sortLabel[s] as keyof typeof t] }}
+          {{ t(sortLabel[s]) }}
         </button>
       </div>
       <div class="flex items-center gap-3 max-[900px]:justify-between">
@@ -68,7 +68,7 @@ const sortLabel: Record<SortKey, string> = {
           ]"
           @click="load"
         >
-          {{ t.refresh }}
+          {{ t('refresh') }}
         </button>
       </div>
     </div>
@@ -78,22 +78,22 @@ const sortLabel: Record<SortKey, string> = {
         <thead>
           <tr>
             <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap w-12 text-center">#</th>
-            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap">{{ t.col_hash }}</th>
-            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap text-right">{{ t.sort_peers }}</th>
-            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap text-right">{{ t.sort_seeders }}</th>
-            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap text-right">{{ t.sort_leechers }}</th>
-            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap text-right">{{ t.sort_downloaded }}</th>
+            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap">{{ t('col_hash') }}</th>
+            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap text-right">{{ t('sort_peers') }}</th>
+            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap text-right">{{ t('sort_seeders') }}</th>
+            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap text-right">{{ t('sort_leechers') }}</th>
+            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap text-right">{{ t('sort_downloaded') }}</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="loading">
-            <td colspan="6" class="p-8 text-center text-muted">{{ t.top100_loading }}</td>
+            <td colspan="6" class="p-8 text-center text-muted">{{ t('top100_loading') }}</td>
           </tr>
           <tr v-else-if="error">
-            <td colspan="6" class="p-8 text-center text-bad">{{ t.top100_error }}</td>
+            <td colspan="6" class="p-8 text-center text-bad">{{ t('top100_error') }}</td>
           </tr>
           <tr v-else-if="!rows.length">
-            <td colspan="6" class="p-8 text-center text-muted">{{ t.top100_empty }}</td>
+            <td colspan="6" class="p-8 text-center text-muted">{{ t('top100_empty') }}</td>
           </tr>
           <template v-else>
             <tr

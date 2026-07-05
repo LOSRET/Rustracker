@@ -12,36 +12,38 @@ const props = defineProps<{
 const { t, number, localeFor } = useI18n();
 const { copied, copy } = useClipboard({ copiedDuring: 1500 });
 
+const trackerUrl = `${window.location.origin}/announce`;
+
 function copyAddr() {
-  copy(t.value.config_fmt());
+  copy(trackerUrl);
 }
 
 function lastUpdateText() {
   const ts = props.lastUpdated;
-  if (ts == null) return t.value.loading;
-  return `${t.value.last_update} ${new Date(ts).toLocaleTimeString(localeFor())}`;
+  if (ts == null) return t("loading");
+  return `${t("last_update")} ${new Date(ts).toLocaleTimeString(localeFor())}`;
 }
 </script>
 
 <template>
   <section class="flex justify-between items-start gap-5 mb-6 max-[900px]:flex-col max-[900px]:items-stretch">
     <div>
-      <h1 class="m-0 mb-1.5 text-[28px] leading-tight font-bold max-[560px]:text-[24px]">{{ t.title }}</h1>
-      <p class="m-0 text-muted text-sm leading-relaxed">{{ t.subtitle }}</p>
+      <h1 class="m-0 mb-1.5 text-[28px] leading-tight font-bold max-[560px]:text-[24px]">{{ t('title') }}</h1>
+      <p class="m-0 text-muted text-sm leading-relaxed">{{ t('subtitle') }}</p>
       <p :class="['text-xs mt-1.5', error ? 'text-bad' : 'text-muted']">
-        {{ error ? t.error : lastUpdateText() }}
+        {{ error ? t('error') : lastUpdateText() }}
       </p>
       <div class="flex items-center flex-wrap gap-1 mb-5">
-        <span class="text-muted text-sm font-normal whitespace-nowrap">{{ t.tracker_addr_label }}</span>
+        <span class="text-muted text-sm font-normal whitespace-nowrap">{{ t('tracker_addr_label') }}</span>
         <span
           :class="[
             'tracker-addr text-base font-bold break-all cursor-pointer relative border-b border-dashed border-line transition-colors',
             copied ? 'tracker-addr-copied text-good' : 'text-ink hover:text-accent',
           ]"
-          :data-tooltip="t.copied"
+          :data-tooltip="t('copied')"
           @click="copyAddr"
         >
-          {{ t.config_fmt() }}
+          {{ trackerUrl }}
         </span>
       </div>
     </div>

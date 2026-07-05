@@ -65,7 +65,7 @@ const option = computed(() => {
 
   if (!historyAll.length) {
     return {
-      title: { text: t.value.top100_empty, left: "center", top: "center", textStyle: { color: "#94a3b8", fontSize: 14 } },
+      title: { text: t("top100_empty"), left: "center", top: "center", textStyle: { color: "#94a3b8", fontSize: 14 } },
       series: [],
     };
   }
@@ -111,8 +111,8 @@ const option = computed(() => {
   <section class="bg-panel border border-line p-4 mb-5">
     <div class="flex items-baseline justify-between gap-4 mb-3 max-[900px]:flex-col max-[900px]:items-stretch">
       <div>
-        <h2 class="m-0 text-base leading-relaxed font-bold">{{ t.client_chart_title }}</h2>
-        <span class="text-muted text-xs">{{ t.client_chart_note }}</span>
+        <h2 class="m-0 text-base leading-relaxed font-bold">{{ t('client_chart_title') }}</h2>
+        <span class="text-muted text-xs">{{ t('client_chart_note') }}</span>
       </div>
     </div>
     <div class="w-full h-[440px] max-[900px]:h-[330px] max-[560px]:h-[275px]">

@@ -1,63 +1,7 @@
+import { createI18n } from "vue-i18n";
 import type { LangKey } from "../types/api";
 
-export interface Translation {
-  monitoring: string;
-  overview: string;
-  running: string;
-  error: string;
-  paused_state: string;
-  disc_link: string;
-  view: string;
-  side_note: string;
-  title: string;
-  subtitle: string;
-  loading: string;
-  last_update: string;
-  read_error: string;
-  chart_title: string;
-  chart_note: string;
-  client_chart_title: string;
-  client_chart_note: string;
-  range_24h: string;
-  range_3d: string;
-  range_7d: string;
-  top100_link: string;
-  top100_title: string;
-  top100_subtitle: string;
-  sort_peers: string;
-  sort_seeders: string;
-  sort_leechers: string;
-  sort_downloaded: string;
-  col_hash: string;
-  top100_loading: string;
-  top100_empty: string;
-  top100_error: string;
-  clients_link: string;
-  clients_title: string;
-  clients_subtitle: string;
-  clients_col_name: string;
-  clients_col_share: string;
-  refresh: string;
-  tracker_addr_label: string;
-  config_fmt: () => string;
-  copied: string;
-  disc_title: string;
-  disc_p1: string;
-  disc_p2: string;
-  disc_p3: string;
-  disc_p4: string;
-  disc_p5: string;
-  torrents: string;
-  completed: string;
-  powered_by: string;
-  uptime: string;
-  blog_label: string;
-  contact_label: string;
-  seo_title: string;
-  seo_desc: string;
-}
-
-const zh: Translation = {
+const zh = {
   monitoring: "监控", overview: "Tracker 概览", running: "运行中",
   error: "异常", paused_state: "已暂停", disc_link: "Tracker 免责说明",
   view: "查看", side_note: "HTTP tracker 的连接、做种、下载和完成统计。",
@@ -77,7 +21,6 @@ const zh: Translation = {
   clients_col_name: "客户端", clients_col_share: "占比",
   refresh: "刷新",
   tracker_addr_label: "Tracker 地址：",
-  config_fmt: () => `${window.location.origin}/announce`,
   copied: "已复制",
   disc_title: "Tracker 免责说明",
   disc_p1: "本站 Tracker 仅提供连接协调、状态记录与统计展示，不存储、不托管、不分发任何实际资源内容。",
@@ -91,7 +34,7 @@ const zh: Translation = {
   seo_desc: "BitTorrent HTTP Tracker 实时监控面板，查看 Peers、Seeders、Leechers、客户端分布与趋势图表。提供 announce/scrape 接口，支持 IPv4/IPv6。",
 };
 
-const en: Translation = {
+const en = {
   monitoring: "Monitoring", overview: "Tracker Overview", running: "Running",
   error: "Error", paused_state: "Paused", disc_link: "Disclaimer",
   view: "View", side_note: "HTTP tracker connection, seeding, downloading and completion statistics.",
@@ -111,7 +54,6 @@ const en: Translation = {
   clients_col_name: "Client", clients_col_share: "Share",
   refresh: "Refresh",
   tracker_addr_label: "Tracker URL: ",
-  config_fmt: () => `${window.location.origin}/announce`,
   copied: "Copied!",
   disc_title: "Disclaimer",
   disc_p1: "This tracker only provides connection coordination, status recording and statistical display. It does not store, host or distribute any actual resource content.",
@@ -125,7 +67,7 @@ const en: Translation = {
   seo_desc: "BitTorrent HTTP Tracker dashboard. Monitor Peers, Seeders, Leechers, client distribution and trend charts. Supports announce/scrape with IPv4/IPv6.",
 };
 
-const ja: Translation = {
+const ja = {
   monitoring: "モニタリング", overview: "Tracker概要", running: "稼働中",
   error: "エラー", paused_state: "一時停止", disc_link: "免責事項",
   view: "表示", side_note: "HTTP trackerの接続、シード、ダウンロード、完了の統計。",
@@ -145,7 +87,6 @@ const ja: Translation = {
   clients_col_name: "クライアント", clients_col_share: "シェア",
   refresh: "更新",
   tracker_addr_label: "Trackerアドレス：",
-  config_fmt: () => `${window.location.origin}/announce`,
   copied: "コピーしました",
   disc_title: "免責事項",
   disc_p1: "本Trackerは接続調整、状態記録、統計表示のみを提供し、実際のリソースコンテンツの保存、ホスト、配信は行いません。",
@@ -159,7 +100,7 @@ const ja: Translation = {
   seo_desc: "BitTorrent HTTP Trackerダッシュボード。Peers、Seeders、Leechers、クライアント分布、トレンドチャートを監視。announce/scrape対応、IPv4/IPv6サポート。",
 };
 
-const ru: Translation = {
+const ru = {
   monitoring: "Мониторинг", overview: "Обзор трекера", running: "Работает",
   error: "Ошибка", paused_state: "Приостановлен", disc_link: "Отказ от ответственности",
   view: "Просмотр", side_note: "Статистика подключений, сидирования, загрузки и завершений HTTP-трекера.",
@@ -179,7 +120,6 @@ const ru: Translation = {
   clients_col_name: "Клиент", clients_col_share: "Доля",
   refresh: "Обновить",
   tracker_addr_label: "Адрес трекера: ",
-  config_fmt: () => `${window.location.origin}/announce`,
   copied: "Скопировано",
   disc_title: "Отказ от ответственности",
   disc_p1: "Данный трекер предоставляет только координацию подключений, запись состояния и отображение статистики. Он не хранит, не размещает и не распространяет какой-либо контент ресурсов.",
@@ -193,7 +133,7 @@ const ru: Translation = {
   seo_desc: "Панель мониторинга BitTorrent HTTP-трекера. Отслеживание Peers, Seeders, Leechers, распределения клиентов и графиков трендов. Поддержка announce/scrape, IPv4/IPv6.",
 };
 
-const de: Translation = {
+const de = {
   monitoring: "Überwachung", overview: "Tracker-Übersicht", running: "Läuft",
   error: "Fehler", paused_state: "Pausiert", disc_link: "Haftungsausschluss",
   view: "Ansehen", side_note: "HTTP-Tracker-Statistiken zu Verbindungen, Seeding, Downloads und Abschlüssen.",
@@ -213,7 +153,6 @@ const de: Translation = {
   clients_col_name: "Client", clients_col_share: "Anteil",
   refresh: "Aktualisieren",
   tracker_addr_label: "Tracker-Adresse: ",
-  config_fmt: () => `${window.location.origin}/announce`,
   copied: "Kopiert",
   disc_title: "Haftungsausschluss",
   disc_p1: "Dieser Tracker bietet nur Verbindungskoordination, Statusaufzeichnung und statistische Anzeige. Er speichert, hostet oder verteilt keine tatsächlichen Ressourceninhalte.",
@@ -227,7 +166,7 @@ const de: Translation = {
   seo_desc: "BitTorrent HTTP-Tracker-Dashboard. Überwachung von Peers, Seeders, Leechers, Client-Verteilung und Trenddiagrammen. Unterstützt announce/scrape mit IPv4/IPv6.",
 };
 
-const uk: Translation = {
+const uk = {
   monitoring: "Моніторинг", overview: "Огляд трекера", running: "Працює",
   error: "Помилка", paused_state: "Призупинено", disc_link: "Відмова від відповідальності",
   view: "Перегляд", side_note: "Статистика підключень, сідування, завантаження та завершень HTTP-трекера.",
@@ -247,7 +186,6 @@ const uk: Translation = {
   clients_col_name: "Клієнт", clients_col_share: "Частка",
   refresh: "Оновити",
   tracker_addr_label: "Адреса трекера: ",
-  config_fmt: () => `${window.location.origin}/announce`,
   copied: "Скопійовано",
   disc_title: "Відмова від відповідальності",
   disc_p1: "Цей трекер надає лише координацію підключень, запис стану та відображення статистики. Він не зберігає, не розміщує та не поширює жодний вміст ресурсів.",
@@ -261,7 +199,7 @@ const uk: Translation = {
   seo_desc: "Панель моніторингу BitTorrent HTTP-трекера. Відстеження Peers, Seeders, Leechers, розподілу клієнтів та графіків трендів. Підтримка announce/scrape, IPv4/IPv6.",
 };
 
-export const translations: Record<LangKey, Translation> = { zh, en, ja, ru, de, uk };
+export const messages: Record<LangKey, Record<string, string>> = { zh, en, ja, ru, de, uk };
 
 export const LANG_LOCALE: Record<LangKey, string> = {
   zh: "zh-CN", en: "en", ja: "ja", ru: "ru", de: "de", uk: "uk",
@@ -284,3 +222,10 @@ export function detectLang(): LangKey {
   if (nav.startsWith("uk")) return "uk";
   return "en";
 }
+
+export const i18n = createI18n({
+  legacy: false,
+  locale: detectLang(),
+  fallbackLocale: "en",
+  messages,
+});

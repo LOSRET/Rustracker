@@ -15,10 +15,10 @@ const totalPeers = computed(() =>
 const rows = computed(() => data.value?.clients ?? []);
 
 const statusText = computed(() => {
-  if (loading.value) return t.value.top100_loading;
-  if (error.value) return t.value.top100_error;
+  if (loading.value) return t("top100_loading");
+  if (error.value) return t("top100_error");
   if (lastUpdated.value)
-    return `${t.value.last_update} ${new Date(lastUpdated.value).toLocaleTimeString(localeFor())}`;
+    return `${t("last_update")} ${new Date(lastUpdated.value).toLocaleTimeString(localeFor())}`;
   return "";
 });
 
@@ -31,8 +31,8 @@ function share(peers: number): string {
 <template>
   <section class="flex justify-between items-start gap-5 mb-6 max-[900px]:flex-col max-[900px]:items-stretch">
     <div>
-      <h1 class="m-0 mb-1.5 text-[28px] leading-tight max-[560px]:text-[24px] font-bold">{{ t.clients_title }}</h1>
-      <p class="m-0 text-muted text-sm leading-relaxed">{{ t.clients_subtitle }}</p>
+      <h1 class="m-0 mb-1.5 text-[28px] leading-tight max-[560px]:text-[24px] font-bold">{{ t('clients_title') }}</h1>
+      <p class="m-0 text-muted text-sm leading-relaxed">{{ t('clients_subtitle') }}</p>
     </div>
   </section>
 
@@ -48,7 +48,7 @@ function share(peers: number): string {
           ]"
           @click="load"
         >
-          {{ t.refresh }}
+          {{ t('refresh') }}
         </button>
       </div>
     </div>
@@ -58,20 +58,20 @@ function share(peers: number): string {
         <thead>
           <tr>
             <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap w-12 text-center">#</th>
-            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap">{{ t.clients_col_name }}</th>
-            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap text-right">{{ t.sort_peers }}</th>
-            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap text-right">{{ t.clients_col_share }}</th>
+            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap">{{ t('clients_col_name') }}</th>
+            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap text-right">{{ t('sort_peers') }}</th>
+            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap text-right">{{ t('clients_col_share') }}</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="loading">
-            <td colspan="4" class="p-8 text-center text-muted">{{ t.top100_loading }}</td>
+            <td colspan="4" class="p-8 text-center text-muted">{{ t('top100_loading') }}</td>
           </tr>
           <tr v-else-if="error">
-            <td colspan="4" class="p-8 text-center text-bad">{{ t.top100_error }}</td>
+            <td colspan="4" class="p-8 text-center text-bad">{{ t('top100_error') }}</td>
           </tr>
           <tr v-else-if="!rows.length">
-            <td colspan="4" class="p-8 text-center text-muted">{{ t.top100_empty }}</td>
+            <td colspan="4" class="p-8 text-center text-muted">{{ t('top100_empty') }}</td>
           </tr>
           <template v-else>
             <tr

@@ -1,49 +1,33 @@
-import { ref, computed, type Ref, type ComputedRef } from "vue";
+import { useI18n as useVueI18n } from "vue-i18n";
 import type { LangKey } from "../types/api";
-import {
-  translations,
-  LANG_LOCALE,
-  OG_LOCALE,
-  NUM_LOCALE,
-  detectLang,
-  type Translation,
-} from "../i18n";
+import { LANG_LOCALE, OG_LOCALE, NUM_LOCALE } from "../i18n";
 
-const lang = ref<LangKey>(detectLang());
+export function useI18n() {
+  const { t, locale } = useVueI18n({ useScope: "global" });
 
-const t = computed(() => translations[lang.value]);
+  function number(value: number): string {
+    return new Intl.NumberFormat(NUM_LOCALE[locale.value as LangKey]).format(value || 0);
+  }
 
-function number(value: number): string {
-  return new Intl.NumberFormat(NUM_LOCALE[lang.value]).format(value || 0);
-}
+  function localeFor(): string {
+    return NUM_LOCALE[locale.value as LangKey];
+  }
 
-function localeFor(): string {
-  return NUM_LOCALE[lang.value];
-}
+  function setLang(l: LangKey) {
+    locale.value = l;
+    document.documentElement.lang = LANG_LOCALE[l];
+    document.title = t("seo_title");
+    const setMeta = (sel: string, attr: string, val: string) => {
+      const el = document.querySelector(sel);
+      if (el) el.setAttribute(attr, val);
+    };
+    setMeta("meta[name='description']", "content", t("seo_desc"));
+    setMeta("meta[property='og:title']", "content", t("seo_title"));
+    setMeta("meta[property='og:description']", "content", t("seo_desc"));
+    setMeta("meta[property='og:locale']", "content", OG_LOCALE[l]);
+    setMeta("meta[name='twitter:title']", "content", t("seo_title"));
+    setMeta("meta[name='twitter:description']", "content", t("seo_desc"));
+  }
 
-function setLang(l: LangKey) {
-  lang.value = l;
-  document.documentElement.lang = LANG_LOCALE[l];
-  const tr = translations[l];
-  document.title = tr.seo_title;
-  const setMeta = (sel: string, attr: string, val: string) => {
-    const el = document.querySelector(sel);
-    if (el) el.setAttribute(attr, val);
-  };
-  setMeta("meta[name='description']", "content", tr.seo_desc);
-  setMeta("meta[property='og:title']", "content", tr.seo_title);
-  setMeta("meta[property='og:description']", "content", tr.seo_desc);
-  setMeta("meta[property='og:locale']", "content", OG_LOCALE[l]);
-  setMeta("meta[name='twitter:title']", "content", tr.seo_title);
-  setMeta("meta[name='twitter:description']", "content", tr.seo_desc);
-}
-
-export function useI18n(): {
-  lang: Ref<LangKey>;
-  t: ComputedRef<Translation>;
-  number: (value: number) => string;
-  localeFor: () => string;
-  setLang: (lang: LangKey) => void;
-} {
-  return { lang, t, number, localeFor, setLang };
+  return { t, lang: locale, number, localeFor, setLang };
 }

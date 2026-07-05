@@ -18,10 +18,10 @@ function formatUptime(secs: number): string {
 <template>
   <footer class="flex justify-end items-center flex-wrap gap-6 py-4 text-muted text-xs">
     <span>
-      {{ t.powered_by }}
+      {{ t('powered_by') }}
       <a href="https://github.com/LOSRET/Rustracker" target="_blank" rel="noopener noreferrer" class="text-accent no-underline font-semibold hover:underline">Rustracker</a>
       v{{ stats?.version ?? "-" }}
     </span>
-    <span v-if="stats?.uptime_secs != null">{{ t.uptime }} {{ formatUptime(stats.uptime_secs) }}</span>
+    <span v-if="stats?.uptime_secs != null">{{ t('uptime') }} {{ formatUptime(stats.uptime_secs) }}</span>
   </footer>
 </template>

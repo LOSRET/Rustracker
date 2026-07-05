@@ -47,7 +47,7 @@ function scrollToDisclaimer() {
       </select>
     </div>
 
-    <div class="text-[#9ca3af] text-xs uppercase mb-2.5">{{ t.monitoring }}</div>
+    <div class="text-[#9ca3af] text-xs uppercase mb-2.5">{{ t('monitoring') }}</div>
     <nav class="flex flex-col">
       <button
         :class="[
@@ -58,8 +58,8 @@ function scrollToDisclaimer() {
         ]"
         @click="emit('switch', 'dashboard')"
       >
-        <span>{{ t.overview }}</span>
-        <span>{{ error ? t.error : t.running }}</span>
+        <span>{{ t('overview') }}</span>
+        <span>{{ error ? t('error') : t('running') }}</span>
       </button>
       <button
         :class="[
@@ -70,7 +70,7 @@ function scrollToDisclaimer() {
         ]"
         @click="emit('switch', 'top100')"
       >
-        <span>🏆 {{ t.top100_link }}</span>
+        <span>🏆 {{ t('top100_link') }}</span>
         <span>→</span>
       </button>
       <button
@@ -82,7 +82,7 @@ function scrollToDisclaimer() {
         ]"
         @click="emit('switch', 'clients')"
       >
-        <span>📊 {{ t.clients_link }}</span>
+        <span>📊 {{ t('clients_link') }}</span>
         <span>→</span>
       </button>
       <a
@@ -90,11 +90,11 @@ function scrollToDisclaimer() {
         href="#disclaimer"
         @click.prevent="scrollToDisclaimer"
       >
-        <span>{{ t.disc_link }}</span>
-        <span>{{ t.view }}</span>
+        <span>{{ t('disc_link') }}</span>
+        <span>{{ t('view') }}</span>
       </a>
     </nav>
 
-    <p class="mt-6 text-[#cbd5e1] text-[13px] leading-relaxed">{{ t.side_note }}</p>
+    <p class="mt-6 text-[#cbd5e1] text-[13px] leading-relaxed">{{ t('side_note') }}</p>
   </aside>
 </template>

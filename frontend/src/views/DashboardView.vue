@@ -25,11 +25,11 @@ onDeactivated(stop);
     <section
       class="grid gap-3 mb-5 grid-cols-[repeat(5,minmax(140px,1fr))] max-[1100px]:grid-cols-[repeat(3,minmax(140px,1fr))] max-[900px]:grid-cols-[repeat(2,minmax(130px,1fr))] max-[560px]:grid-cols-1"
     >
-      <MetricCard variant="peers" :label="t.sort_peers" :value="number(stats?.peers ?? 0)" />
-      <MetricCard variant="seeders" :label="t.sort_seeders" :value="number(stats?.seeders ?? 0)" />
-      <MetricCard variant="leechers" :label="t.sort_leechers" :value="number(stats?.leechers ?? 0)" />
-      <MetricCard variant="torrents" :label="t.torrents" :value="number(stats?.torrents ?? 0)" />
-      <MetricCard variant="completed" :label="t.completed" :value="number(stats?.completed ?? 0)" />
+      <MetricCard variant="peers" :label="t('sort_peers')" :value="number(stats?.peers ?? 0)" />
+      <MetricCard variant="seeders" :label="t('sort_seeders')" :value="number(stats?.seeders ?? 0)" />
+      <MetricCard variant="leechers" :label="t('sort_leechers')" :value="number(stats?.leechers ?? 0)" />
+      <MetricCard variant="torrents" :label="t('torrents')" :value="number(stats?.torrents ?? 0)" />
+      <MetricCard variant="completed" :label="t('completed')" :value="number(stats?.completed ?? 0)" />
     </section>
 
     <TrendChart :data="trends" v-model:range="range" />
