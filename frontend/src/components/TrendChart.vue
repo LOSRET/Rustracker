@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import VChart from "vue-echarts";
 import "echarts";
+import { RadioGroup, RadioGroupOption } from "@headlessui/vue";
 import { usePreferredDark } from "@vueuse/core";
 import type { TrendsResponse, RangeKey } from "../types/api";
 import { useI18n } from "../composables/useI18n";
@@ -86,23 +87,23 @@ function setRange(r: RangeKey) {
         <h2 class="m-0 text-base leading-relaxed font-bold">{{ t('chart_title') }}</h2>
         <span class="text-muted text-xs">{{ t('chart_note') }}</span>
       </div>
-      <div class="flex shrink-0">
-        <button
+      <RadioGroup :modelValue="range" @update:modelValue="setRange" class="flex shrink-0">
+        <RadioGroupOption
           v-for="(r, i) in (['24h', '3d', '7d'] as RangeKey[])"
           :key="r"
+          :value="r"
           :class="[
-            'border text-muted px-3 text-xs cursor-pointer min-h-7 transition-colors',
+            'border text-muted px-3 text-xs cursor-pointer min-h-7 transition-colors flex items-center justify-center',
             i === 0 ? 'rounded-l' : 'border-l-0',
             i === 2 ? 'rounded-r' : '',
             range === r
               ? 'bg-accent border-accent text-white'
               : 'bg-panel border-line hover:bg-hover-soft',
           ]"
-          @click="setRange(r)"
         >
           {{ t(`range_${r}`) }}
-        </button>
-      </div>
+        </RadioGroupOption>
+      </RadioGroup>
     </div>
     <div class="w-full h-[440px] max-[900px]:h-[330px] max-[560px]:h-[275px]">
       <v-chart :option="option" :init-options="{ renderer: 'svg' }" autoresize />

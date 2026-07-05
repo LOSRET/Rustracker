@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
+import { RadioGroup, RadioGroupOption } from "@headlessui/vue";
 import type { SortKey } from "../types/api";
 import { useTop100 } from "../composables/useTop100";
 import { useI18n } from "../composables/useI18n";
@@ -41,23 +42,23 @@ const sortLabel: Record<SortKey, string> = {
 
   <section class="bg-panel border border-line p-4 mb-5">
     <div class="flex items-center justify-between gap-4 mb-3 max-[900px]:flex-col max-[900px]:items-stretch">
-      <div class="flex shrink-0">
-        <button
+      <RadioGroup v-model="sort" class="flex shrink-0">
+        <RadioGroupOption
           v-for="(s, i) in sortOptions"
           :key="s"
+          :value="s"
           :class="[
-            'border text-muted px-4 text-[13px] cursor-pointer min-h-8 transition-colors',
+            'border text-muted px-4 text-[13px] cursor-pointer min-h-8 transition-colors flex items-center justify-center',
             i === 0 ? 'rounded-l' : 'border-l-0',
             i === 3 ? 'rounded-r' : '',
             sort === s
               ? 'bg-accent border-accent text-white'
               : 'bg-panel border-line hover:bg-hover-soft',
           ]"
-          @click="sort = s"
         >
           {{ t(sortLabel[s]) }}
-        </button>
-      </div>
+        </RadioGroupOption>
+      </RadioGroup>
       <div class="flex items-center gap-3 max-[900px]:justify-between">
         <span class="text-muted text-xs whitespace-nowrap">{{ statusText }}</span>
         <button
