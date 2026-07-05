@@ -1,6 +1,6 @@
 [package]
 name = "rustracker"
-version = "0.2.27"
+version = "0.2.28"
 edition = "2021"
 description = "A minimal HTTP BitTorrent tracker written in Rust"
 license = "MIT"
