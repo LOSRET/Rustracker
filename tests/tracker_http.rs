@@ -889,6 +889,69 @@ async fn corrupted_jsonl_first_line_still_loads() {
 }
 
 #[tokio::test]
+async fn corrupted_client_trend_subarray_does_not_panic() {
+    use std::io::Write;
+
+    let dir = std::env::temp_dir().join(format!(
+        "rustracker-test-jsonl-client-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+
+    let trends_file = dir.join("trends.jsonl");
+    let top_clients_file = dir.join("top_clients.jsonl");
+    let mut f = std::fs::File::create(&trends_file).unwrap();
+    // A valid trend point so load_trends_from_file does not short-circuit.
+    writeln!(
+        f,
+        r#"{{"timestamp":9999999,"torrents":5,"peers":10,"seeders":3,"leechers":7}}"#
+    )
+    .unwrap();
+    drop(f);
+
+    let mut cf = std::fs::File::create(&top_clients_file).unwrap();
+    // Line contains a subarray with only ONE element — this used to panic at
+    // `arr[1]` index access. Must be skipped instead.
+    writeln!(
+        cf,
+        r#"{{"timestamp":9999999,"clients":[[1],[2,300],[3,120]]}}"#
+    )
+    .unwrap();
+    drop(cf);
+
+    // If this regress to index-based access, the test process would panic
+    // during state construction and the test would fail.
+    let state = AppState::sharded_with_blacklist_file(
+        Duration::from_secs(1800),
+        Duration::from_secs(3000),
+        16,
+        None,
+        Some(trends_file),
+        None,
+    );
+    let app = router(state);
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/clients")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // Cleanup
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[tokio::test]
 async fn blacklist_case_insensitive_hex() {
     // Create blacklist with uppercase hex
     let path = std::env::temp_dir().join(format!(
