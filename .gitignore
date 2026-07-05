@@ -37,9 +37,6 @@ examples/memory_ci_compare.rs
 examples/memory_staircase_test.rs
 examples/memory_tracker_btree.rs
 
-# 排除未使用的测试文件
-tests/
-
 # Trae IDE
 .trae/
 skills-lock.json
