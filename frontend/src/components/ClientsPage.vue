@@ -38,7 +38,7 @@ function share(peers: number): string {
 
   <section class="bg-panel border border-line p-4 mb-5">
     <div class="flex items-center justify-between gap-4 mb-3 max-[900px]:flex-col max-[900px]:items-stretch">
-      <div class="flex items-center gap-3 max-[900px]:justify-between">
+      <div class="flex items-center justify-end gap-3 w-full">
         <span class="text-muted text-xs whitespace-nowrap">{{ statusText }}</span>
         <button
           :disabled="loading"
