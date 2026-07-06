@@ -132,101 +132,17 @@ GET /scrape?info_hash=<20字节>[&info_hash=...]
 d5:filesd20:<info_hash>d8:completei5e10:downloadedi10e10:incompletei3eeee
 ```
 
-### 统计 API
+### 面板 API
 
-```
-GET /api/stats
-```
+| 端点 | 说明 |
+|------|------|
+| `GET /api/stats` | 实时计数：peers、seeders、leechers、torrents、completed、rps、version、uptime |
+| `GET /api/trends` | 历史趋势数据（7 天保留，10 分钟采样） |
+| `GET /api/clients` | Top 15 客户端类型及时序历史 |
+| `GET /api/clients/list` | 所有已连接客户端类型，按 peer 数降序（当前快照） |
+| `GET /api/top100?limit=100` | Top 100 种子，按 peers / seeders / leechers / downloaded 排名（`limit` 最大 500） |
 
-返回 JSON：
-
-```json
-{
-  "interval": 1800,
-  "peer_timeout": 3000,
-  "torrents": 42,
-  "peers": 128,
-  "seeders": 85,
-  "leechers": 43,
-  "completed": 310,
-  "rps": 12.5,
-  "version": "0.2.24",
-  "uptime_secs": 3600
-}
-```
-
-### 趋势历史
-
-```
-GET /api/trends
-```
-
-返回 JSON，包含历史趋势数据（7 天保留，10 分钟采样）：
-
-```json
-{
-  "history": [
-    {"timestamp": 1715800000, "torrents": 40, "peers": 120, "seeders": 80, "leechers": 40}
-  ]
-}
-```
-
-### 客户端分布
-
-```
-GET /api/clients
-```
-
-返回 JSON，包含 Top 15 客户端类型及其历史 peer 数量：
-
-```json
-{
-  "timestamp": 1715800000,
-  "tags": [1, 2, 3],
-  "clients": ["qBittorrent", "Transmission", "µTorrent"],
-  "history": [
-    {"timestamp": 1715800000, "tags": [1, 2, 3], "counts": [50, 30, 20]}
-  ]
-}
-```
-
-### 客户端列表
-
-```
-GET /api/clients/list
-```
-
-返回 JSON，包含当前所有已连接的客户端类型，按 peer 数降序排列（过滤掉计数为 0 的客户端）。此接口为面板的「客户端页面」提供数据，与提供时序历史的 `/api/clients` 互补。
-
-```json
-{
-  "clients": [
-    {"name": "qBittorrent", "peers": 50},
-    {"name": "Transmission", "peers": 30}
-  ]
-}
-```
-
-### Top 100 种子
-
-```
-GET /api/top100?limit=100
-```
-
-| 查询参数 | 说明 | 默认值 | 最大值 |
-|---------|------|--------|--------|
-| `limit` | 每个排名返回的条目数 | `100` | `500` |
-
-返回 JSON，包含四种排序的排名：
-
-```json
-{
-  "peers": [{"info_hash": "...", "seeders": 10, "leechers": 5, "peers": 15, "downloaded": 100}],
-  "seeders": [...],
-  "leechers": [...],
-  "downloaded": [...]
-}
-```
+均返回 JSON。
 
 ## Web 监控面板
 
@@ -328,88 +244,18 @@ cargo run --release -- --trends-file /var/lib/rustracker/trends.jsonl
 
 ```
 rustracker/
-├── Cargo.toml                     # Rust 项目清单与依赖声明
-├── LICENSE                        # MIT 许可证
-├── README.md                      # 英文文档
-├── README-zh.md                   # 中文文档
-├── install-linux.sh               # Linux systemd 安装脚本（交互式菜单）
-│
-├── src/                           # Rust 源代码
-│   ├── main.rs                    # 入口：CLI 解析、Tokio 运行时、优雅关闭
-│   ├── lib.rs                     # 库根：重新导出 core、protocol、server 模块
-│   │
-│   ├── core.rs                    # 核心追踪引擎模块声明
-│   ├── core/                      # 核心追踪引擎（无 I/O 依赖）
-│   │   ├── types.rs               # 核心类型：InfoHash、PeerId、PeerState、TorrentStats
-│   │   ├── tracker.rs             # Tracker、AnnounceInput/Output、TrackerSnapshot
-│   │   ├── swarm.rs               # 每种子 Peer 集合，紧凑二进制存储、PeerEndpoint
-│   │   ├── topk.rs                # 四维 Top-K 排名（peers/seeders/leechers/downloaded）
-│   │   └── counters.rs            # 增量计数器，O(1) 快照
-│   │
-│   ├── protocol.rs                # BT 协议模块声明
-│   ├── protocol/                  # BitTorrent 协议编解码（无网络依赖）
-│   │   ├── bencode.rs             # 轻量 Bencode 编码器（零外部依赖）
-│   │   ├── announce.rs            # BEP 3 announce/scrape 查询解析与响应构建
-│   │   └── client_id.rs           # 102 种客户端 Peer ID 识别（编译时查找表）
-│   │
-│   ├── server.rs                  # HTTP 服务层模块声明
-│   └── server/                    # HTTP 服务层（axum + tokio）
-│       ├── handlers.rs            # HTTP 处理器：announce、scrape、healthz、面板、API
-│       ├── admin.rs               # 鉴权管理 API（黑名单 GET/POST）
-│       ├── pool.rs                # 64 分片 TrackerPool，按分片加 RwLock
-│       ├── blacklist.rs           # 种子黑名单，5 秒热重载文件监视
-│       └── trends.rs              # 趋势数据采集、7 天 JSONL 持久化、历史 API
-│
-├── build.rs                        # 构建脚本：在 frontend/ 中执行 `npm run build`，将 dist/ 内嵌进二进制
-├── frontend/                       # Vue 3 + Vite + Tailwind 面板 SPA（编译时内嵌进二进制）
-│   ├── package.json                # Node 依赖与构建脚本
-│   ├── vite.config.ts              # Vite 配置；通过 VITE_PERSONAL_CONTACT 环境变量内联联系信息
-│   ├── tailwind.config.js          # Tailwind CSS 配置
-│   ├── index.html                  # SPA 入口 HTML
-│   └── src/
-│       ├── main.ts                 # 应用启动（Vue、ECharts、i18n）
-│       ├── App.vue                 # 根组件（Sidebar + Topbar + 路由视图）
-│       ├── style.css               # Tailwind 入口与全局样式
-│       ├── views/                  # DashboardView.vue（概览 + 图表）
-│       ├── components/             # MetricCard、TrendChart、ClientChart、ClientsPage、Top100Page、Disclaimer、Sidebar、Topbar、AppFooter
-│       ├── composables/            # useStats、useTrends、useTop100、useClientsList、useI18n（响应式 API 钩子）
-│       ├── i18n/                   # 中文 / English / 日本語 / Русский / Deutsch / Українська 翻译
-│       └── types/                  # TypeScript API 类型定义
-│
-├── examples/                      # 负载测试与性能基准
-│   ├── announce_load.rs           # 简单并发通告负载测试
-│   ├── load_test.rs               # 高级负载测试（Zipf 分布、Peer 生命周期）
-│   ├── rps_bench.rs               # 每秒请求数基准
-│   ├── unified_bench.rs           # 统一基准测试套件
-│   ├── shrink_bench.rs            # Swarm 收缩策略基准
-│   ├── memory_bench_common/       # 内存基准的共用辅助代码
-│   ├── memory_tracker_bench.rs    # 内存占用基准
-│   ├── memory_jemalloc_bench.rs   # jemalloc 分配器内存基准
-│   ├── memory_mimalloc_bench.rs   # mimalloc 分配器内存基准
-│   ├── memory_tracker_btree.rs    # BTree 内存布局分析
-│   ├── memory_staircase_test.rs   # 内存阶梯增长测试
-│   └── memory_ci_compare.rs       # CI 内存回归对比
-│
-└── tests/                         # 集成测试
-    └── tracker_http.rs            # HTTP 端点集成测试
+├── src/
+│   ├── core/          # 追踪引擎（无 I/O）：types、tracker、swarm、topk、counters
+│   ├── protocol/      # BT 协议：bencode、announce、client_id（102 种客户端）
+│   └── server/        # HTTP 层：handlers、admin、pool（64 分片）、blacklist、trends
+├── frontend/          # Vue 3 + Vite + Tailwind 面板 SPA（编译时内嵌）
+├── examples/          # 负载测试与性能基准
+├── tests/             # 集成测试
+├── build.rs           # 构建前端，将 dist/ 内嵌进二进制
+└── install-linux.sh   # Linux systemd 安装脚本
 ```
 
-**源码模块概览：**
-
-| 层级 | 模块 | 职责 |
-|------|------|------|
-| `core` | `types.rs` | `InfoHash`（20 字节）、`PeerId`（20 字节）、`PeerState`、`TorrentStats` |
-| `core` | `tracker.rs` | 单分片 `Tracker` — `BTreeMap<InfoHash, Swarm>`，announce/scrape、快照 |
-| `core` | `swarm.rs` | 每种子 Peer 集合 — IPv4 每 peer 6 字节、IPv6 每 peer 18 字节紧凑存储 |
-| `core` | `counters.rs` | 增量计数器，O(1) 快照（无需全量遍历） |
-| `protocol` | `bencode.rs` | 最小化 Bencode 序列化器 — 无外部 crate 依赖 |
-| `protocol` | `announce.rs` | BEP 3 规范 Bencode 响应构建、紧凑 Peer 编码 |
-| `protocol` | `client_id.rs` | 编译时 256×256 查找表，匹配 `-XX####-` Azureus 风格 Peer ID 前缀 |
-| `server` | `pool.rs` | 64 分片 `TrackerPool` — 每分片 `RwLock<Tracker>`，按 `DefaultHasher(info_hash) % 64` 选片 |
-| `server` | `handlers.rs` | `/announce`、`/scrape`、`/healthz`、`/api/*`、`/` 请求处理 |
-| `server` | `admin.rs` | 鉴权管理端点（`GET`/`POST /api/blacklist`） |
-| `server` | `blacklist.rs` | `HashSet<InfoHash>` 通过 5 秒轮询实现热重载 |
-| `server` | `trends.rs` | 内存环形缓冲 + 可选 JSONL 持久化，7 天保留 |
+三层设计：`core`（纯引擎）→ `protocol`（BT 编解码）→ `server`（Axum HTTP）。详细模块职责见 `CLAUDE.md`。
 
 ## 客户端识别
 
@@ -428,40 +274,7 @@ Tracker 可从 peer ID 前缀识别 **102 种 BitTorrent 客户端**，包括：
 
 ## Linux 安装
 
-发布包中包含 `install-linux.sh`。将 Linux 二进制文件和脚本放在同一目录下，然后运行：
-
-```bash
-sudo sh install-linux.sh
-```
-
-安装程序提供中文交互菜单，支持：
-
-1. 安装或更新
-2. 卸载
-3. 启动服务
-4. 停止服务
-5. 重启服务
-6. 查看状态
-7. 查看配置
-8. 修改配置（监听地址、通告间隔、超时时间）
-9. 查看自动生成的 Admin Token
-10. 应用系统优化（sysctl 与文件句柄上限）
-0. 退出
-
-非交互式命令：
-
-```bash
-sudo sh install-linux.sh install
-sudo sh install-linux.sh uninstall
-sudo sh install-linux.sh start
-sudo sh install-linux.sh stop
-sudo sh install-linux.sh restart
-sudo sh install-linux.sh status
-sudo sh install-linux.sh config
-sudo sh install-linux.sh configure
-sudo sh install-linux.sh token
-sudo sh install-linux.sh tune
-```
+发布包中包含 `install-linux.sh`。将 Linux 二进制文件和脚本放在同一目录下，运行 `sudo sh install-linux.sh` 即可进入交互菜单（安装/更新、启动/停止/重启、配置、系统优化）。也支持 `install`、`start`、`stop`、`status` 等非交互式命令。
 
 **安装后的默认文件布局：**
 
@@ -473,93 +286,18 @@ sudo sh install-linux.sh tune
 | `/var/lib/rustracker/trends.jsonl` | 趋势数据 |
 | `/etc/systemd/system/rustracker.service` | systemd 服务单元 |
 
-对于监听地址，仅输入端口号（如 `6969`）会被接受并保存为 `0.0.0.0:6969`。
-
 ## 负载测试
 
-内置的压测示例：
-
-### 简单负载测试
+内置的压测工具位于 `examples/`：
 
 ```bash
-cargo run --release --example announce_load -- 2000 200 100
-#                                       总请求数 并发数 种子数
+cargo run --release --example announce_load -- 2000 200 100   # 简单负载测试
+cargo run --release --example load_test -- --duration 60 --concurrency 500  # 高级（Zipf 分布）
+cargo run --release --example unified_bench    # RPS、RSS、CPU、延迟
+cargo run --release --example shrink_bench     # 内存收缩/再增长周期
 ```
 
-按持续时间模式：
-
-```bash
-cargo run --release --example announce_load -- \
-  --duration-secs 30 --concurrency 200 --torrents 100
-```
-
-### 高级负载测试
-
-```bash
-cargo run --release --example load_test -- \
-  --duration 60 \
-  --concurrency 500 \
-  --torrents 1000 \
-  --peers 50000 \
-  --scrape-weight 1 \
-  --announce-weight 5 \
-  --keep-alive \
-  --progress-interval 5
-```
-
-特性：Zipf 分布模拟真实种子热度、peer 生命周期事件（started/completed/stopped）、40% 做种比例、延迟百分位统计（p50/p95/p99）。
-
-### RPS 基准测试
-
-```bash
-cargo run --release --example rps_bench
-```
-
-单任务混合流量基准，模拟真实 tracker 生命周期（初期以新 peer 为主，后期以重新通告为主）。报告累计 RPS、窗口 RPS 和 RSS。
-
-### 统一基准测试
-
-```bash
-cargo run --release --example unified_bench
-```
-
-并发 HTTP 基准，追踪 RPS、RSS、CPU 使用率和每请求延迟（avg/p50/p99/max）。
-
-### 内存基准
-
-```bash
-# 系统分配器内存占用
-cargo run --release --example memory_tracker_bench
-
-# jemalloc 分配器对比（仅 Linux）
-cargo run --release --example memory_jemalloc_bench
-
-# mimalloc 分配器对比
-cargo run --release --example memory_mimalloc_bench
-
-# BTree 内存布局分析
-cargo run --release --example memory_tracker_btree
-
-# 内存阶梯增长测试
-cargo run --release --example memory_staircase_test
-
-# CI 内存回归对比
-cargo run --release --example memory_ci_compare
-```
-
-### 收缩/再增长基准
-
-```bash
-cargo run --release --example shrink_bench
-```
-
-在重复的 grow→shrink→regrow 周期后测量 RSS 开销，验证 swarm 的 `shrink_if_idle` 策略是否将内存归还给操作系统。向 stdout 输出 CSV（`cycle,torrents,rss_build_mb,peers_after_expire,rss_shrink_mb,rss_regrow_mb,overhead_mb`），向 stderr 输出进度日志。通过环境变量配置：
-
-| 环境变量 | 默认值 | 说明 |
-|---------|--------|------|
-| `SHRINK_TORRENTS` | `30000` | 种子数量 |
-| `SHRINK_BULK` | `300` | 每种子批量 peer 数（每周期过期） |
-| `SHRINK_CYCLES` | `10` | grow→shrink→regrow 周期数 |
+完整的内存与基准测试列表见 `CLAUDE.md`。
 
 ## 开发指南
 

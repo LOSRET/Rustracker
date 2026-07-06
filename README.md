@@ -132,101 +132,17 @@ Multiple `info_hash` parameters are supported. Response (bencoded):
 d5:filesd20:<info_hash>d8:completei5e10:downloadedi10e10:incompletei3eeee
 ```
 
-### Stats API
+### Dashboard API
 
-```
-GET /api/stats
-```
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/stats` | Real-time counts: peers, seeders, leechers, torrents, completed, rps, version, uptime |
+| `GET /api/trends` | Historical trend data (7-day retention, 10-min sampling) |
+| `GET /api/clients` | Top 15 client types with time-series history |
+| `GET /api/clients/list` | All connected client types sorted by peer count (current snapshot) |
+| `GET /api/top100?limit=100` | Top 100 torrents ranked by peers / seeders / leechers / downloaded (`limit` max 500) |
 
-Returns JSON:
-
-```json
-{
-  "interval": 1800,
-  "peer_timeout": 3000,
-  "torrents": 42,
-  "peers": 128,
-  "seeders": 85,
-  "leechers": 43,
-  "completed": 310,
-  "rps": 12.5,
-  "version": "0.2.24",
-  "uptime_secs": 3600
-}
-```
-
-### Trend History
-
-```
-GET /api/trends
-```
-
-Returns JSON with historical trend data (7-day retention, 10-min sampling):
-
-```json
-{
-  "history": [
-    {"timestamp": 1715800000, "torrents": 40, "peers": 120, "seeders": 80, "leechers": 40}
-  ]
-}
-```
-
-### Client Distribution
-
-```
-GET /api/clients
-```
-
-Returns JSON with the top 15 client types and their historical peer counts:
-
-```json
-{
-  "timestamp": 1715800000,
-  "tags": [1, 2, 3],
-  "clients": ["qBittorrent", "Transmission", "µTorrent"],
-  "history": [
-    {"timestamp": 1715800000, "tags": [1, 2, 3], "counts": [50, 30, 20]}
-  ]
-}
-```
-
-### Client List
-
-```
-GET /api/clients/list
-```
-
-Returns JSON with all client types currently connected, sorted by peer count descending (zero-count clients excluded). This backs the dashboard's Clients page and complements `/api/clients`, which provides time-series history.
-
-```json
-{
-  "clients": [
-    {"name": "qBittorrent", "peers": 50},
-    {"name": "Transmission", "peers": 30}
-  ]
-}
-```
-
-### Top 100 Torrents
-
-```
-GET /api/top100?limit=100
-```
-
-| Query | Description | Default | Max |
-|-------|-------------|---------|-----|
-| `limit` | Number of entries per ranking | `100` | `500` |
-
-Returns JSON with four sorted rankings:
-
-```json
-{
-  "peers": [{"info_hash": "...", "seeders": 10, "leechers": 5, "peers": 15, "downloaded": 100}],
-  "seeders": [...],
-  "leechers": [...],
-  "downloaded": [...]
-}
-```
+All return JSON.
 
 ## Web Dashboard
 
@@ -328,88 +244,18 @@ cargo run --release -- --trends-file /var/lib/rustracker/trends.jsonl
 
 ```
 rustracker/
-├── Cargo.toml                     # Rust project manifest and dependencies
-├── LICENSE                        # MIT license
-├── README.md                      # English documentation
-├── README-zh.md                   # Chinese documentation
-├── install-linux.sh               # Linux systemd installer (interactive menu)
-│
-├── src/                           # Rust source code
-│   ├── main.rs                    # Entry point: CLI parsing, Tokio runtime, graceful shutdown
-│   ├── lib.rs                     # Library root: re-exports core, protocol, server modules
-│   │
-│   ├── core.rs                    # Core tracker engine module declaration
-│   ├── core/                      # Core tracker engine (no I/O dependency)
-│   │   ├── types.rs               # Core types: InfoHash, PeerId, PeerState, TorrentStats
-│   │   ├── tracker.rs             # Tracker, AnnounceInput/Output, TrackerSnapshot
-│   │   ├── swarm.rs               # Per-torrent peer set, packed binary storage, PeerEndpoint
-│   │   ├── topk.rs                # 4-way Top-K ranking (peers/seeders/leechers/downloaded)
-│   │   └── counters.rs            # Incremental counters for O(1) snapshots
-│   │
-│   ├── protocol.rs                # BT protocol module declaration
-│   ├── protocol/                  # BitTorrent protocol encoding (no network dependency)
-│   │   ├── bencode.rs             # Lightweight bencode encoder (zero external dependency)
-│   │   ├── announce.rs            # BEP 3 announce/scrape query parsing, response building
-│   │   └── client_id.rs           # 102-client peer ID identification (compile-time lookup)
-│   │
-│   ├── server.rs                  # HTTP server module declaration
-│   └── server/                    # HTTP server layer (axum + tokio)
-│       ├── handlers.rs            # HTTP handlers: announce, scrape, healthz, dashboard, APIs
-│       ├── admin.rs               # Authenticated admin API (blacklist GET/POST)
-│       ├── pool.rs                # 64-shard TrackerPool with per-shard RwLock
-│       ├── blacklist.rs           # Torrent blacklist with 5-sec hot-reload file watcher
-│       └── trends.rs              # Trend data collection, 7-day JSONL persistence, history API
-│
-├── build.rs                        # Build script: runs `npm run build` in frontend/, embeds dist/ into the binary
-├── frontend/                       # Vue 3 + Vite + Tailwind dashboard SPA (compiled into the binary)
-│   ├── package.json                # Node dependencies and build scripts
-│   ├── vite.config.ts              # Vite config; inlines contact info via VITE_PERSONAL_CONTACT env var
-│   ├── tailwind.config.js          # Tailwind CSS config
-│   ├── index.html                  # SPA entry HTML
-│   └── src/
-│       ├── main.ts                 # App bootstrap (Vue, ECharts, i18n)
-│       ├── App.vue                 # Root component (Sidebar + Topbar + routed view)
-│       ├── style.css               # Tailwind entry + global styles
-│       ├── views/                  # DashboardView.vue (overview + charts)
-│       ├── components/             # MetricCard, TrendChart, ClientChart, ClientsPage, Top100Page, Disclaimer, Sidebar, Topbar, AppFooter
-│       ├── composables/            # useStats, useTrends, useTop100, useClientsList, useI18n (reactive API hooks)
-│       ├── i18n/                   # Translations for 中文 / English / 日本語 / Русский / Deutsch / Українська
-│       └── types/                  # TypeScript API types
-│
-├── examples/                      # Load testing and benchmarking tools
-│   ├── announce_load.rs           # Simple concurrent announce load test
-│   ├── load_test.rs               # Advanced load test (Zipf distribution, peer lifecycle)
-│   ├── rps_bench.rs               # Requests-per-second benchmark
-│   ├── unified_bench.rs           # Unified benchmark suite
-│   ├── shrink_bench.rs            # Swarm shrink-strategy benchmark
-│   ├── memory_bench_common/       # Shared helpers for memory benchmarks
-│   ├── memory_tracker_bench.rs    # Memory usage benchmark
-│   ├── memory_jemalloc_bench.rs   # Memory benchmark with jemalloc allocator
-│   ├── memory_mimalloc_bench.rs   # Memory benchmark with mimalloc allocator
-│   ├── memory_tracker_btree.rs    # BTree memory layout analysis
-│   ├── memory_staircase_test.rs   # Memory staircase growth test
-│   └── memory_ci_compare.rs       # CI memory regression comparison
-│
-└── tests/                         # Integration tests
-    └── tracker_http.rs            # HTTP endpoint integration tests
+├── src/
+│   ├── core/          # Tracker engine (no I/O): types, tracker, swarm, topk, counters
+│   ├── protocol/      # BT protocol: bencode, announce, client_id (102 clients)
+│   └── server/        # HTTP layer: handlers, admin, pool (64 shards), blacklist, trends
+├── frontend/          # Vue 3 + Vite + Tailwind dashboard SPA (embedded at compile time)
+├── examples/          # Load testing and benchmarking tools
+├── tests/             # Integration tests
+├── build.rs           # Builds frontend, embeds dist/ into the binary
+└── install-linux.sh   # Linux systemd installer
 ```
 
-**Source module overview:**
-
-| Layer | Module | Responsibility |
-|-------|--------|---------------|
-| `core` | `types.rs` | `InfoHash` (20 bytes), `PeerId` (20 bytes), `PeerState`, `TorrentStats` |
-| `core` | `tracker.rs` | Single-shard `Tracker` — `BTreeMap<InfoHash, Swarm>`, announce/scrape, snapshots |
-| `core` | `swarm.rs` | Per-torrent peer collection — packed binary IPv4 (6B) / IPv6 (18B) per peer |
-| `core` | `counters.rs` | Incremental counters for O(1) snapshots (no full traversal) |
-| `protocol` | `bencode.rs` | Minimal bencode serializer — no external crate dependency |
-| `protocol` | `announce.rs` | BEP 3 compliant bencode response builder, compact peer encoding |
-| `protocol` | `client_id.rs` | Compile-time 256×256 lookup table for `-XX####-` Azureus peer ID prefixes |
-| `server` | `pool.rs` | 64-shard `TrackerPool` — per-shard `RwLock<Tracker>` selected by `DefaultHasher(info_hash) % 64` |
-| `server` | `handlers.rs` | Request handlers for `/announce`, `/scrape`, `/healthz`, `/api/*`, `/` |
-| `server` | `admin.rs` | Authenticated admin endpoints (`GET`/`POST /api/blacklist`) |
-| `server` | `blacklist.rs` | `HashSet<InfoHash>` hot-reload via 5-second file polling |
-| `server` | `trends.rs` | In-memory ring buffer + optional JSONL persistence, 7-day retention |
+Three-layer design: `core` (pure engine) → `protocol` (BT encoding) → `server` (Axum HTTP). See `CLAUDE.md` for detailed module responsibilities.
 
 ## Client Identification
 
@@ -428,40 +274,7 @@ Client tags are exposed in the `/api/clients` endpoint and the dashboard's clien
 
 ## Linux Installation
 
-Release packages include `install-linux.sh`. Place the Linux binary and the script in the same directory, then:
-
-```bash
-sudo sh install-linux.sh
-```
-
-The installer provides a Chinese interactive menu for:
-
-1. Install or update
-2. Uninstall
-3. Start service
-4. Stop service
-5. Restart service
-6. View status
-7. View configuration
-8. Modify configuration (listen address, interval, timeout)
-9. View the generated Admin Token
-10. Apply system tuning (sysctl + open-file limits)
-0. Exit
-
-Non-interactive commands:
-
-```bash
-sudo sh install-linux.sh install
-sudo sh install-linux.sh uninstall
-sudo sh install-linux.sh start
-sudo sh install-linux.sh stop
-sudo sh install-linux.sh restart
-sudo sh install-linux.sh status
-sudo sh install-linux.sh config
-sudo sh install-linux.sh configure
-sudo sh install-linux.sh token
-sudo sh install-linux.sh tune
-```
+Release packages include `install-linux.sh`. Place the Linux binary and the script in the same directory, then run `sudo sh install-linux.sh` for an interactive menu (install/update, start/stop/restart, config, system tuning). Non-interactive commands like `install`, `start`, `stop`, `status` are also supported.
 
 **Default file layout after installation:**
 
@@ -473,93 +286,18 @@ sudo sh install-linux.sh tune
 | `/var/lib/rustracker/trends.jsonl` | Trend data |
 | `/etc/systemd/system/rustracker.service` | systemd unit |
 
-For the listen address, entering only a port (e.g. `6969`) is accepted and saved as `0.0.0.0:6969`.
-
 ## Load Testing
 
-Built-in examples for benchmarking:
-
-### Simple Load Test
+Built-in benchmarking tools are in `examples/`:
 
 ```bash
-cargo run --release --example announce_load -- 2000 200 100
-#                                       total concurrency torrents
+cargo run --release --example announce_load -- 2000 200 100   # simple load test
+cargo run --release --example load_test -- --duration 60 --concurrency 500  # advanced (Zipf)
+cargo run --release --example unified_bench    # RPS, RSS, CPU, latency
+cargo run --release --example shrink_bench     # memory shrink/regrow cycles
 ```
 
-Duration mode:
-
-```bash
-cargo run --release --example announce_load -- \
-  --duration-secs 30 --concurrency 200 --torrents 100
-```
-
-### Advanced Load Test
-
-```bash
-cargo run --release --example load_test -- \
-  --duration 60 \
-  --concurrency 500 \
-  --torrents 1000 \
-  --peers 50000 \
-  --scrape-weight 1 \
-  --announce-weight 5 \
-  --keep-alive \
-  --progress-interval 5
-```
-
-Features: Zipf distribution for realistic torrent popularity, peer lifecycle events (started/completed/stopped), 40% seeder ratio, latency percentiles (p50/p95/p99).
-
-### RPS Benchmark
-
-```bash
-cargo run --release --example rps_bench
-```
-
-Single-task mixed traffic benchmark simulating a real tracker lifecycle (mostly new peers early, mostly re-announces later). Reports cumulative RPS, per-window RPS, and RSS.
-
-### Unified Benchmark
-
-```bash
-cargo run --release --example unified_bench
-```
-
-Concurrent HTTP benchmark tracking RPS, RSS, CPU usage, and per-request latency (avg/p50/p99/max).
-
-### Memory Benchmarks
-
-```bash
-# System allocator memory usage
-cargo run --release --example memory_tracker_bench
-
-# Jemalloc allocator comparison (Linux only)
-cargo run --release --example memory_jemalloc_bench
-
-# Mimalloc allocator comparison
-cargo run --release --example memory_mimalloc_bench
-
-# BTree memory layout analysis
-cargo run --release --example memory_tracker_btree
-
-# Memory staircase growth test
-cargo run --release --example memory_staircase_test
-
-# CI memory regression comparison
-cargo run --release --example memory_ci_compare
-```
-
-### Shrink/Regrow Benchmark
-
-```bash
-cargo run --release --example shrink_bench
-```
-
-Measures RSS overhead after repeated grow→shrink→regrow cycles to verify that the swarm `shrink_if_idle` strategy returns memory to the OS. Emits a CSV (`cycle,torrents,rss_build_mb,peers_after_expire,rss_shrink_mb,rss_regrow_mb,overhead_mb`) to stdout and a progress log to stderr. Config via env vars:
-
-| Env | Default | Description |
-|-----|---------|-------------|
-| `SHRINK_TORRENTS` | `30000` | Number of torrents |
-| `SHRINK_BULK` | `300` | Bulk peers per torrent (expired each cycle) |
-| `SHRINK_CYCLES` | `10` | Number of grow→shrink→regrow cycles |
+See `CLAUDE.md` for the full list of memory and benchmark examples.
 
 ## Development
 
