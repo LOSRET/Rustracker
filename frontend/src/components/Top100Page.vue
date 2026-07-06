@@ -12,7 +12,7 @@ onMounted(load);
 
 const rows = computed(() => {
   if (!data.value) return [];
-  return data.value[sort.value] ?? [];
+  return data.value[sort.value];
 });
 
 const statusText = computed(() => {

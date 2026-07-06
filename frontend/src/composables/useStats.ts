@@ -5,14 +5,11 @@ import type { StatsResponse } from "../types/api";
 export function useStats(intervalMs = 5000): {
   stats: Ref<StatsResponse | null>;
   error: Ref<string | null>;
-  loading: Ref<boolean>;
   lastUpdated: Ref<number | null>;
-  refresh: () => Promise<void>;
   stop: () => void;
 } {
   const stats = ref<StatsResponse | null>(null);
   const error = ref<string | null>(null);
-  const loading = ref(true);
   const lastUpdated = ref<number | null>(null);
 
   async function refresh() {
@@ -24,8 +21,6 @@ export function useStats(intervalMs = 5000): {
       error.value = null;
     } catch (e) {
       error.value = e instanceof Error ? e.message : String(e);
-    } finally {
-      loading.value = false;
     }
   }
 
@@ -35,5 +30,5 @@ export function useStats(intervalMs = 5000): {
     pause();
   }
 
-  return { stats, error, loading, lastUpdated, refresh, stop };
+  return { stats, error, lastUpdated, stop };
 }

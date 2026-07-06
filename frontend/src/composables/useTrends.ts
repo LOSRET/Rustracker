@@ -5,7 +5,6 @@ import type { TrendsResponse, ClientsResponse } from "../types/api";
 export function useTrends(intervalMs = 600000): {
   trends: Ref<TrendsResponse | null>;
   clients: Ref<ClientsResponse | null>;
-  refresh: () => Promise<void>;
   start: () => void;
   stop: () => void;
 } {
@@ -37,5 +36,5 @@ export function useTrends(intervalMs = 600000): {
   }
 
   start();
-  return { trends, clients, refresh, start, stop };
+  return { trends, clients, start, stop };
 }
