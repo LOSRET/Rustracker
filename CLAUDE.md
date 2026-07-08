@@ -15,6 +15,7 @@ Before implementing:
 - If multiple interpretations exist, present them — don't pick silently.
 - If a simpler approach exists, say so. Push back when warranted.
 - If something is unclear, stop. Name what's confusing. Ask.
+- **Never guess code, APIs, or framework behavior from memory.** If a detail is uncertain (function signature, config option, directive syntax, breaking change between versions, whether a file is needed), look it up in the official documentation before writing or asserting anything. Memory-based claims about APIs/configs are a frequent source of silent breakage — verify first. This applies to all libraries/frameworks (Tailwind, Nuxt UI, Vue, Vite, Rust crates, etc.).
 
 ### 2. Simplicity First
 
