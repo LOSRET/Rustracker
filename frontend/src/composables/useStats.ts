@@ -1,34 +1,27 @@
-import { ref, type Ref } from "vue";
-import { useIntervalFn } from "@vueuse/core";
+import { ref } from "vue";
+import { useFetch, useIntervalFn } from "@vueuse/core";
 import type { StatsResponse } from "../types/api";
 
-export function useStats(intervalMs = 5000): {
-  stats: Ref<StatsResponse | null>;
-  error: Ref<string | null>;
-  lastUpdated: Ref<number | null>;
-  stop: () => void;
-} {
-  const stats = ref<StatsResponse | null>(null);
-  const error = ref<string | null>(null);
+export function useStats(intervalMs = 5000) {
   const lastUpdated = ref<number | null>(null);
+  let prev: StatsResponse | null = null;
 
-  async function refresh() {
-    try {
-      const res = await fetch("/api/stats", { cache: "no-store" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      stats.value = await res.json();
-      lastUpdated.value = Date.now();
-      error.value = null;
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : String(e);
-    }
-  }
+  const { data: stats, error, execute } = useFetch(
+    "/api/stats",
+    { cache: "no-store" },
+    {
+      immediate: false,
+      updateDataOnError: true,
+      afterFetch: (ctx) => {
+        prev = ctx.data;
+        lastUpdated.value = Date.now();
+        return ctx;
+      },
+      onFetchError: () => ({ data: prev }),
+    },
+  ).get().json<StatsResponse>();
 
-  const { pause } = useIntervalFn(refresh, intervalMs, { immediateCallback: true });
+  const { pause } = useIntervalFn(execute, intervalMs, { immediateCallback: true });
 
-  function stop() {
-    pause();
-  }
-
-  return { stats, error, lastUpdated, stop };
+  return { stats, error, lastUpdated, stop: pause };
 }

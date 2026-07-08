@@ -3,10 +3,10 @@ import type { LangKey } from "../types/api";
 import { LANG_LOCALE, OG_LOCALE, NUM_LOCALE } from "../i18n";
 
 export function useI18n() {
-  const { t, locale } = useVueI18n({ useScope: "global" });
+  const { t, locale, n } = useVueI18n({ useScope: "global" });
 
   function number(value: number): string {
-    return new Intl.NumberFormat(NUM_LOCALE[locale.value as LangKey]).format(value || 0);
+    return n(value || 0);
   }
 
   function localeFor(): string {
