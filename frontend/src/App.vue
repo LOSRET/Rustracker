@@ -31,7 +31,7 @@ onUnmounted(stop);
 <template>
   <UApp>
     <button
-      class="hidden max-[900px]:block fixed top-[14px] left-[14px] z-[999] bg-side text-[#f8fafc] border-0 p-2 cursor-pointer rounded-md leading-none"
+      class="hidden max-[900px]:block fixed top-[14px] left-[14px] z-[999] bg-side text-side-fg border-0 p-2 cursor-pointer rounded-md leading-none"
       @click="sidebarOpen = !sidebarOpen"
       aria-label="Menu"
     >

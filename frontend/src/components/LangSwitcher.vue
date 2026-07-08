@@ -28,15 +28,15 @@ const langs: { key: LangKey; label: string }[] = [
     :portal="false"
     variant="none"
     :content="{ sideOffset: 4 }"
-    class="w-full bg-side-sel hover:border-accent text-[#f8fafc] border border-side-border text-[13px] cursor-pointer outline-none focus:border-accent rounded-none"
+    class="w-full bg-side-sel hover:border-accent text-side-fg border border-side-border text-[13px] cursor-pointer outline-none focus:border-accent rounded-none"
     :ui="{
       leading: 'ps-2.5',
       trailing: 'pe-2.5',
-      value: 'flex-1 text-left text-[#f8fafc]',
+      value: 'flex-1 text-left text-side-fg',
       content: 'z-[1100] bg-side-sel border border-side-border ring-0 shadow-lg max-h-60 rounded-none',
       viewport: 'divide-y-0',
       group: 'p-0',
-      item: 'flex items-center gap-2 px-2.5 py-1.5 text-[13px] cursor-pointer transition-colors duration-150 text-[#f8fafc] data-highlighted:bg-side-hover data-highlighted:!text-white before:hidden',
+      item: 'flex items-center gap-2 px-2.5 py-1.5 text-[13px] cursor-pointer transition-colors duration-150 text-side-fg data-highlighted:bg-side-hover data-highlighted:!text-white before:hidden',
       itemTrailingIcon: 'size-3.5 text-accent',
     }"
   >
@@ -45,7 +45,7 @@ const langs: { key: LangKey; label: string }[] = [
     </template>
 
     <template #trailing>
-      <svg class="w-3.5 h-3.5 text-[#9ca3af] transition-transform duration-200 group-data-[state=open]:rotate-180" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.06l3.71-3.83a.75.75 0 111.08 1.04l-4.25 4.39a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd" /></svg>
+      <svg class="w-3.5 h-3.5 text-side-muted transition-transform duration-200 group-data-[state=open]:rotate-180" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.06l3.71-3.83a.75.75 0 111.08 1.04l-4.25 4.39a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd" /></svg>
     </template>
 
     <template #item-leading="{ item }">

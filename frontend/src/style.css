@@ -1,15 +1,7 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
-@config "../tailwind.config.js";
 
-.flag-svg svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-:root {
-  color-scheme: light dark;
+@theme {
   --color-ink: #1f2937;
   --color-muted: #64748b;
   --color-line: #d8dee8;
@@ -20,6 +12,9 @@
   --color-side-hover: #1e2d45;
   --color-side-sel: #22304a;
   --color-side-border: #334155;
+  --color-side-fg: #f8fafc;
+  --color-side-muted: #9ca3af;
+  --color-side-note: #cbd5e1;
   --color-accent: #2563eb;
   --color-accent-dark: #1d4ed8;
   --color-hover-soft: #e8ecf2;
@@ -31,6 +26,27 @@
   --color-violet: #6d28d9;
   --color-bad: #b91c1c;
   --color-peers: #475569;
+
+  --font-sans: "Segoe UI", Arial, sans-serif;
+  --font-display: Sora, sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, monospace;
+
+  --animate-rps-pulse: rps-pulse 2s ease-in-out infinite;
+
+  @keyframes rps-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+}
+
+.flag-svg svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+:root {
+  color-scheme: light dark;
 }
 
 @media (prefers-color-scheme: dark) {
