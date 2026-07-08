@@ -5,7 +5,7 @@ export function useTrends(intervalMs = 600000) {
   let prevTrends: TrendsResponse | null = null;
   let prevClients: ClientsResponse | null = null;
 
-  const { data: trends, execute: execTrends } = useFetch(
+  const { data: trends, error: trendsError, execute: execTrends } = useFetch(
     "/api/trends",
     { cache: "no-store" },
     {
@@ -19,7 +19,7 @@ export function useTrends(intervalMs = 600000) {
     },
   ).get().json<TrendsResponse>();
 
-  const { data: clients, execute: execClients } = useFetch(
+  const { data: clients, error: clientsError, execute: execClients } = useFetch(
     "/api/clients",
     { cache: "no-store" },
     {
@@ -48,6 +48,5 @@ export function useTrends(intervalMs = 600000) {
     pause();
   }
 
-  start();
-  return { trends, clients, start, stop };
+  return { trends, clients, trendsError, clientsError, start, stop };
 }

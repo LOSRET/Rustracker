@@ -29,7 +29,7 @@ const zh = {
   disc_p4: "对于第三方客户端行为、资源内容、传输结果及由此产生的任何直接或间接后果，本站不承担责任，使用者应自行判断并承担相关风险。",
   disc_p5: "受 Tracker 工作机制限制，本站不保留可用于长期识别、追踪或还原单个连接历史的完整日志，也无法对既往连接行为提供持续、完整或可验证的回溯记录。",
   torrents: "Torrents", completed: "已完成", powered_by: "基于", uptime: "运行时间:",
-  blog_label: "Blog", contact_label: "如有问题请联系",
+  blog_label: "Blog：", contact_label: "如有问题请联系：",
   seo_title: "BitTorrent Tracker – HTTP Tracker 实时监控面板",
   seo_desc: "BitTorrent HTTP Tracker 实时监控面板，查看 Peers、Seeders、Leechers、客户端分布与趋势图表。提供 announce/scrape 接口，支持 IPv4/IPv6。",
 };
@@ -62,7 +62,7 @@ const en = {
   disc_p4: "This site assumes no responsibility for third-party client behavior, resource content, transmission results, or any direct or indirect consequences arising therefrom. Users should exercise their own judgment and bear associated risks.",
   disc_p5: "Due to tracker operational limitations, this site does not retain complete logs that could be used for long-term identification, tracking or reconstruction of individual connection histories, and cannot provide continuous, complete or verifiable retrospective records of past connection activity.",
   torrents: "Torrents", completed: "Completed", powered_by: "Powered by", uptime: "Uptime:",
-  blog_label: "Blog", contact_label: "Contact",
+  blog_label: "Blog: ", contact_label: "Contact: ",
   seo_title: "BitTorrent Tracker – Real-time HTTP Tracker Dashboard",
   seo_desc: "BitTorrent HTTP Tracker dashboard. Monitor Peers, Seeders, Leechers, client distribution and trend charts. Supports announce/scrape with IPv4/IPv6.",
 };
@@ -95,7 +95,7 @@ const ja = {
   disc_p4: "サードパーティのクライアント行動、リソースコンテンツ、送信結果、およびそれらから生じる直接的または間接的な結果について、本サイトは一切の責任を負いません。利用者は自己の判断で関連するリスクを負担してください。",
   disc_p5: "Trackerの動作上の制限により、本サイトは個々の接続履歴の長期的な識別、追跡、復元に使用できる完全なログを保持せず、過去の接続活動に対する連続的、完全、または検証可能な遡及記録を提供できません。",
   torrents: "Torrents", completed: "完了", powered_by: "提供元:", uptime: "稼働時間:",
-  blog_label: "ブログ", contact_label: "お問い合わせ",
+  blog_label: "ブログ：", contact_label: "お問い合わせ：",
   seo_title: "BitTorrent Tracker – リアルタイムHTTP Trackerダッシュボード",
   seo_desc: "BitTorrent HTTP Trackerダッシュボード。Peers、Seeders、Leechers、クライアント分布、トレンドチャートを監視。announce/scrape対応、IPv4/IPv6サポート。",
 };
@@ -128,7 +128,7 @@ const ru = {
   disc_p4: "Данный сайт не несёт ответственности за поведение сторонних клиентов, содержание ресурсов, результаты передачи и любые прямые или косвенные последствия, возникающие из этого. Пользователи должны самостоятельно оценивать риски.",
   disc_p5: "В связи с ограничениями работы трекера, сайт не хранит полные журналы, которые могут быть использованы для долгосрочной идентификации, отслеживания или восстановления истории отдельных подключений, и не может предоставить непрерывные, полные или проверяемые записи о прошлой активности.",
   torrents: "Torrents", completed: "Завершено", powered_by: "На базе", uptime: "Время работы:",
-  blog_label: "Блог", contact_label: "Контакт",
+  blog_label: "Блог: ", contact_label: "Контакт: ",
   seo_title: "BitTorrent Tracker – Панель мониторинга HTTP-трекера",
   seo_desc: "Панель мониторинга BitTorrent HTTP-трекера. Отслеживание Peers, Seeders, Leechers, распределения клиентов и графиков трендов. Поддержка announce/scrape, IPv4/IPv6.",
 };
@@ -161,7 +161,7 @@ const de = {
   disc_p4: "Diese Website übernimmt keine Verantwortung für das Verhalten von Drittanbieter-Clients, Ressourceninhalte, Übertragungsergebnisse oder daraus entstehende direkte oder indirekte Folgen. Nutzer sollten eigenständig urteilen und die damit verbundenen Risiken tragen.",
   disc_p5: "Aufgrund der betrieblichen Einschränkungen des Trackers speichert diese Website keine vollständigen Protokolle, die zur langfristigen Identifizierung, Nachverfolgung oder Rekonstruktion einzelner Verbindungsverläufe verwendet werden könnten, und kann keine lückenlosen, vollständigen oder überprüfbaren Aufzeichnungen vergangener Verbindungsaktivitäten bereitstellen.",
   torrents: "Torrents", completed: "Abgeschlossen", powered_by: "Betrieben mit", uptime: "Betriebszeit:",
-  blog_label: "Blog", contact_label: "Kontakt",
+  blog_label: "Blog: ", contact_label: "Kontakt: ",
   seo_title: "BitTorrent Tracker – Echtzeit-HTTP-Tracker-Dashboard",
   seo_desc: "BitTorrent HTTP-Tracker-Dashboard. Überwachung von Peers, Seeders, Leechers, Client-Verteilung und Trenddiagrammen. Unterstützt announce/scrape mit IPv4/IPv6.",
 };
@@ -194,7 +194,7 @@ const uk = {
   disc_p4: "Цей сайт не несе відповідальності за поведінку сторонніх клієнтів, вміст ресурсів, результати передачі та будь-які прямі чи непрямі наслідки, що виникають з цього. Користувачі повинні самостійно оцінювати ризики.",
   disc_p5: "У зв'язку з обмеженнями роботи трекера, сайт не зберігає повні журнали, які можуть бути використані для довгострокової ідентифікації, відстеження або відновлення історії окремих підключень, і не може надати безперервні, повні або звіряні записи про минулу активність.",
   torrents: "Torrents", completed: "Завершено", powered_by: "На базі", uptime: "Час роботи:",
-  blog_label: "Блог", contact_label: "Контакт",
+  blog_label: "Блог: ", contact_label: "Контакт: ",
   seo_title: "BitTorrent Tracker – Панель моніторингу HTTP-трекера",
   seo_desc: "Панель моніторингу BitTorrent HTTP-трекера. Відстеження Peers, Seeders, Leechers, розподілу клієнтів та графіків трендів. Підтримка announce/scrape, IPv4/IPv6.",
 };

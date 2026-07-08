@@ -17,6 +17,6 @@
     "noFallthroughCasesInSwitch": true,
     "verbatimModuleSyntax": true
   },
-  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.vue"],
+  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.vue", "auto-imports.d.ts", "components.d.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

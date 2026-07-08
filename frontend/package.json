@@ -10,7 +10,7 @@
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
-    "@headlessui/vue": "^1.7.23",
+    "@nuxt/ui": "^4.9.0",
     "@vueuse/core": "^14.3.0",
     "country-flag-icons": "^1.6.20",
     "echarts": "^6.1.0",

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
-import { RadioGroup, RadioGroupOption } from "@headlessui/vue";
 import type { SortKey } from "../types/api";
 import { useTop100 } from "../composables/useTop100";
 import { useI18n } from "../composables/useI18n";
@@ -30,6 +29,8 @@ const sortLabel: Record<SortKey, string> = {
   leechers: "sort_leechers",
   downloaded: "sort_downloaded",
 };
+
+const sortItems = computed(() => sortOptions.map((s) => ({ label: t(sortLabel[s]), value: s })));
 </script>
 
 <template>
@@ -42,23 +43,21 @@ const sortLabel: Record<SortKey, string> = {
 
   <section class="bg-panel border border-line p-4 mb-5">
     <div class="flex items-center justify-between gap-4 mb-3 max-[900px]:flex-col max-[900px]:items-stretch">
-      <RadioGroup v-model="sort" class="flex shrink-0">
-        <RadioGroupOption
-          v-for="(s, i) in sortOptions"
-          :key="s"
-          :value="s"
-          :class="[
-            'border text-muted px-4 text-[13px] cursor-pointer min-h-8 transition-colors flex items-center justify-center',
-            i === 0 ? 'rounded-l' : 'border-l-0',
-            i === 3 ? 'rounded-r' : '',
-            sort === s
-              ? 'bg-accent border-accent text-white'
-              : 'bg-panel border-line hover:bg-hover-soft',
-          ]"
-        >
-          {{ t(sortLabel[s]) }}
-        </RadioGroupOption>
-      </RadioGroup>
+      <URadioGroup
+        v-model="sort"
+        :items="sortItems"
+        variant="table"
+        orientation="horizontal"
+        indicator="hidden"
+        color="neutral"
+        :ui="{
+          fieldset: () => 'flex shrink-0 gap-0 -space-x-px',
+          item: () => 'border text-muted px-4 text-[13px] cursor-pointer min-h-8 transition-colors flex items-center justify-center bg-panel border-line hover:bg-hover-soft has-data-[state=checked]:bg-accent has-data-[state=checked]:border-accent has-data-[state=checked]:text-white has-data-[state=checked]:z-[1] first-of-type:rounded-s last-of-type:rounded-e',
+          container: () => 'contents',
+          wrapper: () => 'contents',
+          label: () => 'text-inherit font-normal',
+        }"
+      />
       <div class="flex items-center gap-3 max-[900px]:justify-between">
         <span class="text-muted text-xs whitespace-nowrap">{{ statusText }}</span>
         <button

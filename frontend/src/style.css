@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "@nuxt/ui";
 @config "../tailwind.config.js";
 
 .flag-svg svg {
@@ -41,7 +42,7 @@
     --color-soft: #0f172a;
     --color-side: #0f172a;
     --color-side-active: #1e293b;
-    --color-side-hover: #1e293b;
+    --color-side-hover: #172033;
     --color-side-sel: #1e293b;
     --color-side-border: #475569;
     --color-accent: #3b82f6;

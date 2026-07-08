@@ -1,3 +1,5 @@
 node_modules/
 *.tsbuildinfo
 vite.config.d.ts
+auto-imports.d.ts
+components.d.ts

@@ -10,7 +10,10 @@
     "isolatedModules": true,
     "moduleDetection": "force",
     "emitDeclarationOnly": true,
-    "strict": true
+    "strict": true,
+    "paths": {
+      "#build/ui": ["./node_modules/.nuxt-ui/ui"]
+    }
   },
   "include": ["vite.config.ts"]
 }

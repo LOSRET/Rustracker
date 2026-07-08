@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { Dialog, DialogPanel, TransitionRoot, TransitionChild } from "@headlessui/vue";
 import { useMediaQuery } from "@vueuse/core";
 import type { PageKey } from "../types/api";
 import SidebarContent from "./SidebarContent.vue";
@@ -15,33 +14,20 @@ const isMobile = useMediaQuery("(max-width: 900px)");
     <SidebarContent :page="page" :error="error" @switch="emit('switch', $event)" />
   </aside>
 
-  <TransitionRoot v-else :show="open" appear as="template">
-    <Dialog @close="emit('close')" class="relative z-[1100]">
-      <TransitionChild
-        as="template"
-        enter="duration-200 ease-out"
-        enterFrom="opacity-0"
-        enterTo="opacity-100"
-        leave="duration-200 ease-in"
-        leaveFrom="opacity-100"
-        leaveTo="opacity-0"
-      >
-        <div class="fixed inset-0 bg-black/45" />
-      </TransitionChild>
-
-      <TransitionChild
-        as="template"
-        enter="transition duration-200 ease-out"
-        enterFrom="-translate-x-full"
-        enterTo="translate-x-0"
-        leave="transition duration-200 ease-in"
-        leaveFrom="translate-x-0"
-        leaveTo="-translate-x-full"
-      >
-        <DialogPanel class="fixed top-0 left-0 h-screen w-[260px] bg-side text-[#f8fafc] overflow-y-auto p-5">
-          <SidebarContent :page="page" :error="error" @switch="emit('switch', $event)" />
-        </DialogPanel>
-      </TransitionChild>
-    </Dialog>
-  </TransitionRoot>
+  <USlideover
+    v-else
+    :open="open"
+    side="left"
+    :close="false"
+    :dismissible="true"
+    :ui="{
+      overlay: 'fixed inset-0 bg-black/45',
+      content: 'fixed top-0 left-0 h-screen w-[260px] bg-side text-[#f8fafc] overflow-y-auto p-5 focus:outline-none',
+    }"
+    @update:open="(v: boolean) => { if (!v) emit('close') }"
+  >
+    <template #content>
+      <SidebarContent :page="page" :error="error" @switch="emit('switch', $event)" />
+    </template>
+  </USlideover>
 </template>

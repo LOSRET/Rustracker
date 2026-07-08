@@ -10,7 +10,7 @@ import ClientChart from "../components/ClientChart.vue";
 
 defineProps<{ stats: StatsResponse | null; error: string | null; lastUpdated: number | null }>();
 
-const { trends, clients, start, stop } = useTrends();
+const { trends, clients, trendsError, clientsError, start, stop } = useTrends();
 const { t, number } = useI18n();
 const range = ref<RangeKey>("24h");
 
@@ -32,7 +32,7 @@ onDeactivated(stop);
       <MetricCard variant="completed" :label="t('completed')" :value="number(stats?.completed ?? 0)" />
     </section>
 
-    <TrendChart :data="trends" v-model:range="range" />
-    <ClientChart :data="clients" :range="range" />
+    <TrendChart :data="trends" :error="trendsError" v-model:range="range" />
+    <ClientChart :data="clients" :error="clientsError" :range="range" />
   </div>
 </template>

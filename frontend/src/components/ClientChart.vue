@@ -9,6 +9,7 @@ import { useI18n } from "../composables/useI18n";
 const props = defineProps<{
   data: ClientsResponse | null;
   range: RangeKey;
+  error?: string | null;
 }>();
 
 const { t, localeFor } = useI18n();
@@ -65,7 +66,7 @@ const option = computed(() => {
 
   if (!historyAll.length) {
     return {
-      title: { text: t("top100_empty"), left: "center", top: "center", textStyle: { color: "#94a3b8", fontSize: 14 } },
+      title: { text: props.error ? t("top100_error") : t("top100_empty"), left: "center", top: "center", textStyle: { color: "#94a3b8", fontSize: 14 } },
       series: [],
     };
   }

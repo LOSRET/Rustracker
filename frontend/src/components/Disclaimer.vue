@@ -17,7 +17,7 @@ const contact = __CONTACT__;
       class="mt-4 text-center text-lg font-bold leading-[1.8]"
     >
       <div>
-        {{ t('blog_label') }}：<a
+        {{ t('blog_label') }}<a
           :href="contact.blogUrl"
           rel="noopener noreferrer"
           target="_blank"
@@ -26,7 +26,7 @@ const contact = __CONTACT__;
         >
       </div>
       <div>
-        {{ t('contact_label') }}：<a
+        {{ t('contact_label') }}<a
           :href="`mailto:${contact.email}`"
           class="text-accent no-underline"
           >{{ contact.email }}</a

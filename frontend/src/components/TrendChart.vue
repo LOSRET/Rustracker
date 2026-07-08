@@ -2,7 +2,6 @@
 import { computed } from "vue";
 import VChart from "vue-echarts";
 import "echarts";
-import { RadioGroup, RadioGroupOption } from "@headlessui/vue";
 import { usePreferredDark } from "@vueuse/core";
 import type { TrendsResponse, RangeKey } from "../types/api";
 import { useI18n } from "../composables/useI18n";
@@ -10,6 +9,7 @@ import { useI18n } from "../composables/useI18n";
 const props = defineProps<{
   data: TrendsResponse | null;
   range: RangeKey;
+  error?: string | null;
 }>();
 const emit = defineEmits<{ "update:range": [range: RangeKey] }>();
 
@@ -38,7 +38,7 @@ const option = computed(() => {
 
   if (!history.length) {
     return {
-      title: { text: t("top100_empty"), left: "center", top: "center", textStyle: { color: "#94a3b8", fontSize: 14 } },
+      title: { text: props.error ? t("top100_error") : t("top100_empty"), left: "center", top: "center", textStyle: { color: "#94a3b8", fontSize: 14 } },
       series: [],
     };
   }
@@ -78,6 +78,10 @@ const option = computed(() => {
 function setRange(r: RangeKey) {
   emit("update:range", r);
 }
+
+const rangeItems = computed(() =>
+  (["24h", "3d", "7d"] as RangeKey[]).map((r) => ({ label: t(`range_${r}`), value: r })),
+);
 </script>
 
 <template>
@@ -87,23 +91,22 @@ function setRange(r: RangeKey) {
         <h2 class="m-0 text-base leading-relaxed font-bold">{{ t('chart_title') }}</h2>
         <span class="text-muted text-xs">{{ t('chart_note') }}</span>
       </div>
-      <RadioGroup :modelValue="range" @update:modelValue="setRange" class="flex shrink-0">
-        <RadioGroupOption
-          v-for="(r, i) in (['24h', '3d', '7d'] as RangeKey[])"
-          :key="r"
-          :value="r"
-          :class="[
-            'border text-muted px-3 text-xs cursor-pointer min-h-7 transition-colors flex items-center justify-center',
-            i === 0 ? 'rounded-l' : 'border-l-0',
-            i === 2 ? 'rounded-r' : '',
-            range === r
-              ? 'bg-accent border-accent text-white'
-              : 'bg-panel border-line hover:bg-hover-soft',
-          ]"
-        >
-          {{ t(`range_${r}`) }}
-        </RadioGroupOption>
-      </RadioGroup>
+      <URadioGroup
+        :model-value="range"
+        @update:model-value="setRange"
+        :items="rangeItems"
+        variant="table"
+        orientation="horizontal"
+        indicator="hidden"
+        color="neutral"
+        :ui="{
+          fieldset: () => 'flex shrink-0 gap-0 -space-x-px',
+          item: () => 'border text-muted px-3 text-xs cursor-pointer min-h-7 transition-colors flex items-center justify-center bg-panel border-line hover:bg-hover-soft has-data-[state=checked]:bg-accent has-data-[state=checked]:border-accent has-data-[state=checked]:text-white has-data-[state=checked]:z-[1] first-of-type:rounded-s last-of-type:rounded-e',
+          container: () => 'contents',
+          wrapper: () => 'contents',
+          label: () => 'text-inherit font-normal',
+        }"
+      />
     </div>
     <div class="w-full h-[440px] max-[900px]:h-[330px] max-[560px]:h-[275px]">
       <v-chart :option="option" :init-options="{ renderer: 'svg' }" autoresize />
