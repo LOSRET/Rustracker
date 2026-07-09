@@ -209,8 +209,13 @@ export const OG_LOCALE: Record<LangKey, string> = {
   zh: "zh_CN", en: "en_US", ja: "ja_JP", ru: "ru_RU", de: "de_DE", uk: "uk_UA",
 };
 
-export const NUM_LOCALE: Record<LangKey, string> = {
-  zh: "zh-CN", en: "en-US", ja: "ja-JP", ru: "ru-RU", de: "de-DE", uk: "uk-UA",
+const dtFormats = {
+  time: { hour: "2-digit", minute: "2-digit", second: "numeric" },
+  chart: { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false },
+} as const;
+
+export const datetimeFormats: Record<LangKey, typeof dtFormats> = {
+  zh: dtFormats, en: dtFormats, ja: dtFormats, ru: dtFormats, de: dtFormats, uk: dtFormats,
 };
 
 export function detectLang(): LangKey {
@@ -228,4 +233,5 @@ export const i18n = createI18n({
   locale: detectLang(),
   fallbackLocale: "en",
   messages,
+  datetimeFormats,
 });

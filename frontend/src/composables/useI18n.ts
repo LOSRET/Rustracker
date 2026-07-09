@@ -1,16 +1,12 @@
 import { useI18n as useVueI18n } from "vue-i18n";
 import type { LangKey } from "../types/api";
-import { LANG_LOCALE, OG_LOCALE, NUM_LOCALE } from "../i18n";
+import { LANG_LOCALE, OG_LOCALE } from "../i18n";
 
 export function useI18n() {
-  const { t, locale, n } = useVueI18n({ useScope: "global" });
+  const { t, locale, n, d } = useVueI18n({ useScope: "global" });
 
   function number(value: number): string {
     return n(value || 0);
-  }
-
-  function localeFor(): string {
-    return NUM_LOCALE[locale.value as LangKey];
   }
 
   function setLang(l: LangKey) {
@@ -29,5 +25,5 @@ export function useI18n() {
     setMeta("meta[name='twitter:description']", "content", t("seo_desc"));
   }
 
-  return { t, lang: locale, number, localeFor, setLang };
+  return { t, lang: locale, number, d, setLang };
 }

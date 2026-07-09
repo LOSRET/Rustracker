@@ -9,7 +9,7 @@ const props = defineProps<{
   lastUpdated: number | null;
 }>();
 
-const { t, number, localeFor } = useI18n();
+const { t, number, d } = useI18n();
 const { copied, copy } = useClipboard({ copiedDuring: 1500 });
 
 const trackerUrl = `${window.location.origin}/announce`;
@@ -21,7 +21,7 @@ function copyAddr() {
 function lastUpdateText() {
   const ts = props.lastUpdated;
   if (ts == null) return t("loading");
-  return `${t("last_update")} ${new Date(ts).toLocaleTimeString(localeFor())}`;
+  return `${t("last_update")} ${d(ts, "time")}`;
 }
 </script>
 

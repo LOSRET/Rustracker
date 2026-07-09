@@ -12,7 +12,7 @@ const props = defineProps<{
   error?: string | null;
 }>();
 
-const { t, localeFor } = useI18n();
+const { t, d } = useI18n();
 const isDark = usePreferredDark();
 
 const CLIENT_BRAND: Record<string, string> = {
@@ -74,11 +74,7 @@ const option = computed(() => {
   const names = props.data?.clients ?? [];
   const cutoff = Math.floor(Date.now() / 1000) - RANGE_SECS[props.range];
   const history = historyAll.filter((item) => item.timestamp >= cutoff);
-  const labels = history.map((item) =>
-    new Date(item.timestamp * 1000).toLocaleString(localeFor(), {
-      month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false,
-    }),
-  );
+  const labels = history.map((item) => d(item.timestamp * 1000, "chart"));
 
   return {
     title: { text: "" },

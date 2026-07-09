@@ -13,7 +13,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ "update:range": [range: RangeKey] }>();
 
-const { t, localeFor } = useI18n();
+const { t, d } = useI18n();
 const isDark = usePreferredDark();
 
 const RANGE_SECS: Record<RangeKey, number> = {
@@ -43,11 +43,7 @@ const option = computed(() => {
     };
   }
 
-  const labels = history.map((item) =>
-    new Date(item.timestamp * 1000).toLocaleString(localeFor(), {
-      month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false,
-    }),
-  );
+  const labels = history.map((item) => d(item.timestamp * 1000, "chart"));
 
   return {
     title: { text: "" },

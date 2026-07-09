@@ -4,7 +4,7 @@ import type { SortKey } from "../types/api";
 import { useTop100 } from "../composables/useTop100";
 import { useI18n } from "../composables/useI18n";
 
-const { t, number, localeFor } = useI18n();
+const { t, number, d } = useI18n();
 const { data, loading, error, sort, lastUpdated, load } = useTop100();
 
 onMounted(load);
@@ -18,7 +18,7 @@ const statusText = computed(() => {
   if (loading.value) return t("top100_loading");
   if (error.value) return t("top100_error");
   if (lastUpdated.value)
-    return `${t("last_update")} ${new Date(lastUpdated.value).toLocaleTimeString(localeFor())}`;
+    return `${t("last_update")} ${d(lastUpdated.value, "time")}`;
   return "";
 });
 
@@ -60,8 +60,9 @@ const sortItems = computed(() => sortOptions.map((s) => ({ label: t(sortLabel[s]
       />
       <div class="flex items-center gap-3 max-[900px]:justify-between">
         <span class="text-muted text-xs whitespace-nowrap">{{ statusText }}</span>
-        <button
+        <UButton
           :disabled="loading"
+          variant="none"
           :class="[
             'border border-line bg-panel text-ink px-4 text-[13px] cursor-pointer min-h-8 rounded hover:bg-hover-soft',
             loading ? 'opacity-50 cursor-not-allowed' : '',
@@ -69,7 +70,7 @@ const sortItems = computed(() => sortOptions.map((s) => ({ label: t(sortLabel[s]
           @click="load"
         >
           {{ t('refresh') }}
-        </button>
+        </UButton>
       </div>
     </div>
 
