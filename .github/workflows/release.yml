@@ -155,20 +155,26 @@ jobs:
             prev_tag=$(git tag --sort=-v:refname | head -1 || true)
           fi
           if [ -n "$prev_tag" ] && git rev-parse "$prev_tag" >/dev/null 2>&1; then
-            log=$(git log ${prev_tag}..HEAD --pretty=format:"- %s" --no-merges)
+            log=$(git log ${prev_tag}..HEAD --pretty=format:"- %s" --no-merges | grep -vE '^- [0-9]+\.[0-9]+\.[0-9]+$')
           else
-            log=$(git log --pretty=format:"- %s" --no-merges)
+            log=$(git log --pretty=format:"- %s" --no-merges | grep -vE '^- [0-9]+\.[0-9]+\.[0-9]+$')
           fi
           if [ -z "$log" ]; then
             log="- 代码优化和修复"
           fi
-          echo "$log" > /tmp/commits.txt
-          opencode run "Based on these commits, generate concise release notes in Chinese for v${version}. Group by: 新功能、Bug 修复、重构优化、文档。 Output markdown only, no explanations.\n\n$(cat /tmp/commits.txt)" > /tmp/notes.md 2>/dev/null || true
+          printf '%s\n' "$log" > /tmp/commits.txt
+          timeout 60 opencode run "Based on these commits, generate concise release notes in Chinese for v${version}. Group by: 新功能、Bug 修复、重构优化、文档。 Output markdown only, no explanations.
+
+          $(cat /tmp/commits.txt)" > /tmp/notes.md 2>/dev/null || true
+          echo "en<<EOF" >> $GITHUB_OUTPUT
+          printf '%s\n' "$log" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "cn<<EOF" >> $GITHUB_OUTPUT
           if [ -s /tmp/notes.md ]; then
-            log=$(cat /tmp/notes.md)
+            printf '%s\n' "$(cat /tmp/notes.md)" >> $GITHUB_OUTPUT
+          else
+            printf '%s\n' "$log" >> $GITHUB_OUTPUT
           fi
-          echo "changelog<<EOF" >> $GITHUB_OUTPUT
-          echo "$log" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
@@ -182,7 +188,7 @@ jobs:
             ## rustracker v${{ needs.check-version.outputs.version }}
 
             ### What's Changed
-            ${{ steps.changelog.outputs.changelog }}
+            ${{ steps.changelog.outputs.en }}
 
             ### Downloads
             - `rustracker-linux.tar.gz` — Linux full package (binary + installer)
@@ -202,7 +208,7 @@ jobs:
             ## rustracker v${{ needs.check-version.outputs.version }}
 
             ### 更新内容
-            ${{ steps.changelog.outputs.changelog }}
+            ${{ steps.changelog.outputs.cn }}
 
             ### 下载
             - `rustracker-linux.tar.gz` — Linux 完整包（含二进制和安装脚本）
