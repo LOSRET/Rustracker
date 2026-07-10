@@ -168,6 +168,7 @@ jobs:
           1. English notes grouped by: Features, Bug Fixes, Refactoring, Documentation
           2. Chinese notes grouped by: 新功能、Bug 修复、重构优化、文档
           Output markdown only, no explanations.
+          Do NOT include any top-level title or version header — start directly with the group headings (### Features, ### Bug Fixes, etc.).
           $(cat /tmp/commits.txt)" > /tmp/notes.md 2>/dev/null || true
           if [ -s /tmp/notes.md ]; then
             awk '/^===SPLIT===$/{f=1;next} f==0' /tmp/notes.md > /tmp/en.md || true
