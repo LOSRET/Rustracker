@@ -157,27 +157,33 @@ jobs:
           if [ -n "$prev_tag" ] && git rev-parse "$prev_tag" >/dev/null 2>&1; then
             log=$(git log ${prev_tag}..HEAD --pretty=format:"- %s" --no-merges | grep -vE '^- [0-9]+\.[0-9]+\.[0-9]+$')
           else
-            log=$(git log --pretty=format:"- %s" --no-merges | grep -vE '^- [0-9]+\.[0-9]+\.[0-9]+$')
+            log=$(git log -100 --pretty=format:"- %s" --no-merges | grep -vE '^- [0-9]+\.[0-9]+\.[0-9]+$')
           fi
           if [ -z "$log" ]; then
             log="- 代码优化和修复"
           fi
           printf '%s\n' "$log" > /tmp/commits.txt
-          timeout 60 opencode run "Based on these commits, generate concise release notes in Chinese for v${version}. Group by: 新功能、Bug 修复、重构优化、文档。 Output markdown only, no explanations.
+          timeout 60 opencode run --model deepseek/deepseek-v4-pro "Based on these commits, generate concise release notes for v${version} in both English and Chinese.
 
-          $(cat /tmp/commits.txt)" > /tmp/notes.md 2>/dev/null || true
+Output exactly two sections separated by a line containing only '===SPLIT===':
+1. English notes grouped by: Features, Bug Fixes, Refactoring, Documentation
+2. Chinese notes grouped by: 新功能、Bug 修复、重构优化、文档
+
+Output markdown only, no explanations.
+
+$(cat /tmp/commits.txt)" > /tmp/notes.md 2>/dev/null || true
+          if [ -s /tmp/notes.md ]; then
+            awk '/^===SPLIT===$/{f=1;next} f==0' /tmp/notes.md > /tmp/en.md || true
+            awk '/^===SPLIT===$/{f=1;next} f==1' /tmp/notes.md > /tmp/cn.md || true
+          fi
           echo "en<<EOF" >> $GITHUB_OUTPUT
-          printf '%s\n' "$log" >> $GITHUB_OUTPUT
+          if [ -s /tmp/en.md ]; then cat /tmp/en.md >> $GITHUB_OUTPUT; else printf '%s\n' "$log" >> $GITHUB_OUTPUT; fi
           echo "EOF" >> $GITHUB_OUTPUT
           echo "cn<<EOF" >> $GITHUB_OUTPUT
-          if [ -s /tmp/notes.md ]; then
-            printf '%s\n' "$(cat /tmp/notes.md)" >> $GITHUB_OUTPUT
-          else
-            printf '%s\n' "$log" >> $GITHUB_OUTPUT
-          fi
+          if [ -s /tmp/cn.md ]; then cat /tmp/cn.md >> $GITHUB_OUTPUT; else printf '%s\n' "$log" >> $GITHUB_OUTPUT; fi
           echo "EOF" >> $GITHUB_OUTPUT
         env:
-          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
 
       - name: Create Release
         uses: softprops/action-gh-release@v3
