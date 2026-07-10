@@ -164,14 +164,11 @@ jobs:
           fi
           printf '%s\n' "$log" > /tmp/commits.txt
           timeout 60 opencode run --model deepseek/deepseek-v4-pro "Based on these commits, generate concise release notes for v${version} in both English and Chinese.
-
-Output exactly two sections separated by a line containing only '===SPLIT===':
-1. English notes grouped by: Features, Bug Fixes, Refactoring, Documentation
-2. Chinese notes grouped by: 新功能、Bug 修复、重构优化、文档
-
-Output markdown only, no explanations.
-
-$(cat /tmp/commits.txt)" > /tmp/notes.md 2>/dev/null || true
+          Output exactly two sections separated by a line containing only '===SPLIT===':
+          1. English notes grouped by: Features, Bug Fixes, Refactoring, Documentation
+          2. Chinese notes grouped by: 新功能、Bug 修复、重构优化、文档
+          Output markdown only, no explanations.
+          $(cat /tmp/commits.txt)" > /tmp/notes.md 2>/dev/null || true
           if [ -s /tmp/notes.md ]; then
             awk '/^===SPLIT===$/{f=1;next} f==0' /tmp/notes.md > /tmp/en.md || true
             awk '/^===SPLIT===$/{f=1;next} f==1' /tmp/notes.md > /tmp/cn.md || true
