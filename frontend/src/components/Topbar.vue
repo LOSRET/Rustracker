@@ -10,7 +10,7 @@ const props = defineProps<{
 }>();
 
 const { t, number, d } = useI18n();
-const { copied, copy } = useClipboard({ copiedDuring: 1500 });
+const { copied, copy } = useClipboard({ copiedDuring: 1500, legacy: true });
 
 const trackerUrl = `${window.location.origin}/announce`;
 

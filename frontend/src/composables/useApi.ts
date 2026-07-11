@@ -10,17 +10,19 @@ export function useApi<T>(url: string) {
     { cache: "no-store" },
     {
       immediate: false,
+      timeout: 10000,
       updateDataOnError: true,
       afterFetch: (ctx) => {
         prev = ctx.data;
         lastUpdated.value = Date.now();
         return ctx;
       },
-      onFetchError: () => ({ data: prev }),
+      onFetchError: (ctx) => ({ ...ctx, data: prev }),
     },
   ).get().json<T>();
 
   async function load() {
+    if (isFetching.value) return;
     await execute();
   }
 
