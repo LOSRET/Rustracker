@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted } from "vue";
-import type { SortKey } from "../types/api";
+import { computed, h, onMounted } from "vue";
+import type { TableColumn } from "@nuxt/ui";
+import type { SortKey, Top100Entry } from "../types/api";
 import { useTop100 } from "../composables/useTop100";
 import { useI18n } from "../composables/useI18n";
 
@@ -31,6 +32,47 @@ const sortLabel: Record<SortKey, string> = {
 };
 
 const sortItems = computed(() => sortOptions.map((s) => ({ label: t(sortLabel[s]), value: s })));
+
+const columns = computed<TableColumn<Top100Entry>[]>(() => [
+  {
+    id: "rank",
+    header: "#",
+    cell: ({ row }) => row.index + 1,
+    meta: { class: { th: "w-12 text-center", td: "w-12 text-center text-muted font-semibold" } },
+  },
+  {
+    accessorKey: "info_hash",
+    header: t("col_hash"),
+    meta: { class: { td: "font-mono text-xs break-all" } },
+    cell: ({ row }) => h("code", { class: "bg-code-bg px-1.5 py-0.5 rounded-sm text-xs" }, String(row.getValue("info_hash"))),
+  },
+  {
+    accessorKey: "peers",
+    header: t("sort_peers"),
+    meta: { class: { th: "text-right", td: "text-right whitespace-nowrap tabular-nums" } },
+    cell: ({ row }) => number(row.getValue("peers") as number),
+  },
+  {
+    accessorKey: "seeders",
+    header: t("sort_seeders"),
+    meta: { class: { th: "text-right", td: "text-right whitespace-nowrap tabular-nums text-good" } },
+    cell: ({ row }) => number(row.getValue("seeders") as number),
+  },
+  {
+    accessorKey: "leechers",
+    header: t("sort_leechers"),
+    meta: { class: { th: "text-right", td: "text-right whitespace-nowrap tabular-nums text-warn" } },
+    cell: ({ row }) => number(row.getValue("leechers") as number),
+  },
+  {
+    accessorKey: "downloaded",
+    header: t("sort_downloaded"),
+    meta: { class: { th: "text-right", td: "text-right whitespace-nowrap tabular-nums" } },
+    cell: ({ row }) => number(row.getValue("downloaded") as number),
+  },
+]);
+
+const tableData = computed(() => (loading.value || error.value ? [] : rows.value));
 </script>
 
 <template>
@@ -75,45 +117,29 @@ const sortItems = computed(() => sortOptions.map((s) => ({ label: t(sortLabel[s]
     </div>
 
     <div class="overflow-x-auto">
-      <table class="w-full border-collapse text-[13px]">
-        <thead>
-          <tr>
-            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap w-12 text-center">#</th>
-            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap">{{ t('col_hash') }}</th>
-            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap text-right">{{ t('sort_peers') }}</th>
-            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap text-right">{{ t('sort_seeders') }}</th>
-            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap text-right">{{ t('sort_leechers') }}</th>
-            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap text-right">{{ t('sort_downloaded') }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="loading">
-            <td colspan="6" class="p-8 text-center text-muted">{{ t('top100_loading') }}</td>
-          </tr>
-          <tr v-else-if="error">
-            <td colspan="6" class="p-8 text-center text-bad">{{ t('top100_error') }}</td>
-          </tr>
-          <tr v-else-if="!rows.length">
-            <td colspan="6" class="p-8 text-center text-muted">{{ t('top100_empty') }}</td>
-          </tr>
-          <template v-else>
-            <tr
-              v-for="(row, i) in rows"
-              :key="row.info_hash"
-              class="hover:bg-row-hover"
-            >
-              <td class="p-2 px-3 border-b border-td-border text-center text-muted font-semibold w-12">{{ i + 1 }}</td>
-              <td class="p-2 px-3 border-b border-td-border font-mono text-xs break-all">
-                <code class="bg-code-bg px-1.5 py-0.5 rounded-sm text-xs">{{ row.info_hash }}</code>
-              </td>
-              <td class="p-2 px-3 border-b border-td-border text-right whitespace-nowrap tabular-nums">{{ number(row.peers) }}</td>
-              <td class="p-2 px-3 border-b border-td-border text-right whitespace-nowrap tabular-nums text-good">{{ number(row.seeders) }}</td>
-              <td class="p-2 px-3 border-b border-td-border text-right whitespace-nowrap tabular-nums text-warn">{{ number(row.leechers) }}</td>
-              <td class="p-2 px-3 border-b border-td-border text-right whitespace-nowrap tabular-nums">{{ number(row.downloaded) }}</td>
-            </tr>
-          </template>
-        </tbody>
-      </table>
+      <UTable
+        :data="tableData"
+        :columns="columns"
+        :loading="loading"
+        :ui="{
+          root: 'overflow-visible',
+          base: 'min-w-full',
+          tbody: 'divide-y-0',
+          tr: 'hover:bg-row-hover',
+          th: 'p-2.5 bg-soft text-muted text-xs uppercase border-b-2 border-line whitespace-nowrap',
+          td: 'p-2 px-3 border-b border-td-border text-[13px] text-ink whitespace-normal',
+          empty: 'p-8 text-center text-[13px]',
+          loading: 'p-8 text-center text-[13px]',
+        }"
+      >
+        <template #loading>
+          <span class="text-muted">{{ t('top100_loading') }}</span>
+        </template>
+        <template #empty>
+          <span v-if="error" class="text-bad">{{ t('top100_error') }}</span>
+          <span v-else class="text-muted">{{ t('top100_empty') }}</span>
+        </template>
+      </UTable>
     </div>
   </section>
 </template>

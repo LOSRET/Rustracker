@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
+import type { TableColumn } from "@nuxt/ui";
+import type { ClientListEntry } from "../types/api";
 import { useClientsList } from "../composables/useClientsList";
 import { useI18n } from "../composables/useI18n";
 
@@ -26,6 +28,34 @@ function share(peers: number): string {
   if (!totalPeers.value) return "—";
   return `${((peers / totalPeers.value) * 100).toFixed(1)}%`;
 }
+
+const columns = computed<TableColumn<ClientListEntry>[]>(() => [
+  {
+    id: "rank",
+    header: "#",
+    cell: ({ row }) => row.index + 1,
+    meta: { class: { th: "w-12 text-center", td: "w-12 text-center text-muted font-semibold" } },
+  },
+  {
+    accessorKey: "name",
+    header: t("clients_col_name"),
+    meta: { class: { td: "font-medium" } },
+  },
+  {
+    accessorKey: "peers",
+    header: t("sort_peers"),
+    meta: { class: { th: "text-right", td: "text-right whitespace-nowrap tabular-nums" } },
+    cell: ({ row }) => number(row.getValue("peers") as number),
+  },
+  {
+    id: "share",
+    header: t("clients_col_share"),
+    meta: { class: { th: "text-right", td: "text-right whitespace-nowrap tabular-nums text-muted" } },
+    cell: ({ row }) => share(row.original.peers),
+  },
+]);
+
+const tableData = computed(() => (loading.value || error.value ? [] : rows.value));
 </script>
 
 <template>
@@ -55,39 +85,29 @@ function share(peers: number): string {
     </div>
 
     <div class="overflow-x-auto">
-      <table class="w-full border-collapse text-[13px]">
-        <thead>
-          <tr>
-            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap w-12 text-center">#</th>
-            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap">{{ t('clients_col_name') }}</th>
-            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap text-right">{{ t('sort_peers') }}</th>
-            <th class="text-left p-2.5 bg-soft text-muted font-semibold text-xs uppercase border-b-2 border-line whitespace-nowrap text-right">{{ t('clients_col_share') }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="loading">
-            <td colspan="4" class="p-8 text-center text-muted">{{ t('top100_loading') }}</td>
-          </tr>
-          <tr v-else-if="error">
-            <td colspan="4" class="p-8 text-center text-bad">{{ t('top100_error') }}</td>
-          </tr>
-          <tr v-else-if="!rows.length">
-            <td colspan="4" class="p-8 text-center text-muted">{{ t('top100_empty') }}</td>
-          </tr>
-          <template v-else>
-            <tr
-              v-for="(row, i) in rows"
-              :key="row.name"
-              class="hover:bg-row-hover"
-            >
-              <td class="p-2 px-3 border-b border-td-border text-center text-muted font-semibold w-12">{{ i + 1 }}</td>
-              <td class="p-2 px-3 border-b border-td-border font-medium">{{ row.name }}</td>
-              <td class="p-2 px-3 border-b border-td-border text-right whitespace-nowrap tabular-nums">{{ number(row.peers) }}</td>
-              <td class="p-2 px-3 border-b border-td-border text-right whitespace-nowrap tabular-nums text-muted">{{ share(row.peers) }}</td>
-            </tr>
-          </template>
-        </tbody>
-      </table>
+      <UTable
+        :data="tableData"
+        :columns="columns"
+        :loading="loading"
+        :ui="{
+          root: 'overflow-visible',
+          base: 'min-w-full',
+          tbody: 'divide-y-0',
+          tr: 'hover:bg-row-hover',
+          th: 'p-2.5 bg-soft text-muted text-xs uppercase border-b-2 border-line whitespace-nowrap',
+          td: 'p-2 px-3 border-b border-td-border text-[13px] text-ink whitespace-normal',
+          empty: 'p-8 text-center text-[13px]',
+          loading: 'p-8 text-center text-[13px]',
+        }"
+      >
+        <template #loading>
+          <span class="text-muted">{{ t('top100_loading') }}</span>
+        </template>
+        <template #empty>
+          <span v-if="error" class="text-bad">{{ t('top100_error') }}</span>
+          <span v-else class="text-muted">{{ t('top100_empty') }}</span>
+        </template>
+      </UTable>
     </div>
   </section>
 </template>
