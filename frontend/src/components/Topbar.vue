@@ -35,16 +35,17 @@ function lastUpdateText() {
       </p>
       <div class="flex items-center flex-wrap gap-1 mb-5">
         <span class="text-muted text-sm font-normal whitespace-nowrap">{{ t('tracker_addr_label') }}</span>
-        <span
-          :class="[
-            'tracker-addr text-base font-bold break-all cursor-pointer relative border-b border-dashed border-line transition-colors',
-            copied ? 'tracker-addr-copied text-good' : 'text-ink hover:text-accent',
-          ]"
-          :data-tooltip="t('copied')"
-          @click="copyAddr"
-        >
-          {{ trackerUrl }}
-        </span>
+        <UTooltip :text="t('copied')" :open="copied" :content="{ side: 'top', sideOffset: 8 }">
+          <span
+            :class="[
+              'tracker-addr text-base font-bold break-all cursor-pointer border-b border-dashed border-line transition-colors',
+              copied ? 'text-good' : 'text-ink hover:text-accent',
+            ]"
+            @click="copyAddr"
+          >
+            {{ trackerUrl }}
+          </span>
+        </UTooltip>
       </div>
     </div>
     <div class="text-right shrink-0 bg-soft px-3.5 py-2 rounded max-[900px]:text-left">
@@ -56,27 +57,3 @@ function lastUpdateText() {
     </div>
   </section>
 </template>
-
-<style scoped>
-.tracker-addr-copied::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  top: -28px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #1f2937;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 500;
-  padding: 3px 10px;
-  border-radius: 4px;
-  white-space: nowrap;
-  pointer-events: none;
-}
-@media (prefers-color-scheme: dark) {
-  .tracker-addr-copied::after {
-    background: #e2e8f0;
-    color: #0f172a;
-  }
-}
-</style>

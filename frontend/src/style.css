@@ -74,3 +74,12 @@
     --color-peers: #475569;
   }
 }
+
+[data-slot="content"][data-state="instant-open"],
+[data-slot="content"][data-state="delayed-open"] {
+  animation: tooltip-in 160ms ease-out;
+}
+
+@keyframes tooltip-in {
+  from { opacity: 0; scale: 0.92; }
+}
