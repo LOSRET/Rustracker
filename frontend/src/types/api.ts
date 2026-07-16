@@ -1,64 +1,64 @@
 export interface StatsResponse {
-  peers: number;
-  seeders: number;
-  leechers: number;
-  torrents: number;
-  completed: number;
-  rps: number;
-  version: string;
-  uptime_secs: number;
+  peers: number
+  seeders: number
+  leechers: number
+  torrents: number
+  completed: number
+  rps: number
+  version: string
+  uptime_secs: number
 }
 
 export interface TrendPoint {
-  timestamp: number;
-  torrents: number;
-  peers: number;
-  seeders: number;
-  leechers: number;
+  timestamp: number
+  torrents: number
+  peers: number
+  seeders: number
+  leechers: number
 }
 
 export interface TrendsResponse {
-  history: TrendPoint[];
+  history: TrendPoint[]
 }
 
 export interface ClientHistoryPoint {
-  timestamp: number;
-  tags: number[];
-  counts: number[];
+  timestamp: number
+  tags: number[]
+  counts: number[]
 }
 
 export interface ClientsResponse {
-  timestamp: number;
-  tags: number[];
-  clients: string[];
-  history: ClientHistoryPoint[];
+  timestamp: number
+  tags: number[]
+  clients: string[]
+  history: ClientHistoryPoint[]
 }
 
 export interface Top100Entry {
-  info_hash: string;
-  seeders: number;
-  leechers: number;
-  peers: number;
-  downloaded: number;
+  info_hash: string
+  seeders: number
+  leechers: number
+  peers: number
+  downloaded: number
 }
 
 export interface Top100Response {
-  peers: Top100Entry[];
-  seeders: Top100Entry[];
-  leechers: Top100Entry[];
-  downloaded: Top100Entry[];
+  peers: Top100Entry[]
+  seeders: Top100Entry[]
+  leechers: Top100Entry[]
+  downloaded: Top100Entry[]
 }
 
-export type SortKey = "peers" | "seeders" | "leechers" | "downloaded";
-export type RangeKey = "24h" | "3d" | "7d";
-export type LangKey = "zh" | "en" | "ja" | "ru" | "de" | "uk";
-export type PageKey = "dashboard" | "top100" | "clients";
+export type SortKey = "peers" | "seeders" | "leechers" | "downloaded"
+export type RangeKey = "24h" | "3d" | "7d"
+export type LangKey = "zh" | "en" | "ja" | "ru" | "de" | "uk"
+export type PageKey = "dashboard" | "top100" | "clients"
 
 export interface ClientListEntry {
-  name: string;
-  peers: number;
+  name: string
+  peers: number
 }
 
 export interface ClientListResponse {
-  clients: ClientListEntry[];
+  clients: ClientListEntry[]
 }

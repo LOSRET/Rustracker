@@ -1,32 +1,29 @@
 <script setup lang="ts">
-import { computed, onMounted } from "vue";
-import type { TableColumn } from "@nuxt/ui";
-import type { ClientListEntry } from "../types/api";
-import { useClientsList } from "../composables/useClientsList";
-import { useI18n } from "../composables/useI18n";
+import { computed, onMounted } from "vue"
+import type { TableColumn } from "@nuxt/ui"
+import type { ClientListEntry } from "../types/api"
+import { useClientsList } from "../composables/useClientsList"
+import { useI18n } from "../composables/useI18n"
 
-const { t, number, d } = useI18n();
-const { data, loading, error, lastUpdated, load } = useClientsList();
+const { t, number, d } = useI18n()
+const { data, loading, error, lastUpdated, load } = useClientsList()
 
-onMounted(load);
+onMounted(load)
 
-const totalPeers = computed(() =>
-  data.value ? data.value.clients.reduce((s, c) => s + c.peers, 0) : 0,
-);
+const totalPeers = computed(() => (data.value ? data.value.clients.reduce((s, c) => s + c.peers, 0) : 0))
 
-const rows = computed(() => data.value?.clients ?? []);
+const rows = computed(() => data.value?.clients ?? [])
 
 const statusText = computed(() => {
-  if (loading.value) return t("top100_loading");
-  if (error.value) return t("top100_error");
-  if (lastUpdated.value)
-    return `${t("last_update")} ${d(lastUpdated.value, "time")}`;
-  return "";
-});
+  if (loading.value) return t("top100_loading")
+  if (error.value) return t("top100_error")
+  if (lastUpdated.value) return `${t("last_update")} ${d(lastUpdated.value, "time")}`
+  return ""
+})
 
 function share(peers: number): string {
-  if (!totalPeers.value) return "—";
-  return `${((peers / totalPeers.value) * 100).toFixed(1)}%`;
+  if (!totalPeers.value) return "—"
+  return `${((peers / totalPeers.value) * 100).toFixed(1)}%`
 }
 
 const columns = computed<TableColumn<ClientListEntry>[]>(() => [
@@ -53,16 +50,16 @@ const columns = computed<TableColumn<ClientListEntry>[]>(() => [
     meta: { class: { th: "text-right", td: "text-right whitespace-nowrap tabular-nums text-muted" } },
     cell: ({ row }) => share(row.original.peers),
   },
-]);
+])
 
-const tableData = computed(() => (loading.value || error.value ? [] : rows.value));
+const tableData = computed(() => (loading.value || error.value ? [] : rows.value))
 </script>
 
 <template>
   <section class="flex justify-between items-start gap-5 mb-6 max-[900px]:flex-col max-[900px]:items-stretch">
     <div>
-      <h1 class="m-0 mb-1.5 text-[28px] leading-tight max-[560px]:text-[24px] font-bold">{{ t('clients_title') }}</h1>
-      <p class="m-0 text-muted text-sm leading-relaxed">{{ t('clients_subtitle') }}</p>
+      <h1 class="m-0 mb-1.5 text-[28px] leading-tight max-[560px]:text-[24px] font-bold">{{ t("clients_title") }}</h1>
+      <p class="m-0 text-muted text-sm leading-relaxed">{{ t("clients_subtitle") }}</p>
     </div>
   </section>
 
@@ -79,7 +76,7 @@ const tableData = computed(() => (loading.value || error.value ? [] : rows.value
           ]"
           @click="load"
         >
-          {{ t('refresh') }}
+          {{ t("refresh") }}
         </UButton>
       </div>
     </div>
@@ -101,11 +98,11 @@ const tableData = computed(() => (loading.value || error.value ? [] : rows.value
         }"
       >
         <template #loading>
-          <span class="text-muted">{{ t('top100_loading') }}</span>
+          <span class="text-muted">{{ t("top100_loading") }}</span>
         </template>
         <template #empty>
-          <span v-if="error" class="text-bad">{{ t('top100_error') }}</span>
-          <span v-else class="text-muted">{{ t('top100_empty') }}</span>
+          <span v-if="error" class="text-bad">{{ t("top100_error") }}</span>
+          <span v-else class="text-muted">{{ t("top100_empty") }}</span>
         </template>
       </UTable>
     </div>

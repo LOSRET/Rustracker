@@ -1,9 +1,9 @@
 <script setup lang="ts">
 defineProps<{
-  label: string;
-  value: string | number;
-  variant?: "peers" | "seeders" | "leechers" | "torrents" | "completed";
-}>();
+  label: string
+  value: string | number
+  variant?: "peers" | "seeders" | "leechers" | "torrents" | "completed"
+}>()
 
 const borderMap: Record<string, string> = {
   peers: "border-t-peers",
@@ -11,7 +11,7 @@ const borderMap: Record<string, string> = {
   leechers: "border-t-warn",
   torrents: "border-t-accent",
   completed: "border-t-violet",
-};
+}
 </script>
 
 <template>

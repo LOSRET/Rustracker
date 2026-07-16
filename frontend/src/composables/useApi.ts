@@ -1,9 +1,9 @@
-import { ref } from "vue";
-import { useFetch } from "@vueuse/core";
+import { ref } from "vue"
+import { useFetch } from "@vueuse/core"
 
 export function useApi<T>(url: string) {
-  const lastUpdated = ref<number | null>(null);
-  let prev: T | null = null;
+  const lastUpdated = ref<number | null>(null)
+  let prev: T | null = null
 
   const { data, error, isFetching, execute } = useFetch(
     url,
@@ -13,18 +13,20 @@ export function useApi<T>(url: string) {
       timeout: 10000,
       updateDataOnError: true,
       afterFetch: (ctx) => {
-        prev = ctx.data;
-        lastUpdated.value = Date.now();
-        return ctx;
+        prev = ctx.data
+        lastUpdated.value = Date.now()
+        return ctx
       },
       onFetchError: (ctx) => ({ ...ctx, data: prev }),
     },
-  ).get().json<T>();
+  )
+    .get()
+    .json<T>()
 
   async function load() {
-    if (isFetching.value) return;
-    await execute();
+    if (isFetching.value) return
+    await execute()
   }
 
-  return { data, loading: isFetching, error, lastUpdated, load };
+  return { data, loading: isFetching, error, lastUpdated, load }
 }

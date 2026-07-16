@@ -1,39 +1,39 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from "vue";
-import type { PageKey } from "./types/api";
-import { useI18n } from "./composables/useI18n";
-import { useStats } from "./composables/useStats";
-import { detectLang } from "./i18n";
-import Sidebar from "./components/Sidebar.vue";
-import AppFooter from "./components/AppFooter.vue";
-import Disclaimer from "./components/Disclaimer.vue";
-import DashboardView from "./views/DashboardView.vue";
-import Top100Page from "./components/Top100Page.vue";
-import ClientsPage from "./components/ClientsPage.vue";
+import { ref, onMounted, onUnmounted } from "vue"
+import type { PageKey } from "./types/api"
+import { useI18n } from "./composables/useI18n"
+import { useStats } from "./composables/useStats"
+import { detectLang } from "./i18n"
+import Sidebar from "./components/Sidebar.vue"
+import AppFooter from "./components/AppFooter.vue"
+import Disclaimer from "./components/Disclaimer.vue"
+import DashboardView from "./views/DashboardView.vue"
+import Top100Page from "./components/Top100Page.vue"
+import ClientsPage from "./components/ClientsPage.vue"
 
-const { setLang } = useI18n();
-const { stats, error, lastUpdated, stop } = useStats();
-const page = ref<PageKey>("dashboard");
-const sidebarOpen = ref(false);
+const { setLang } = useI18n()
+const { stats, error, lastUpdated, stop } = useStats()
+const page = ref<PageKey>("dashboard")
+const sidebarOpen = ref(false)
 
 function switchPage(p: PageKey) {
   if (p !== page.value) {
-    page.value = p;
-    window.scrollTo(0, 0);
+    page.value = p
+    window.scrollTo(0, 0)
   }
-  sidebarOpen.value = false;
+  sidebarOpen.value = false
 }
 
-onMounted(() => setLang(detectLang()));
-onUnmounted(stop);
+onMounted(() => setLang(detectLang()))
+onUnmounted(stop)
 </script>
 
 <template>
   <UApp>
     <button
       class="hidden max-[900px]:block fixed top-[14px] left-[14px] z-[999] bg-side text-side-fg border-0 p-2 cursor-pointer rounded-md leading-none"
-      @click="sidebarOpen = !sidebarOpen"
       aria-label="Menu"
+      @click="sidebarOpen = !sidebarOpen"
     >
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <line x1="3" y1="6" x2="21" y2="6" />

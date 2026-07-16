@@ -43,3 +43,12 @@ skills-lock.json
 
 # Claude Code
 .claude/
+
+# 环境变量
+.env
+.env.local
+.env.*.local
+
+# 临时文件
+tmp*.py
+*.tmp

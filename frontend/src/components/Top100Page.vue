@@ -1,37 +1,36 @@
 <script setup lang="ts">
-import { computed, h, onMounted } from "vue";
-import type { TableColumn } from "@nuxt/ui";
-import type { SortKey, Top100Entry } from "../types/api";
-import { useTop100 } from "../composables/useTop100";
-import { useI18n } from "../composables/useI18n";
+import { computed, h, onMounted } from "vue"
+import type { TableColumn } from "@nuxt/ui"
+import type { SortKey, Top100Entry } from "../types/api"
+import { useTop100 } from "../composables/useTop100"
+import { useI18n } from "../composables/useI18n"
 
-const { t, number, d } = useI18n();
-const { data, loading, error, sort, lastUpdated, load } = useTop100();
+const { t, number, d } = useI18n()
+const { data, loading, error, sort, lastUpdated, load } = useTop100()
 
-onMounted(load);
+onMounted(load)
 
 const rows = computed(() => {
-  if (!data.value) return [];
-  return data.value[sort.value];
-});
+  if (!data.value) return []
+  return data.value[sort.value]
+})
 
 const statusText = computed(() => {
-  if (loading.value) return t("top100_loading");
-  if (error.value) return t("top100_error");
-  if (lastUpdated.value)
-    return `${t("last_update")} ${d(lastUpdated.value, "time")}`;
-  return "";
-});
+  if (loading.value) return t("top100_loading")
+  if (error.value) return t("top100_error")
+  if (lastUpdated.value) return `${t("last_update")} ${d(lastUpdated.value, "time")}`
+  return ""
+})
 
-const sortOptions: SortKey[] = ["peers", "seeders", "leechers", "downloaded"];
+const sortOptions: SortKey[] = ["peers", "seeders", "leechers", "downloaded"]
 const sortLabel: Record<SortKey, string> = {
   peers: "sort_peers",
   seeders: "sort_seeders",
   leechers: "sort_leechers",
   downloaded: "sort_downloaded",
-};
+}
 
-const sortItems = computed(() => sortOptions.map((s) => ({ label: t(sortLabel[s]), value: s })));
+const sortItems = computed(() => sortOptions.map((s) => ({ label: t(sortLabel[s]), value: s })))
 
 const columns = computed<TableColumn<Top100Entry>[]>(() => [
   {
@@ -44,7 +43,8 @@ const columns = computed<TableColumn<Top100Entry>[]>(() => [
     accessorKey: "info_hash",
     header: t("col_hash"),
     meta: { class: { td: "font-mono text-xs break-all" } },
-    cell: ({ row }) => h("code", { class: "bg-code-bg px-1.5 py-0.5 rounded-sm text-xs" }, String(row.getValue("info_hash"))),
+    cell: ({ row }) =>
+      h("code", { class: "bg-code-bg px-1.5 py-0.5 rounded-sm text-xs" }, String(row.getValue("info_hash"))),
   },
   {
     accessorKey: "peers",
@@ -70,16 +70,16 @@ const columns = computed<TableColumn<Top100Entry>[]>(() => [
     meta: { class: { th: "text-right", td: "text-right whitespace-nowrap tabular-nums" } },
     cell: ({ row }) => number(row.getValue("downloaded") as number),
   },
-]);
+])
 
-const tableData = computed(() => (loading.value || error.value ? [] : rows.value));
+const tableData = computed(() => (loading.value || error.value ? [] : rows.value))
 </script>
 
 <template>
   <section class="flex justify-between items-start gap-5 mb-6 max-[900px]:flex-col max-[900px]:items-stretch">
     <div>
-      <h1 class="m-0 mb-1.5 text-[28px] leading-tight max-[560px]:text-[24px] font-bold">{{ t('top100_title') }}</h1>
-      <p class="m-0 text-muted text-sm leading-relaxed">{{ t('top100_subtitle') }}</p>
+      <h1 class="m-0 mb-1.5 text-[28px] leading-tight max-[560px]:text-[24px] font-bold">{{ t("top100_title") }}</h1>
+      <p class="m-0 text-muted text-sm leading-relaxed">{{ t("top100_subtitle") }}</p>
     </div>
   </section>
 
@@ -94,7 +94,8 @@ const tableData = computed(() => (loading.value || error.value ? [] : rows.value
         color="neutral"
         :ui="{
           fieldset: () => 'flex shrink-0 gap-0 -space-x-px',
-          item: () => 'border text-muted px-4 text-[13px] cursor-pointer min-h-8 transition-colors flex items-center justify-center bg-panel border-line hover:bg-hover-soft has-data-[state=checked]:bg-accent has-data-[state=checked]:border-accent has-data-[state=checked]:text-white has-data-[state=checked]:z-[1] first-of-type:rounded-s last-of-type:rounded-e',
+          item: () =>
+            'border text-muted px-4 text-[13px] cursor-pointer min-h-8 transition-colors flex items-center justify-center bg-panel border-line hover:bg-hover-soft has-data-[state=checked]:bg-accent has-data-[state=checked]:border-accent has-data-[state=checked]:text-white has-data-[state=checked]:z-[1] first-of-type:rounded-s last-of-type:rounded-e',
           container: () => 'contents',
           wrapper: () => 'contents',
           label: () => 'text-inherit font-normal',
@@ -111,7 +112,7 @@ const tableData = computed(() => (loading.value || error.value ? [] : rows.value
           ]"
           @click="load"
         >
-          {{ t('refresh') }}
+          {{ t("refresh") }}
         </UButton>
       </div>
     </div>
@@ -133,11 +134,11 @@ const tableData = computed(() => (loading.value || error.value ? [] : rows.value
         }"
       >
         <template #loading>
-          <span class="text-muted">{{ t('top100_loading') }}</span>
+          <span class="text-muted">{{ t("top100_loading") }}</span>
         </template>
         <template #empty>
-          <span v-if="error" class="text-bad">{{ t('top100_error') }}</span>
-          <span v-else class="text-muted">{{ t('top100_empty') }}</span>
+          <span v-if="error" class="text-bad">{{ t("top100_error") }}</span>
+          <span v-else class="text-muted">{{ t("top100_empty") }}</span>
         </template>
       </UTable>
     </div>

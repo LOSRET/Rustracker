@@ -1,21 +1,21 @@
 <script setup lang="ts">
-import { ref, onActivated, onDeactivated } from "vue";
-import type { StatsResponse, RangeKey } from "../types/api";
-import { useTrends } from "../composables/useTrends";
-import { useI18n } from "../composables/useI18n";
-import Topbar from "../components/Topbar.vue";
-import MetricCard from "../components/MetricCard.vue";
-import TrendChart from "../components/TrendChart.vue";
-import ClientChart from "../components/ClientChart.vue";
+import { ref, onActivated, onDeactivated } from "vue"
+import type { StatsResponse, RangeKey } from "../types/api"
+import { useTrends } from "../composables/useTrends"
+import { useI18n } from "../composables/useI18n"
+import Topbar from "../components/Topbar.vue"
+import MetricCard from "../components/MetricCard.vue"
+import TrendChart from "../components/TrendChart.vue"
+import ClientChart from "../components/ClientChart.vue"
 
-defineProps<{ stats: StatsResponse | null; error: string | null; lastUpdated: number | null }>();
+defineProps<{ stats: StatsResponse | null; error: string | null; lastUpdated: number | null }>()
 
-const { trends, clients, trendsError, clientsError, start, stop } = useTrends();
-const { t, number } = useI18n();
-const range = ref<RangeKey>("24h");
+const { trends, clients, trendsError, clientsError, start, stop } = useTrends()
+const { t, number } = useI18n()
+const range = ref<RangeKey>("24h")
 
-onActivated(start);
-onDeactivated(stop);
+onActivated(start)
+onDeactivated(stop)
 </script>
 
 <template>
@@ -32,7 +32,7 @@ onDeactivated(stop);
       <MetricCard variant="completed" :label="t('completed')" :value="number(stats?.completed ?? 0)" />
     </section>
 
-    <TrendChart :data="trends" :error="trendsError" v-model:range="range" />
+    <TrendChart v-model:range="range" :data="trends" :error="trendsError" />
     <ClientChart :data="clients" :error="clientsError" :range="range" />
   </div>
 </template>
