@@ -361,14 +361,8 @@ pub(crate) fn load_trends_from_file(
                         .iter()
                         .filter_map(|c| {
                             let arr = c.as_array()?;
-                            let tag = arr
-                                .first()
-                                .and_then(|v| v.as_u64())
-                                .map(|v| v as u8)?;
-                            let count = arr
-                                .get(1)
-                                .and_then(|v| v.as_u64())
-                                .map(|v| v as u32)?;
+                            let tag = arr.first().and_then(|v| v.as_u64()).map(|v| v as u8)?;
+                            let count = arr.get(1).and_then(|v| v.as_u64()).map(|v| v as u32)?;
                             Some((tag, count))
                         })
                         .collect();

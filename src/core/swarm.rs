@@ -644,9 +644,8 @@ pub(crate) fn allocate_v4_v6(total_v4: usize, total_v6: usize, amount: usize) ->
     let left_v4 = total_v4 - v4;
     let left_v6 = total_v6 - v6;
 
-    if left_v4 + left_v6 > 0 {
-        let scale: usize = 1024;
-        let pct_v4 = (scale * left_v4) / (left_v4 + left_v6);
+    let scale: usize = 1024;
+    if let Some(pct_v4) = (scale * left_v4).checked_div(left_v4 + left_v6) {
         v4 += (amount_left * pct_v4) / scale;
         v6 += amount_left - (amount_left * pct_v4) / scale;
     }

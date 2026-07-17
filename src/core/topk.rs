@@ -156,10 +156,10 @@ pub(crate) fn drain_heap_by(
         })
         .collect();
     match sort_field {
-        1 => result.sort_by(|a, b| b.1.cmp(&a.1)),
-        2 => result.sort_by(|a, b| b.2.cmp(&a.2)),
-        3 => result.sort_by(|a, b| b.3.cmp(&a.3)),
-        _ => result.sort_by(|a, b| (b.1 + b.2).cmp(&(a.1 + a.2))),
+        1 => result.sort_by_key(|r| Reverse(r.1)),
+        2 => result.sort_by_key(|r| Reverse(r.2)),
+        3 => result.sort_by_key(|r| Reverse(r.3)),
+        _ => result.sort_by_key(|r| Reverse(r.1 + r.2)),
     }
     result
 }

@@ -196,7 +196,7 @@ pub(crate) async fn clients_list(State(state): State<AppState>) -> Json<ClientLi
             peers: *c,
         })
         .collect();
-    clients.sort_by(|a, b| b.peers.cmp(&a.peers));
+    clients.sort_by_key(|c| std::cmp::Reverse(c.peers));
     Json(ClientListResponse { clients })
 }
 
