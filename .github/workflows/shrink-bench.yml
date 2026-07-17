@@ -5,13 +5,13 @@ on:
   push:
     branches: [main]
     paths:
-      - 'src/core/swarm.rs'
+      - "src/core/swarm.rs"
 
 env:
   # Shorten jemalloc decay from default 10s to 2s so freed pages are
   # returned to the OS before the next RSS measurement (the benchmark
   # only waits 3s after shrink_to before sampling RSS).
-  MALLOC_CONF: 'dirty_decay_ms:2000,muzzy_decay_ms:2000'
+  MALLOC_CONF: "dirty_decay_ms:2000,muzzy_decay_ms:2000"
 
 jobs:
   shrink-bench:
@@ -22,9 +22,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Build
-        run: cargo build --release --example shrink_bench
+        run: cargo build --release --no-default-features --example shrink_bench
       - name: Run
-        run: cargo run --release --example shrink_bench 2>shrink.log | tee shrink.csv
+        run: cargo run --release --no-default-features --example shrink_bench 2>shrink.log | tee shrink.csv
       - name: Show log
         run: cat shrink.log
       - name: Summary

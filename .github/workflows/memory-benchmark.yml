@@ -12,9 +12,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Build
-        run: cargo build --release --example unified_bench
+        run: cargo build --release --no-default-features --example unified_bench
       - name: Run
-        run: cargo run --release --example unified_bench 2>bench.log | tee bench.csv
+        run: cargo run --release --no-default-features --example unified_bench 2>bench.log | tee bench.csv
       - name: Show log
         run: cat bench.log
       - name: Summary
@@ -40,17 +40,17 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Build (system allocator)
-        run: cargo build --release --example memory_tracker_bench
+        run: cargo build --release --no-default-features --example memory_tracker_bench
       - name: Build (jemalloc)
-        run: cargo build --release --example memory_jemalloc_bench
+        run: cargo build --release --no-default-features --example memory_jemalloc_bench
       - name: Build (mimalloc)
-        run: cargo build --release --example memory_mimalloc_bench
+        run: cargo build --release --no-default-features --example memory_mimalloc_bench
       - name: Run system allocator
-        run: /usr/bin/time -v -o sys.time cargo run --release --example memory_tracker_bench 2>sys.log | tee sys.csv
+        run: /usr/bin/time -v -o sys.time cargo run --release --no-default-features --example memory_tracker_bench 2>sys.log | tee sys.csv
       - name: Run jemalloc
-        run: /usr/bin/time -v -o jem.time cargo run --release --example memory_jemalloc_bench 2>jem.log | tee jem.csv
+        run: /usr/bin/time -v -o jem.time cargo run --release --no-default-features --example memory_jemalloc_bench 2>jem.log | tee jem.csv
       - name: Run mimalloc
-        run: /usr/bin/time -v -o mim.time cargo run --release --example memory_mimalloc_bench 2>mim.log | tee mim.csv
+        run: /usr/bin/time -v -o mim.time cargo run --release --no-default-features --example memory_mimalloc_bench 2>mim.log | tee mim.csv
       - name: Show logs
         run: |
           echo "=== system allocator ===" && cat sys.log
