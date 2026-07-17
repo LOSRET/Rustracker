@@ -41,6 +41,7 @@ const langs: { key: LangKey; label: string }[] = [
     @update:model-value="(v: LangKey) => setLang(v)"
   >
     <template #leading="{ modelValue }">
+      <!-- eslint-disable-next-line vue/no-v-html -- flags are static SVGs imported at build time. -->
       <span v-if="modelValue" class="flag-svg w-4 h-3 shrink-0" v-html="flags[modelValue as LangKey]" />
     </template>
 
@@ -59,6 +60,7 @@ const langs: { key: LangKey; label: string }[] = [
     </template>
 
     <template #item-leading="{ item }">
+      <!-- eslint-disable-next-line vue/no-v-html -- flags are static SVGs imported at build time. -->
       <span class="flag-svg w-4 h-3 shrink-0" v-html="flags[item.key as LangKey]" />
     </template>
   </USelectMenu>

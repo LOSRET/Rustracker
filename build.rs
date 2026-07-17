@@ -68,23 +68,23 @@ fn main() {
         fs::write(out_path.join("assets_manifest.rs"), &manifest)
             .expect("failed to write assets_manifest.rs");
 
-        println!(
-            "cargo:rerun-if-changed={}",
-            frontend_dir.join("package.json").display()
-        );
-        println!(
-            "cargo:rerun-if-changed={}",
-            frontend_dir.join("vite.config.ts").display()
-        );
-        println!(
-            "cargo:rerun-if-changed={}",
-            frontend_dir.join("index.html").display()
-        );
-        for name in &entries {
-            println!("cargo:rerun-if-changed={}", src_assets.join(name).display());
+        for input in [
+            "src",
+            "index.html",
+            "package.json",
+            "package-lock.json",
+            "tsconfig.json",
+            "tsconfig.node.json",
+            "vite.config.ts",
+        ] {
+            println!(
+                "cargo:rerun-if-changed={}",
+                frontend_dir.join(input).display()
+            );
         }
     }
 
     println!("cargo:rerun-if-env-changed=CARGO_FEATURE_DASHBOARD");
     println!("cargo:rerun-if-env-changed=CARGO_FEATURE_PERSONAL_CONTACT");
+    println!("cargo:rerun-if-env-changed=VITE_PERSONAL_CONTACT");
 }

@@ -1,0 +1,61 @@
+name: Frontend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - "build.rs"
+      - "tests/tracker_http.rs"
+      - ".github/workflows/frontend.yml"
+  pull_request:
+    paths:
+      - "frontend/**"
+      - "build.rs"
+      - "tests/tracker_http.rs"
+      - ".github/workflows/frontend.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint -- --max-warnings=0
+
+      - name: Type check
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Check formatting
+        working-directory: frontend
+        run: npm run format:check
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Test embedded dashboard
+        run: cargo test index_returns_dashboard_html

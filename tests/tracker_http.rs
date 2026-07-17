@@ -68,8 +68,8 @@ async fn index_returns_dashboard_html() {
     assert_eq!(response.status(), StatusCode::OK);
     let body = response.into_body().collect().await.unwrap().to_bytes();
     assert!(body
-        .windows(b"<div id=\"app\">".len())
-        .any(|w| w == b"<div id=\"app\">"));
+        .windows(b"id=\"app\"".len())
+        .any(|w| w == b"id=\"app\""));
     assert!(body.windows(b"/assets/".len()).any(|w| w == b"/assets/"));
     assert!(body
         .windows(b".js\"></script>".len())

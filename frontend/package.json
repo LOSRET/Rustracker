@@ -10,7 +10,8 @@
     "typecheck": "vue-tsc --noEmit",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
-    "format": "prettier --write src/"
+    "format": "prettier --write src/",
+    "format:check": "prettier --check src/"
   },
   "dependencies": {
     "@nuxt/ui": "^4.9.0",
