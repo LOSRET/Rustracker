@@ -1,4 +1,6 @@
+import { computed } from "vue"
 import { useI18n as useVueI18n } from "vue-i18n"
+import { useHead, useSeoMeta } from "@unhead/vue"
 import type { LangKey } from "../types/api"
 import { LANG_LOCALE, OG_LOCALE } from "../i18n"
 
@@ -11,19 +13,24 @@ export function useI18n() {
 
   function setLang(l: LangKey) {
     locale.value = l
-    document.documentElement.lang = LANG_LOCALE[l]
-    document.title = t("seo_title")
-    const setMeta = (sel: string, attr: string, val: string) => {
-      const el = document.querySelector(sel)
-      if (el) el.setAttribute(attr, val)
-    }
-    setMeta("meta[name='description']", "content", t("seo_desc"))
-    setMeta("meta[property='og:title']", "content", t("seo_title"))
-    setMeta("meta[property='og:description']", "content", t("seo_desc"))
-    setMeta("meta[property='og:locale']", "content", OG_LOCALE[l])
-    setMeta("meta[name='twitter:title']", "content", t("seo_title"))
-    setMeta("meta[name='twitter:description']", "content", t("seo_desc"))
   }
 
   return { t, lang: locale, number, d, setLang }
+}
+
+/** Called once in App.vue: SEO meta and <html lang> update reactively with locale. */
+export function useSeoHead() {
+  const { t, locale } = useVueI18n({ useScope: "global" })
+  const lang = computed(() => locale.value as LangKey)
+
+  useHead({ htmlAttrs: { lang: () => LANG_LOCALE[lang.value] } })
+  useSeoMeta({
+    title: () => t("seo_title"),
+    description: () => t("seo_desc"),
+    ogTitle: () => t("seo_title"),
+    ogDescription: () => t("seo_desc"),
+    ogLocale: () => OG_LOCALE[lang.value],
+    twitterTitle: () => t("seo_title"),
+    twitterDescription: () => t("seo_desc"),
+  })
 }

@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from "vue"
+import { ref, onUnmounted } from "vue"
 import type { PageKey } from "./types/api"
-import { useI18n } from "./composables/useI18n"
+import { useSeoHead } from "./composables/useI18n"
 import { useStats } from "./composables/useStats"
-import { detectLang } from "./i18n"
 import Sidebar from "./components/Sidebar.vue"
 import AppFooter from "./components/AppFooter.vue"
 import Disclaimer from "./components/Disclaimer.vue"
@@ -11,10 +10,11 @@ import DashboardView from "./views/DashboardView.vue"
 import Top100Page from "./components/Top100Page.vue"
 import ClientsPage from "./components/ClientsPage.vue"
 
-const { setLang } = useI18n()
 const { stats, error, lastUpdated, stop } = useStats()
 const page = ref<PageKey>("dashboard")
 const sidebarOpen = ref(false)
+
+useSeoHead()
 
 function switchPage(p: PageKey) {
   if (p !== page.value) {
@@ -24,7 +24,6 @@ function switchPage(p: PageKey) {
   sidebarOpen.value = false
 }
 
-onMounted(() => setLang(detectLang()))
 onUnmounted(stop)
 </script>
 

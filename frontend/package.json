@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@nuxt/ui": "^4.9.0",
+    "@unhead/vue": "^2.1.15",
     "@vueuse/core": "^14.3.0",
     "country-flag-icons": "^1.6.20",
     "echarts": "^6.1.0",
