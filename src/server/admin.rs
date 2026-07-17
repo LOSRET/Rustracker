@@ -132,7 +132,8 @@ async fn append_blacklist_entry(path: &Path, info_hash: InfoHash) -> std::io::Re
         .append(true)
         .open(path)
         .await?;
-    file.write_all(format!("{info_hash}\n").as_bytes()).await
+    file.write_all(format!("{info_hash}\n").as_bytes()).await?;
+    file.flush().await
 }
 
 fn blacklist_success(info_hash: InfoHash, added: bool) -> (StatusCode, Json<AddBlacklistResponse>) {
