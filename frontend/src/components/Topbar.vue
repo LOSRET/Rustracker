@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { TooltipRoot, TooltipTrigger, TooltipPortal, TooltipContent } from "reka-ui"
 import type { StatsResponse } from "../types/api"
 import { useClipboard } from "@vueuse/core"
 import { useI18n } from "../composables/useI18n"
@@ -35,17 +36,28 @@ function lastUpdateText() {
       </p>
       <div class="flex items-center flex-wrap gap-1 mb-5">
         <span class="text-muted text-sm font-normal whitespace-nowrap">{{ t("tracker_addr_label") }}</span>
-        <UTooltip :text="t('copied')" :open="copied" :content="{ side: 'top', sideOffset: 8 }">
-          <span
-            :class="[
-              'tracker-addr text-base font-bold break-all cursor-pointer border-b border-dashed border-line transition-colors',
-              copied ? 'text-good' : 'text-ink hover:text-accent',
-            ]"
-            @click="copyAddr"
-          >
-            {{ trackerUrl }}
-          </span>
-        </UTooltip>
+        <TooltipRoot :open="copied">
+          <TooltipTrigger as-child>
+            <span
+              :class="[
+                'tracker-addr text-base font-bold break-all cursor-pointer border-b border-dashed border-line transition-colors',
+                copied ? 'text-good' : 'text-ink hover:text-accent',
+              ]"
+              @click="copyAddr"
+            >
+              {{ trackerUrl }}
+            </span>
+          </TooltipTrigger>
+          <TooltipPortal>
+            <TooltipContent
+              side="top"
+              :side-offset="8"
+              class="z-[1100] bg-side-sel text-side-fg border border-side-border text-xs px-2 py-1 rounded-sm shadow-lg data-[state=delayed-open]:animate-tooltip-in"
+            >
+              {{ t("copied") }}
+            </TooltipContent>
+          </TooltipPortal>
+        </TooltipRoot>
       </div>
     </div>
     <div class="text-right shrink-0 bg-soft px-3.5 py-2 rounded max-[900px]:text-left">

@@ -1,7 +1,4 @@
-@import "tailwindcss";
-@import "@nuxt/ui";
-
-@theme {
+:root {
   --color-ink: #1f2937;
   --color-muted: #64748b;
   --color-line: #d8dee8;
@@ -33,14 +30,16 @@
 
   --animate-rps-pulse: rps-pulse 2s ease-in-out infinite;
 
-  @keyframes rps-pulse {
-    0%,
-    100% {
-      opacity: 1;
-    }
-    50% {
-      opacity: 0.35;
-    }
+  color-scheme: light dark;
+}
+
+@keyframes rps-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
   }
 }
 
@@ -48,10 +47,6 @@
   display: block;
   width: 100%;
   height: 100%;
-}
-
-:root {
-  color-scheme: light dark;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -77,17 +72,5 @@
     --color-violet: #a78bfa;
     --color-bad: #ef4444;
     --color-peers: #475569;
-  }
-}
-
-[data-slot="content"][data-state="instant-open"],
-[data-slot="content"][data-state="delayed-open"] {
-  animation: tooltip-in 160ms ease-out;
-}
-
-@keyframes tooltip-in {
-  from {
-    opacity: 0;
-    scale: 0.92;
   }
 }

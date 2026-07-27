@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { DialogRoot, DialogPortal, DialogOverlay, DialogContent } from "reka-ui"
 import { useMediaQuery } from "@vueuse/core"
 import type { PageKey } from "../types/api"
 import SidebarContent from "./SidebarContent.vue"
@@ -14,24 +15,22 @@ const isMobile = useMediaQuery("(max-width: 900px)")
     <SidebarContent :page="page" :error="error" @switch="emit('switch', $event)" />
   </aside>
 
-  <USlideover
+  <DialogRoot
     v-else
     :open="open"
-    side="left"
-    :close="false"
-    :dismissible="true"
-    :ui="{
-      overlay: 'fixed inset-0 bg-black/45',
-      content: 'fixed top-0 left-0 h-screen w-[260px] bg-side text-side-fg overflow-y-auto p-5 focus:outline-none',
-    }"
     @update:open="
       (v: boolean) => {
         if (!v) emit('close')
       }
     "
   >
-    <template #content>
-      <SidebarContent :page="page" :error="error" @switch="emit('switch', $event)" />
-    </template>
-  </USlideover>
+    <DialogPortal>
+      <DialogOverlay class="fixed inset-0 bg-black/45 z-[1099]" />
+      <DialogContent
+        class="fixed top-0 left-0 h-screen w-[260px] bg-side text-side-fg overflow-y-auto p-5 focus:outline-none z-[1100]"
+      >
+        <SidebarContent :page="page" :error="error" @switch="emit('switch', $event)" />
+      </DialogContent>
+    </DialogPortal>
+  </DialogRoot>
 </template>
