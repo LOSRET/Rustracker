@@ -107,23 +107,28 @@ const rangeItems = computed(() =>
         <h2 class="m-0 text-base leading-relaxed font-bold">{{ t("chart_title") }}</h2>
         <span class="text-muted text-xs">{{ t("chart_note") }}</span>
       </div>
-      <URadioGroup
-        :model-value="range"
-        :items="rangeItems"
-        variant="table"
-        orientation="horizontal"
-        indicator="hidden"
-        color="neutral"
-        :ui="{
-          fieldset: () => 'flex shrink-0 gap-0 -space-x-px',
-          item: () =>
-            'border text-muted px-3 text-xs cursor-pointer min-h-7 transition-colors flex items-center justify-center bg-panel border-line hover:bg-hover-soft has-data-[state=checked]:bg-accent has-data-[state=checked]:border-accent has-data-[state=checked]:text-white has-data-[state=checked]:z-[1] first-of-type:rounded-s last-of-type:rounded-e',
-          container: () => 'contents',
-          wrapper: () => 'contents',
-          label: () => 'text-inherit font-normal',
-        }"
-        @update:model-value="setRange"
-      />
+      <div class="flex shrink-0 gap-0 -space-x-px" role="radiogroup">
+        <label
+          v-for="(item, idx) in rangeItems"
+          :key="item.value"
+          :class="[
+            'border text-muted px-3 text-xs cursor-pointer min-h-7 transition-colors flex items-center justify-center bg-panel border-line hover:bg-hover-soft',
+            idx === 0 ? 'rounded-s' : '',
+            idx === rangeItems.length - 1 ? 'rounded-e' : '',
+            range === item.value ? 'bg-accent border-accent text-white z-[1]' : '',
+          ]"
+        >
+          <input
+            type="radio"
+            class="sr-only"
+            :name="`trend-range`"
+            :value="item.value"
+            :checked="range === item.value"
+            @change="setRange(item.value)"
+          />
+          <span class="text-inherit font-normal">{{ item.label }}</span>
+        </label>
+      </div>
     </div>
     <div class="w-full h-[440px] max-[900px]:h-[330px] max-[560px]:h-[275px]">
       <v-chart :option="option" :init-options="{ renderer: 'svg' }" autoresize />

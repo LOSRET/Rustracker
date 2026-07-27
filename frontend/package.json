@@ -14,24 +14,27 @@
     "format:check": "prettier --check src/"
   },
   "dependencies": {
-    "@nuxt/ui": "^4.9.0",
+    "@tanstack/vue-table": "^8.21.3",
     "@unhead/vue": "^3.0.0",
     "@vueuse/core": "^14.3.0",
     "country-flag-icons": "^1.6.20",
     "echarts": "^6.1.0",
+    "reka-ui": "^2.10.1",
     "vue": "^3.5.13",
     "vue-echarts": "^8.0.1",
     "vue-i18n": "^11.4.6"
   },
   "devDependencies": {
     "@types/node": "^26.0.1",
+    "@unocss/preset-icons": "^66.7.5",
+    "@unocss/preset-wind3": "^66.7.5",
     "@vitejs/plugin-vue": "^6.0.0",
     "@vue/eslint-config-prettier": "^10.2.0",
     "@vue/eslint-config-typescript": "^14.9.0",
     "eslint": "^10.7.0",
     "prettier": "^3.9.5",
-    "tailwindcss": "^4.0.0",
     "typescript": "~6.0.0",
+    "unocss": "^66.7.5",
     "vite": "^8.0.0",
     "vue-tsc": "^3.3.8"
   }

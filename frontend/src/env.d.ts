@@ -7,3 +7,5 @@ declare module "*.vue" {
 }
 
 declare const __CONTACT__: { blogUrl: string; email: string } | null
+
+declare module "virtual:uno.css"

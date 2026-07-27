@@ -11,7 +11,7 @@ export default defineConfig([
 
   {
     name: "app/files-to-ignore",
-    ignores: ["**/dist/**", "**/dist-ssr/**", "**/node_modules/**", "**/auto-imports.d.ts", "**/components.d.ts"],
+    ignores: ["**/dist/**", "**/dist-ssr/**", "**/node_modules/**"],
   },
 
   ...vue.configs["flat/recommended"],

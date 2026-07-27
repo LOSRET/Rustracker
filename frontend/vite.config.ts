@@ -1,6 +1,6 @@
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
-import ui from "@nuxt/ui/vite";
+import UnoCSS from "unocss/vite";
 
 const contact = process.env.VITE_PERSONAL_CONTACT === "true"
   ? { blogUrl: "https://blog.7471.top/", email: "tracker@mail.7471.top" }
@@ -13,15 +13,7 @@ const analytics = process.env.VITE_PERSONAL_CONTACT === "true"
 export default defineConfig({
   plugins: [
     vue(),
-    ui({
-      router: false,
-      ui: {
-        colors: {
-          primary: "blue",
-          neutral: "slate",
-        },
-      },
-    }),
+    UnoCSS(),
     analytics && {
       name: "inject-analytics",
       transformIndexHtml(html: string) {

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onUnmounted } from "vue"
+import { TooltipProvider } from "reka-ui"
 import type { PageKey } from "./types/api"
 import { useSeoHead } from "./composables/useI18n"
 import { useStats } from "./composables/useStats"
@@ -28,7 +29,7 @@ onUnmounted(stop)
 </script>
 
 <template>
-  <UApp>
+  <TooltipProvider :delay-duration="700">
     <button
       class="hidden max-[900px]:block fixed top-[14px] left-[14px] z-[999] bg-side text-side-fg border-0 p-2 cursor-pointer rounded-md leading-none"
       aria-label="Menu"
@@ -53,5 +54,5 @@ onUnmounted(stop)
         <AppFooter :stats="stats" />
       </main>
     </div>
-  </UApp>
+  </TooltipProvider>
 </template>

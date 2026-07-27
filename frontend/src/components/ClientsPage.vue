@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue"
-import type { TableColumn } from "@nuxt/ui"
+import { FlexRender, getCoreRowModel, useVueTable, type ColumnDef } from "@tanstack/vue-table"
 import type { ClientListEntry } from "../types/api"
 import { useClientsList } from "../composables/useClientsList"
 import { useI18n } from "../composables/useI18n"
@@ -26,33 +26,50 @@ function share(peers: number): string {
   return `${((peers / totalPeers.value) * 100).toFixed(1)}%`
 }
 
-const columns = computed<TableColumn<ClientListEntry>[]>(() => [
+interface ColumnMeta {
+  class?: {
+    th?: string
+    td?: string
+  }
+}
+
+const columns = computed<ColumnDef<ClientListEntry>[]>(() => [
   {
     id: "rank",
     header: "#",
     cell: ({ row }) => row.index + 1,
-    meta: { class: { th: "w-12 text-center", td: "w-12 text-center text-muted font-semibold" } },
+    meta: { class: { th: "w-12 text-center", td: "w-12 text-center text-muted font-semibold" } } as ColumnMeta,
   },
   {
     accessorKey: "name",
     header: t("clients_col_name"),
-    meta: { class: { td: "font-medium" } },
+    meta: { class: { td: "font-medium" } } as ColumnMeta,
   },
   {
     accessorKey: "peers",
     header: t("sort_peers"),
-    meta: { class: { th: "text-right", td: "text-right whitespace-nowrap tabular-nums" } },
+    meta: { class: { th: "text-right", td: "text-right whitespace-nowrap tabular-nums" } } as ColumnMeta,
     cell: ({ row }) => number(row.getValue("peers") as number),
   },
   {
     id: "share",
     header: t("clients_col_share"),
-    meta: { class: { th: "text-right", td: "text-right whitespace-nowrap tabular-nums text-muted" } },
+    meta: { class: { th: "text-right", td: "text-right whitespace-nowrap tabular-nums text-muted" } } as ColumnMeta,
     cell: ({ row }) => share(row.original.peers),
   },
 ])
 
 const tableData = computed(() => (loading.value || error.value ? [] : rows.value))
+
+const table = useVueTable({
+  get data() {
+    return tableData.value
+  },
+  get columns() {
+    return columns.value
+  },
+  getCoreRowModel: getCoreRowModel(),
+})
 </script>
 
 <template>
@@ -67,9 +84,8 @@ const tableData = computed(() => (loading.value || error.value ? [] : rows.value
     <div class="flex items-center justify-between gap-4 mb-3 max-[900px]:flex-col max-[900px]:items-stretch">
       <div class="flex items-center justify-end gap-3 w-full">
         <span class="text-muted text-xs whitespace-nowrap">{{ statusText }}</span>
-        <UButton
+        <button
           :disabled="loading"
-          variant="none"
           :class="[
             'border border-line bg-panel text-ink px-4 text-[13px] cursor-pointer min-h-8 rounded hover:bg-hover-soft',
             loading ? 'opacity-50 cursor-not-allowed' : '',
@@ -77,34 +93,60 @@ const tableData = computed(() => (loading.value || error.value ? [] : rows.value
           @click="load"
         >
           {{ t("refresh") }}
-        </UButton>
+        </button>
       </div>
     </div>
 
     <div class="overflow-x-auto">
-      <UTable
-        :data="tableData"
-        :columns="columns"
-        :loading="loading"
-        :ui="{
-          root: 'overflow-visible',
-          base: 'min-w-full',
-          tbody: 'divide-y-0',
-          tr: 'hover:bg-row-hover',
-          th: 'p-2.5 bg-soft text-muted text-xs uppercase border-b-2 border-line whitespace-nowrap',
-          td: 'p-2 px-3 border-b border-td-border text-[13px] text-ink whitespace-normal',
-          empty: 'p-8 text-center text-[13px]',
-          loading: 'p-8 text-center text-[13px]',
-        }"
-      >
-        <template #loading>
-          <span class="text-muted">{{ t("top100_loading") }}</span>
-        </template>
-        <template #empty>
-          <span v-if="error" class="text-bad">{{ t("top100_error") }}</span>
-          <span v-else class="text-muted">{{ t("top100_empty") }}</span>
-        </template>
-      </UTable>
+      <table class="min-w-full border-collapse">
+        <thead>
+          <tr>
+            <th
+              v-for="header in table.getHeaderGroups()[0]?.headers ?? []"
+              :key="header.id"
+              :class="[
+                'p-2.5 bg-soft text-muted text-xs uppercase border-b-2 border-line whitespace-nowrap',
+                (header.column.columnDef.meta as ColumnMeta)?.class?.th ?? '',
+              ]"
+            >
+              <FlexRender
+                v-if="!header.isPlaceholder"
+                :render="header.column.columnDef.header"
+                :props="header.getContext()"
+              />
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="row in table.getRowModel().rows" :key="row.id" class="hover:bg-row-hover">
+            <td
+              v-for="cell in row.getVisibleCells()"
+              :key="cell.id"
+              :class="[
+                'p-2 px-3 border-b border-td-border text-[13px] text-ink whitespace-normal',
+                (cell.column.columnDef.meta as ColumnMeta)?.class?.td ?? '',
+              ]"
+            >
+              <FlexRender :render="cell.column.columnDef.cell" :props="cell.getContext()" />
+            </td>
+          </tr>
+          <tr v-if="loading">
+            <td :colspan="columns.length" class="p-8 text-center text-[13px] text-muted">
+              {{ t("top100_loading") }}
+            </td>
+          </tr>
+          <tr v-else-if="error">
+            <td :colspan="columns.length" class="p-8 text-center text-[13px] text-bad">
+              {{ t("top100_error") }}
+            </td>
+          </tr>
+          <tr v-else-if="tableData.length === 0">
+            <td :colspan="columns.length" class="p-8 text-center text-[13px] text-muted">
+              {{ t("top100_empty") }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </section>
 </template>
