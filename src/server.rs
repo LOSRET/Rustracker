@@ -255,7 +255,7 @@ where
     tokio::spawn(async move {
         shutdown.await;
         tracing::trace!("received graceful shutdown signal");
-        shutdown_handle.graceful_shutdown(None);
+        shutdown_handle.graceful_shutdown(Some(Duration::from_secs(10)));
     });
 
     let mut tasks = Vec::with_capacity(listeners.len());
