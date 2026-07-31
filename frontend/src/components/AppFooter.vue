@@ -1,14 +1,19 @@
 <script setup lang="ts">
+import dayjs from "dayjs"
+import duration from "dayjs/plugin/duration"
 import type { StatsResponse } from "../types/api"
 import { useI18n } from "../composables/useI18n"
+
+dayjs.extend(duration)
 
 defineProps<{ stats: StatsResponse | null }>()
 const { t } = useI18n()
 
 function formatUptime(secs: number): string {
-  const d = Math.floor(secs / 86400)
-  const h = Math.floor((secs % 86400) / 3600)
-  const m = Math.floor((secs % 3600) / 60)
+  const dur = dayjs.duration(secs, "seconds")
+  const d = dur.days()
+  const h = dur.hours()
+  const m = dur.minutes()
   if (d > 0) return `${d}d ${h}h ${m}m`
   if (h > 0) return `${h}h ${m}m`
   return `${m}m`

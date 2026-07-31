@@ -18,6 +18,7 @@
     "@unhead/vue": "^3.0.0",
     "@vueuse/core": "^14.3.0",
     "country-flag-icons": "^1.6.20",
+    "dayjs": "^1.11.21",
     "echarts": "^6.1.0",
     "vue": "^3.5.13",
     "vue-echarts": "^8.0.1",
