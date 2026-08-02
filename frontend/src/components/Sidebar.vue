@@ -4,14 +4,14 @@ import type { PageKey } from "../types/api"
 import SidebarContent from "./SidebarContent.vue"
 
 defineProps<{ page: PageKey; open: boolean; error?: string | null }>()
-const emit = defineEmits<{ switch: [page: PageKey]; close: [] }>()
+const emit = defineEmits<{ close: [] }>()
 
 const isMobile = useMediaQuery("(max-width: 900px)")
 </script>
 
 <template>
   <aside v-if="!isMobile" class="bg-side text-side-fg sticky top-0 h-screen overflow-y-auto p-6">
-    <SidebarContent :page="page" :error="error" @switch="emit('switch', $event)" />
+    <SidebarContent :page="page" :error="error" @close="emit('close')" />
   </aside>
 
   <USlideover
@@ -31,7 +31,7 @@ const isMobile = useMediaQuery("(max-width: 900px)")
     "
   >
     <template #content>
-      <SidebarContent :page="page" :error="error" @switch="emit('switch', $event)" />
+      <SidebarContent :page="page" :error="error" @close="emit('close')" />
     </template>
   </USlideover>
 </template>

@@ -3,14 +3,14 @@ import type { PageKey } from "../types/api"
 import { useI18n } from "../composables/useI18n"
 import LangSwitcher from "./LangSwitcher.vue"
 
-const props = defineProps<{ page: PageKey; error?: string | null }>()
-const emit = defineEmits<{ switch: [page: PageKey] }>()
+defineProps<{ page: PageKey; error?: string | null }>()
+const emit = defineEmits<{ close: [] }>()
 
 const { t } = useI18n()
 
 function scrollToDisclaimer() {
   document.getElementById("disclaimer")?.scrollIntoView({ behavior: "smooth" })
-  emit("switch", props.page)
+  emit("close")
 }
 </script>
 
@@ -38,36 +38,36 @@ function scrollToDisclaimer() {
 
     <div class="text-side-muted text-xs uppercase mb-2.5">{{ t("monitoring") }}</div>
     <nav class="flex flex-col">
-      <button
+      <RouterLink
+        :to="{ name: 'dashboard' }"
         :class="[
-          'flex items-center justify-between px-3 py-2.5 text-white text-sm border-l-4 max-[900px]:cursor-pointer',
+          'flex items-center justify-between px-3 py-2.5 text-white text-sm border-l-4 max-[900px]:cursor-pointer no-underline',
           page === 'dashboard' ? 'bg-side-active border-accent' : 'border-transparent hover:bg-side-hover',
         ]"
-        @click="emit('switch', 'dashboard')"
       >
         <span>{{ t("overview") }}</span>
         <span>{{ error ? t("error") : t("running") }}</span>
-      </button>
-      <button
+      </RouterLink>
+      <RouterLink
+        :to="{ name: 'top100' }"
         :class="[
-          'flex items-center justify-between px-3 py-2.5 text-white text-sm border-l-4 max-[900px]:cursor-pointer',
+          'flex items-center justify-between px-3 py-2.5 text-white text-sm border-l-4 max-[900px]:cursor-pointer no-underline',
           page === 'top100' ? 'bg-side-active border-accent' : 'border-transparent hover:bg-side-hover',
         ]"
-        @click="emit('switch', 'top100')"
       >
         <span>🏆 {{ t("top100_link") }}</span>
         <span>→</span>
-      </button>
-      <button
+      </RouterLink>
+      <RouterLink
+        :to="{ name: 'clients' }"
         :class="[
-          'flex items-center justify-between px-3 py-2.5 text-white text-sm border-l-4 max-[900px]:cursor-pointer',
+          'flex items-center justify-between px-3 py-2.5 text-white text-sm border-l-4 max-[900px]:cursor-pointer no-underline',
           page === 'clients' ? 'bg-side-active border-accent' : 'border-transparent hover:bg-side-hover',
         ]"
-        @click="emit('switch', 'clients')"
       >
         <span>📊 {{ t("clients_link") }}</span>
         <span>→</span>
-      </button>
+      </RouterLink>
       <a
         class="flex items-center justify-between px-3 py-2.5 text-white text-sm border-l-4 border-transparent hover:bg-side-hover mt-2.5 no-underline cursor-pointer"
         href="#disclaimer"
