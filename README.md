@@ -108,7 +108,7 @@ GET /announce?info_hash=<20-byte>&peer_id=<20-byte>&port=6881&uploaded=0&downloa
 | `downloaded` | No | Total bytes downloaded |
 | `left` | No | Bytes remaining to complete |
 | `event` | No | `started`, `completed`, `stopped`, or empty |
-| `compact` | No | `1` for compact encoding (default), `0` for dictionary |
+| `compact` | No | Compact encoding. Always compact — the value is accepted and ignored; only compact (binary) peer lists are returned (BEP 3 `compact=0` dictionary form is not supported) |
 | `numwant` | No | Number of peers to return (default 100, max 400) |
 | `ip` | No | Override peer IP address (for reverse proxy setups) |
 

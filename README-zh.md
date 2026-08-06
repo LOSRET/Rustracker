@@ -108,7 +108,7 @@ GET /announce?info_hash=<20字节>&peer_id=<20字节>&port=6881&uploaded=0&downl
 | `downloaded` | 否 | 已下载总字节数 |
 | `left` | 否 | 剩余需下载字节数 |
 | `event` | 否 | `started`、`completed`、`stopped` 或留空 |
-| `compact` | 否 | `1` 使用紧凑编码（默认），`0` 使用字典编码 |
+| `compact` | 否 | 紧凑编码。始终返回紧凑格式——该参数会被接收但被忽略；仅支持紧凑（二进制）peer 列表（不支持 BEP 3 `compact=0` 字典形式） |
 | `numwant` | 否 | 返回的 peer 数量（默认 100，最大 400） |
 | `ip` | 否 | 覆盖 peer IP 地址（用于反向代理场景） |
 
