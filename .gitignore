@@ -1,6 +1,5 @@
 # Rust / Cargo 构建产物
 target/
-Cargo.lock
 
 # 打包输出
 deliverable/
