@@ -237,7 +237,13 @@ pub fn router(state: AppState) -> Router {
         .route("/", get(handlers::index))
         .route("/assets/{*name}", get(handlers::asset));
 
-    r.fallback(handlers::not_found).with_state(state)
+    #[cfg(feature = "dashboard")]
+    let r = r.fallback(handlers::spa_fallback);
+
+    #[cfg(not(feature = "dashboard"))]
+    let r = r.fallback(handlers::not_found);
+
+    r.with_state(state)
 }
 
 fn file_mtime(path: &Path) -> SystemTime {

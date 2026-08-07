@@ -76,6 +76,61 @@ async fn index_returns_dashboard_html() {
         .any(|w| w == b".js\"></script>"));
 }
 
+#[cfg(feature = "dashboard")]
+#[tokio::test]
+async fn spa_fallback_serves_index_for_browser_requests() {
+    for uri in ["/top100", "/clients", "/totally-unknown"] {
+        let response = app()
+            .oneshot(
+                Request::builder()
+                    .uri(uri)
+                    .header(header::ACCEPT, "text/html,application/xhtml+xml")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK, "GET {uri}");
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        assert!(
+            body.windows(b"id=\"app\"".len())
+                .any(|w| w == b"id=\"app\""),
+            "GET {uri} should serve the dashboard html"
+        );
+    }
+}
+
+#[cfg(feature = "dashboard")]
+#[tokio::test]
+async fn spa_fallback_keeps_404_for_non_browser_requests() {
+    // No Accept: text/html header — non-browser client.
+    let response = app()
+        .oneshot(
+            Request::builder()
+                .uri("/top100")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+
+    // Non-GET method.
+    let response = app()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/top100")
+                .header(header::ACCEPT, "text/html")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+}
+
 #[tokio::test]
 async fn stats_api_returns_json_totals() {
     let app = app();

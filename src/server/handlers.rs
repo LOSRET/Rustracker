@@ -45,6 +45,32 @@ pub(crate) async fn index(State(state): State<AppState>) -> Html<axum::body::Byt
     Html(state.versioned_index.clone())
 }
 
+/// SPA fallback for vue-router history mode: unknown GET paths from browsers
+/// get index.html; other methods and non-browser clients keep 404.
+#[cfg(feature = "dashboard")]
+pub(crate) async fn spa_fallback(
+    State(state): State<AppState>,
+    method: axum::http::Method,
+    headers: HeaderMap,
+) -> Response<Body> {
+    let wants_html = headers
+        .get(header::ACCEPT)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.contains("text/html"));
+    if method == axum::http::Method::GET && wants_html {
+        Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "text/html; charset=utf-8")
+            .body(Body::from(state.versioned_index.clone()))
+            .unwrap()
+    } else {
+        Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(Body::from("404 Not Found"))
+            .unwrap()
+    }
+}
+
 #[cfg(feature = "dashboard")]
 pub(crate) async fn asset(
     axum::extract::Path(name): axum::extract::Path<String>,
@@ -117,6 +143,7 @@ pub(crate) async fn healthz() -> &'static str {
     "ok"
 }
 
+#[cfg(not(feature = "dashboard"))]
 pub(crate) async fn not_found() -> (StatusCode, &'static str) {
     (StatusCode::NOT_FOUND, "404 Not Found")
 }
