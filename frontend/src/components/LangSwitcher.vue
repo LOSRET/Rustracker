@@ -35,7 +35,7 @@ const langs: { key: LangKey; label: string }[] = [
       content: 'z-[1100] bg-side-sel border border-side-border ring-0 shadow-lg max-h-60 rounded-none',
       viewport: 'divide-y-0',
       group: 'p-0',
-      item: 'flex items-center gap-2 px-2.5 py-1.5 text-[13px] cursor-pointer transition-colors duration-150 text-side-fg data-highlighted:bg-side-hover data-highlighted:!text-white before:hidden',
+      item: 'flex items-center gap-2 px-2.5 py-1.5 text-[13px] cursor-pointer transition-colors duration-150 text-side-fg data-highlighted:bg-side-hover data-highlighted:text-white! before:hidden',
       itemTrailingIcon: 'size-3.5 text-accent',
     }"
     @update:model-value="(v: LangKey) => setLang(v)"
