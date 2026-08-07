@@ -15,6 +15,7 @@ export default defineConfig({
     vue(),
     ui({
       router: false,
+      icon: { clientBundle: { scan: true } },
       ui: {
         colors: {
           primary: "blue",

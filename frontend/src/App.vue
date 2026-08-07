@@ -20,7 +20,6 @@ watch(
   () => route.fullPath,
   () => {
     sidebarOpen.value = false
-    window.scrollTo(0, 0)
   },
 )
 
@@ -34,11 +33,7 @@ onUnmounted(stop)
       aria-label="Menu"
       @click="sidebarOpen = !sidebarOpen"
     >
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <line x1="3" y1="6" x2="21" y2="6" />
-        <line x1="3" y1="12" x2="21" y2="12" />
-        <line x1="3" y1="18" x2="21" y2="18" />
-      </svg>
+      <UIcon name="i-lucide-menu" class="size-6" />
     </button>
 
     <div class="min-h-screen grid grid-cols-[248px_minmax(0,1fr)] max-[900px]:grid-cols-1">
