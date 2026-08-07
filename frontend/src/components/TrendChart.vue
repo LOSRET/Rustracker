@@ -5,6 +5,7 @@ import "echarts"
 import { usePreferredDark } from "@vueuse/core"
 import type { TrendsResponse, RangeKey } from "../types/api"
 import { useI18n } from "../composables/useI18n"
+import { baseChart, emptyChartOption, filterRange, lineSeries } from "../utils/chart"
 
 const props = defineProps<{
   data: TrendsResponse | null
@@ -16,77 +17,35 @@ const emit = defineEmits<{ "update:range": [range: RangeKey] }>()
 const { t, d } = useI18n()
 const isDark = usePreferredDark()
 
-const RANGE_SECS: Record<RangeKey, number> = {
-  "24h": 86400,
-  "3d": 259200,
-  "7d": 604800,
-}
-
-function filterHistory() {
-  const history = props.data?.history ?? []
-  if (!history.length) return history
-  const cutoff = Math.floor(Date.now() / 1000) - RANGE_SECS[props.range]
-  return history.filter((item) => item.timestamp >= cutoff)
-}
-
 const option = computed(() => {
-  const history = filterHistory()
-  const dark = isDark.value
-  const cc = dark
-    ? { axis: "#94a3b8", line: "#334155", legend: "#cbd5e1" }
-    : { axis: "#64748b", line: "#e6ebf2", legend: "#1f2937" }
-
+  const history = filterRange(props.data?.history ?? [], props.range)
   if (!history.length) {
-    return {
-      title: {
-        text: props.error ? t("top100_error") : t("top100_empty"),
-        left: "center",
-        top: "center",
-        textStyle: { color: "#94a3b8", fontSize: 14 },
-      },
-      series: [],
-    }
+    return emptyChartOption(props.error ? t("top100_error") : t("top100_empty"))
   }
-
+  const dark = isDark.value
   const labels = history.map((item) => d(item.timestamp * 1000, "chart"))
 
   return {
     title: { text: "" },
     color: dark ? ["#3b82f6", "#94a3b8", "#22c55e", "#f59e0b"] : ["#2563eb", "#475569", "#15803d", "#b45309"],
-    tooltip: {
-      trigger: "axis",
-      backgroundColor: dark ? "#1e293b" : "#ffffff",
-      borderColor: dark ? "#334155" : "#e2e8f0",
-      textStyle: { color: dark ? "#e2e8f0" : "#1f2937" },
-    },
-    legend: {
-      type: "scroll",
-      top: 0,
-      left: "center",
-      itemWidth: 16,
-      itemGap: 14,
-      textStyle: { fontSize: 11, color: cc.legend },
-      data: [t("torrents"), t("sort_peers"), t("sort_seeders"), t("sort_leechers")],
-    },
-    grid: { left: 4, right: 4, top: 52, bottom: 36, containLabel: true },
-    xAxis: {
-      type: "category",
-      boundaryGap: false,
-      data: labels,
-      axisLine: { lineStyle: { color: cc.line } },
-      axisLabel: { color: cc.axis },
-    },
-    yAxis: {
-      type: "value",
-      minInterval: 1,
-      axisLabel: { color: cc.axis },
-      splitLine: { lineStyle: { color: cc.line } },
-    },
+    ...baseChart(dark, [t("torrents"), t("sort_peers"), t("sort_seeders"), t("sort_leechers")], labels),
     series: [
-      { name: t("torrents"), type: "line", smooth: true, showSymbol: false, data: history.map((i) => i.torrents) },
-      { name: t("sort_peers"), type: "line", smooth: true, showSymbol: false, data: history.map((i) => i.peers) },
-      { name: t("sort_seeders"), type: "line", smooth: true, showSymbol: false, data: history.map((i) => i.seeders) },
-      { name: t("sort_leechers"), type: "line", smooth: true, showSymbol: false, data: history.map((i) => i.leechers) },
+      lineSeries(
+        t("torrents"),
+        history.map((i) => i.torrents),
+      ),
+      lineSeries(
+        t("sort_peers"),
+        history.map((i) => i.peers),
+      ),
+      lineSeries(
+        t("sort_seeders"),
+        history.map((i) => i.seeders),
+      ),
+      lineSeries(
+        t("sort_leechers"),
+        history.map((i) => i.leechers),
+      ),
     ],
   }
 })

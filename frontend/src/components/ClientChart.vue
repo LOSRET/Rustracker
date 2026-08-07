@@ -5,6 +5,7 @@ import "echarts"
 import { usePreferredDark } from "@vueuse/core"
 import type { ClientsResponse, RangeKey } from "../types/api"
 import { useI18n } from "../composables/useI18n"
+import { baseChart, emptyChartOption, filterRange, lineSeries } from "../utils/chart"
 
 const props = defineProps<{
   data: ClientsResponse | null
@@ -41,12 +42,6 @@ const CLIENT_BRAND: Record<string, string> = {
 }
 const UNKNOWN_GRAY = "#9E9E9E"
 
-const RANGE_SECS: Record<RangeKey, number> = {
-  "24h": 86400,
-  "3d": 259200,
-  "7d": 604800,
-}
-
 function brandColor(name: string): string {
   const trimmed = name.trim()
   if (!trimmed || /^unknown$/i.test(trimmed)) return UNKNOWN_GRAY
@@ -61,67 +56,24 @@ function brandColor(name: string): string {
 
 const option = computed(() => {
   const historyAll = props.data?.history ?? []
-  const dark = isDark.value
-  const cc = dark
-    ? { axis: "#94a3b8", line: "#334155", legend: "#cbd5e1" }
-    : { axis: "#64748b", line: "#e6ebf2", legend: "#1f2937" }
-
   if (!historyAll.length) {
-    return {
-      title: {
-        text: props.error ? t("top100_error") : t("top100_empty"),
-        left: "center",
-        top: "center",
-        textStyle: { color: "#94a3b8", fontSize: 14 },
-      },
-      series: [],
-    }
+    return emptyChartOption(props.error ? t("top100_error") : t("top100_empty"))
   }
 
   const names = props.data?.clients ?? []
-  const cutoff = Math.floor(Date.now() / 1000) - RANGE_SECS[props.range]
-  const history = historyAll.filter((item) => item.timestamp >= cutoff)
+  const history = filterRange(historyAll, props.range)
   const labels = history.map((item) => d(item.timestamp * 1000, "chart"))
 
   return {
     title: { text: "" },
-    tooltip: {
-      trigger: "axis",
-      backgroundColor: dark ? "#1e293b" : "#ffffff",
-      borderColor: dark ? "#334155" : "#e2e8f0",
-      textStyle: { color: dark ? "#e2e8f0" : "#1f2937" },
-    },
-    legend: {
-      type: "scroll",
-      top: 0,
-      left: "center",
-      itemWidth: 16,
-      itemGap: 14,
-      textStyle: { fontSize: 11, color: cc.legend },
-      data: names,
-    },
-    grid: { left: 4, right: 4, top: 52, bottom: 36, containLabel: true },
-    xAxis: {
-      type: "category",
-      boundaryGap: false,
-      data: labels,
-      axisLine: { lineStyle: { color: cc.line } },
-      axisLabel: { color: cc.axis },
-    },
-    yAxis: {
-      type: "value",
-      minInterval: 1,
-      axisLabel: { color: cc.axis },
-      splitLine: { lineStyle: { color: cc.line } },
-    },
-    series: names.map((name, j) => ({
-      name,
-      type: "line",
-      smooth: true,
-      showSymbol: false,
-      itemStyle: { color: brandColor(name) },
-      data: history.map((item) => item.counts[j] ?? 0),
-    })),
+    ...baseChart(isDark.value, names, labels),
+    series: names.map((name, j) =>
+      lineSeries(
+        name,
+        history.map((item) => item.counts[j] ?? 0),
+        { itemStyle: { color: brandColor(name) } },
+      ),
+    ),
   }
 })
 </script>

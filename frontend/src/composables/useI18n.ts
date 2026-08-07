@@ -15,7 +15,7 @@ export function useI18n() {
     locale.value = l
   }
 
-  return { t, lang: locale, number, d, setLang }
+  return { t, lang: locale, n, number, d, setLang }
 }
 
 /** Called once in App.vue: SEO meta and <html lang> update reactively with locale. */

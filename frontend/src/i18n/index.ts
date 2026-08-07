@@ -6,7 +6,6 @@ const zh = {
   overview: "Tracker 概览",
   running: "运行中",
   error: "异常",
-  paused_state: "已暂停",
   disc_link: "Tracker 免责说明",
   view: "查看",
   side_note: "HTTP tracker 的连接、做种、下载和完成统计。",
@@ -14,7 +13,6 @@ const zh = {
   subtitle: "查看当前端口上的 peer、做种和下载状态。",
   loading: "正在加载...",
   last_update: "最后更新",
-  read_error: "读取失败",
   chart_title: "Tracker 趋势",
   chart_note: "Torrents、Peers、Seeders 和 Leechers 随时间变化",
   client_chart_title: "客户端分布",
@@ -66,7 +64,6 @@ const en = {
   overview: "Tracker Overview",
   running: "Running",
   error: "Error",
-  paused_state: "Paused",
   disc_link: "Disclaimer",
   view: "View",
   side_note: "HTTP tracker connection, seeding, downloading and completion statistics.",
@@ -74,7 +71,6 @@ const en = {
   subtitle: "View peer, seeding and download status on the current port.",
   loading: "Loading...",
   last_update: "Last updated",
-  read_error: "Read failed",
   chart_title: "Tracker Trends",
   chart_note: "Torrents, Peers, Seeders and Leechers over time",
   client_chart_title: "Client Distribution",
@@ -128,7 +124,6 @@ const ja = {
   overview: "Tracker概要",
   running: "稼働中",
   error: "エラー",
-  paused_state: "一時停止",
   disc_link: "免責事項",
   view: "表示",
   side_note: "HTTP trackerの接続、シード、ダウンロード、完了の統計。",
@@ -136,7 +131,6 @@ const ja = {
   subtitle: "現在のポートのピア、シード、ダウンロードの状態を表示。",
   loading: "読み込み中...",
   last_update: "最終更新",
-  read_error: "読み込み失敗",
   chart_title: "Trackerトレンド",
   chart_note: "Torrents、Peers、Seeders、Leechersの推移",
   client_chart_title: "クライアント分布",
@@ -190,7 +184,6 @@ const ru = {
   overview: "Обзор трекера",
   running: "Работает",
   error: "Ошибка",
-  paused_state: "Приостановлен",
   disc_link: "Отказ от ответственности",
   view: "Просмотр",
   side_note: "Статистика подключений, сидирования, загрузки и завершений HTTP-трекера.",
@@ -198,7 +191,6 @@ const ru = {
   subtitle: "Просмотр состояния пиров, сидирования и загрузки на текущем порту.",
   loading: "Загрузка...",
   last_update: "Последнее обновление",
-  read_error: "Ошибка чтения",
   chart_title: "Тренды трекера",
   chart_note: "Torrents, Peers, Seeders и Leechers во времени",
   client_chart_title: "Распределение клиентов",
@@ -252,7 +244,6 @@ const de = {
   overview: "Tracker-Übersicht",
   running: "Läuft",
   error: "Fehler",
-  paused_state: "Pausiert",
   disc_link: "Haftungsausschluss",
   view: "Ansehen",
   side_note: "HTTP-Tracker-Statistiken zu Verbindungen, Seeding, Downloads und Abschlüssen.",
@@ -260,7 +251,6 @@ const de = {
   subtitle: "Peer-, Seeding- und Download-Status auf dem aktuellen Port anzeigen.",
   loading: "Wird geladen...",
   last_update: "Letzte Aktualisierung",
-  read_error: "Lesefehler",
   chart_title: "Tracker-Trends",
   chart_note: "Torrents, Peers, Seeders und Leechers im Zeitverlauf",
   client_chart_title: "Client-Verteilung",
@@ -314,7 +304,6 @@ const uk = {
   overview: "Огляд трекера",
   running: "Працює",
   error: "Помилка",
-  paused_state: "Призупинено",
   disc_link: "Відмова від відповідальності",
   view: "Перегляд",
   side_note: "Статистика підключень, сідування, завантаження та завершень HTTP-трекера.",
@@ -322,7 +311,6 @@ const uk = {
   subtitle: "Перегляд стану пірів, сідування та завантаження на поточному порту.",
   loading: "Завантаження...",
   last_update: "Останнє оновлення",
-  read_error: "Помилка читання",
   chart_title: "Тренди трекера",
   chart_note: "Torrents, Peers, Seeders та Leechers у часі",
   client_chart_title: "Розподіл клієнтів",
@@ -405,6 +393,19 @@ export const datetimeFormats: Record<LangKey, typeof dtFormats> = {
   uk: dtFormats,
 }
 
+const nfFormats = {
+  percent: { style: "percent", maximumFractionDigits: 1 },
+} as const
+
+export const numberFormats: Record<LangKey, typeof nfFormats> = {
+  zh: nfFormats,
+  en: nfFormats,
+  ja: nfFormats,
+  ru: nfFormats,
+  de: nfFormats,
+  uk: nfFormats,
+}
+
 export function detectLang(): LangKey {
   const nav = navigator.language || ""
   if (nav.startsWith("zh")) return "zh"
@@ -421,4 +422,5 @@ export const i18n = createI18n({
   fallbackLocale: "en",
   messages,
   datetimeFormats,
+  numberFormats,
 })

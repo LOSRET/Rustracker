@@ -5,7 +5,7 @@ import type { ClientListEntry } from "../types/api"
 import { useClientsList } from "../composables/useClientsList"
 import { useI18n } from "../composables/useI18n"
 
-const { t, number, d } = useI18n()
+const { t, number, d, n } = useI18n()
 const { data, loading, error, lastUpdated, load } = useClientsList()
 
 onMounted(load)
@@ -23,7 +23,7 @@ const statusText = computed(() => {
 
 function share(peers: number): string {
   if (!totalPeers.value) return "—"
-  return `${((peers / totalPeers.value) * 100).toFixed(1)}%`
+  return n(peers / totalPeers.value, "percent")
 }
 
 const columns = computed<TableColumn<ClientListEntry>[]>(() => [
