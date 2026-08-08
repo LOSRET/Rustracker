@@ -142,9 +142,13 @@ cargo run --release --example rps_bench
 # Unified benchmark (RPS, RSS, CPU, latency)
 cargo run --release --example unified_bench
 
-# Memory benchmarks
+# Memory benchmarks (system vs jemalloc vs mimalloc comparison)
 cargo run --release --example memory_tracker_bench
 cargo run --release --example memory_jemalloc_bench
+cargo run --release --example memory_mimalloc_bench
+
+# Shrink/regrow cycle benchmark (env: SHRINK_TORRENTS=30000, SHRINK_BULK=300)
+cargo run --release --example shrink_bench
 ```
 
 ## Architecture
@@ -180,8 +184,19 @@ Three-layer design with clear separation of concerns:
 - **Peer storage**: Packed binary, no heap allocation per peer — stored inline in `Vec<u8>`
 - **Shrink strategy (`shrink_if_idle`)**: After peer expiry sweeps, each `Swarm`'s `Vec<u8>` checks if `cap > floor * entry_size` (skip tiny vecs), then computes `target = next_power_of_two(entries).max(floor) * entry_size`. Shrinks to target only if `target < cap`, yielding 50–100% post-shrink utilization. This is tighter than opentracker's approach (waits until <25% utilization, then halves).
 - **Background tasks**: Peer expiry sweeps every 1s, trend sampling every 10min, blacklist file watch every 5s
+- **Allocator**: `tikv-jemallocator` is installed as the global allocator on Linux only (`#[global_allocator]` in `main.rs`); other platforms use the system allocator. Memory benchmarks (`memory_tracker_bench` vs `memory_jemalloc_bench` vs `memory_mimalloc_bench`) compare these.
 - **build.rs**: When the `dashboard` feature is on, runs `npm run build` in `frontend/`, then copies `dist/index.html` to `$OUT_DIR/index.html` and `dist/assets/*` to `$OUT_DIR/assets/`, generating an `assets_manifest.rs` of `include_bytes!` calls. The `personal-contact` feature is handled at Vite build time via the `VITE_PERSONAL_CONTACT=true` env var — `vite.config.ts` inlines contact info (blog URL + email) into the JS bundle via `define: { __CONTACT__: ... }` (an object when enabled, `null` when not); the `Disclaimer.vue` component renders it with `v-if` and real `<a>` tags using i18n labels (`t.blog_label`/`t.contact_label`). This means the contact info distinction is compile-time (public releases have no contact info in the binary at all), controlled by whether CI sets the env var.
 - **Features**: `dashboard` (default) enables web UI routes and embeds the Vue SPA at compile time; `personal-contact` injects contact info into the frontend bundle via `VITE_PERSONAL_CONTACT` env var (set by `sync-deploy.yml`, not set by `release.yml`)
+
+## Developer Conventions
+
+Recorded by the user in `.trae/rules/project_rules.md` and `.trae/memory/project_rules.md` (Trae IDE project rules):
+
+- **No panicking calls in production code**: `.unwrap()` / `.expect()` are banned in `src/` outside `#[cfg(test)]`. Use `if let`, `match`, `.map()`, `.unwrap_or()` instead. Tests, examples, and build scripts are exempt.
+- **Verify before committing**: run `cargo check` (or `cargo build`) after writing code to catch compile errors.
+- **Commit granularity**: small changes (single file, simple bug fix, small tweak) commit directly to the current branch; large changes (multi-file, new feature, refactor, version bump) go on a new branch via `gh pr create`.
+- **Git sync before editing**: `git fetch` first, check `git status`; if clean `git pull`, if dirty `git stash` (or commit) then `git pull`.
+- **Push preference**: the user generally wants code committed and pushed without extra confirmation — a `.git/hooks/post-commit` hook auto-pushes after each commit.
 
 ## Testing Pattern
 
@@ -200,15 +215,19 @@ cargo test --doc              # doctests only
 
 GitHub Actions workflows:
 
+- **`ci.yml`** — fmt + clippy + tests on `src`/`tests`/`examples` changes (push to `main` or PR). Runs `cargo fmt --check`, strict clippy (`--lib --tests -- -D warnings`), non-blocking clippy on examples, and `cargo test` with both default and `--no-default-features` (installs Node first since default features build the dashboard).
+- **`frontend.yml`** — Frontend validation on `frontend/**` changes: `npm run lint -- --max-warnings=0`, `typecheck`, `format:check`, `build`, then `cargo test index_returns_dashboard_html` to verify the embedded dashboard.
 - **`release.yml`** — Triggers on pushes to `main` that modify `Cargo.toml`. Compares the version field between the push commit and its parent — if changed, builds Linux/Windows binaries and creates a GitHub Release with the new version tag. Bump `version` in `Cargo.toml` to trigger a release. Dashboard builds run `setup-node` + `npm ci` before `cargo build`; the no-dashboard matrix entry skips Node.
 - **`sync-deploy.yml`** — Personal deployment workflow triggered on version bumps or manual dispatch. Builds Linux (musl) and Windows artifacts without creating a GitHub Release. Sets `VITE_PERSONAL_CONTACT=true` on `cargo build` so contact info is embedded in the frontend bundle.
+- **`shrink-bench.yml`** — Runs the `shrink_bench` example (RSS shrink/regrow cycles) on `src/core/swarm.rs` changes or manual dispatch, posting the CSV results to the job summary. Sets `MALLOC_CONF` decay to 2s so freed pages return to the OS before RSS sampling.
+- **`opencode.yml`** — Posting `/oc` or `/opencode` in an issue/PR comment runs the opencode agent (deepseek-v4-pro) on the repo.
 - **`memory-benchmark.yml`** — Manual dispatch workflow that runs `unified_bench` and system-vs-jemalloc allocator comparisons.
 
 ## CLI Configuration
 
 ```
---listen                  RUSTRACKER_LISTEN                  default: [::]:8080 (Linux); [::]:8080 + 0.0.0.0:8080 (Windows)
---interval-secs           RUSTRACKER_INTERVAL_SECS           default: 1800
+--listen                  RUSTRACKER_LISTEN                  default: [::]:8080 (Linux); [::]:8080 + 0.0.0.0:8080 (Windows); comma-separated and repeatable
+--interval-secs           RUSTRACKER_INTERVAL_SECS           default: 1800 (announce interval returned to peers)
 --peer-timeout-secs       RUSTRACKER_PEER_TIMEOUT_SECS       default: 3000
 --blacklist               RUSTRACKER_BLACKLIST               optional: path to blacklist file
 --trends-file             RUSTRACKER_TRENDS_FILE             optional: path to trends JSONL
@@ -216,7 +235,7 @@ GitHub Actions workflows:
 --trust-proxy-headers     RUSTRACKER_TRUST_PROXY_HEADERS     default: false — trust CF-Connecting-IP / X-Real-IP / X-Forwarded-For for the announce client IP; enable only when reachable exclusively through a trusted proxy (any client can spoof these headers otherwise)
 ```
 
-All flags support env var fallback. CLI takes precedence over env vars. `--interval-secs` controls the peer expiry sweep interval; `--peer-timeout-secs` is the peer timeout threshold.
+All flags support env var fallback. CLI takes precedence over env vars. `--interval-secs` is the announce interval advertised to peers; `--peer-timeout-secs` is the peer expiry threshold. (Peer expiry sweeps run on a fixed 1s background interval, not on `--interval-secs`.)
 
 ## Key API Endpoints
 
@@ -225,8 +244,9 @@ All flags support env var fallback. CLI takes precedence over env vars. `--inter
 - `GET /healthz` — Health check (returns `200 OK` with body `ok`)
 - `GET /api/stats` — JSON statistics (peers, seeders, leechers, torrents, completed, rps, version, uptime_secs)
 - `GET /api/trends` — Historical trend data (7-day retention, 10-min sampling)
-- `GET /api/clients` — Client distribution (top 15 clients by peer count)
-- `GET /api/top100` — Top 100 torrents by peers/seeders/leechers/downloaded
+- `GET /api/clients` — Client distribution (top 15 clients by peer count, with time-series history)
+- `GET /api/clients/list` — All connected client types sorted by current peer count (snapshot)
+- `GET /api/top100` — Top 100 torrents by peers/seeders/leechers/downloaded (`limit` query param, max 500)
 - `GET /api/blacklist?info_hash=<40-char-hex>` — Authenticated read-only blacklist status endpoint; returns `blacklisted: true/false`
 - `POST /api/blacklist` — Authenticated admin endpoint that appends a 40-char hex `info_hash` to the configured blacklist file, then updates the in-memory blacklist; requires `Authorization: Bearer <admin-token>`
 - `GET /` — Web dashboard (requires `dashboard` feature)
