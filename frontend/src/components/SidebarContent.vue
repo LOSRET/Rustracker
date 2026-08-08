@@ -50,7 +50,7 @@ function scrollToDisclaimer() {
           page === 'top100' ? 'bg-side-active border-accent' : 'border-transparent hover:bg-side-hover',
         ]"
       >
-        <span>🏆 {{ t("top100_link") }}</span>
+        <span>{{ t("top100_link") }}</span>
         <span>→</span>
       </RouterLink>
       <RouterLink
@@ -60,7 +60,7 @@ function scrollToDisclaimer() {
           page === 'clients' ? 'bg-side-active border-accent' : 'border-transparent hover:bg-side-hover',
         ]"
       >
-        <span>📊 {{ t("clients_link") }}</span>
+        <span>{{ t("clients_link") }}</span>
         <span>→</span>
       </RouterLink>
       <a
