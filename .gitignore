@@ -31,11 +31,6 @@ Thumbs.db
 # Copilot Skills（本地使用）
 .github/skills/
 
-# 排除未使用的示例文件
-examples/memory_ci_compare.rs
-examples/memory_staircase_test.rs
-examples/memory_tracker_btree.rs
-
 # Trae IDE
 .trae/
 skills-lock.json
@@ -51,3 +46,6 @@ skills-lock.json
 # 临时文件
 tmp*.py
 *.tmp
+
+# 测试运行产物
+test-results/

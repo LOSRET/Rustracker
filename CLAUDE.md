@@ -144,10 +144,7 @@ cargo run --release --example unified_bench
 
 # Memory benchmarks
 cargo run --release --example memory_tracker_bench
-cargo run --release --example memory_ci_compare
 cargo run --release --example memory_jemalloc_bench
-cargo run --release --example memory_staircase_test
-cargo run --release --example memory_tracker_btree
 ```
 
 ## Architecture
