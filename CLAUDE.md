@@ -216,6 +216,7 @@ GitHub Actions workflows:
 --blacklist               RUSTRACKER_BLACKLIST               optional: path to blacklist file
 --trends-file             RUSTRACKER_TRENDS_FILE             optional: path to trends JSONL
 --admin-token             RUSTRACKER_ADMIN_TOKEN             optional: bearer token for admin API
+--trust-proxy-headers     RUSTRACKER_TRUST_PROXY_HEADERS     default: false — trust CF-Connecting-IP / X-Real-IP / X-Forwarded-For for the announce client IP; enable only when reachable exclusively through a trusted proxy (any client can spoof these headers otherwise)
 ```
 
 All flags support env var fallback. CLI takes precedence over env vars. `--interval-secs` controls the peer expiry sweep interval; `--peer-timeout-secs` is the peer timeout threshold.

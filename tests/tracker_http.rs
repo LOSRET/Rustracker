@@ -42,6 +42,19 @@ fn sharded_app() -> axum::Router {
     ))
 }
 
+/// App with proxy-header trust enabled, for tests of the header-based IP path.
+fn trusted_proxy_app() -> axum::Router {
+    router(AppState::sharded_with_blacklist_file(
+        Duration::from_secs(1800),
+        Duration::from_secs(3000),
+        16,
+        None,
+        None,
+        None,
+        true,
+    ))
+}
+
 #[tokio::test]
 async fn healthz_returns_ok() {
     let response = app()
@@ -321,7 +334,7 @@ async fn compact_announce_includes_ipv6_peers6() {
 
 #[tokio::test]
 async fn announce_uses_cloudflare_connecting_ip() {
-    let app = app();
+    let app = trusted_proxy_app();
     let cloudflare_peer = "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-cloudflare01&port=6881&left=0&event=started&compact=1";
     let requester = "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-requester123&port=6882&left=128&event=started&compact=1&ip=127.0.0.1";
 
@@ -349,7 +362,7 @@ async fn announce_uses_cloudflare_connecting_ip() {
 
 #[tokio::test]
 async fn announce_uses_nginx_real_ip() {
-    let app = app();
+    let app = trusted_proxy_app();
     let nginx_peer = "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-nginxpeer001&port=6881&left=0&event=started&compact=1";
     let requester = "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-requester123&port=6882&left=128&event=started&compact=1";
 
@@ -377,7 +390,7 @@ async fn announce_uses_nginx_real_ip() {
 
 #[tokio::test]
 async fn announce_uses_x_forwarded_for() {
-    let app = app();
+    let app = trusted_proxy_app();
     let proxy_peer = "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-proxypeer001&port=6881&left=0&event=started&compact=1";
     let requester = "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-requester123&port=6882&left=128&event=started&compact=1";
 
@@ -401,6 +414,37 @@ async fn announce_uses_x_forwarded_for() {
     assert!(body
         .windows([203, 0, 113, 50, 26, 225].len())
         .any(|window| window == [203, 0, 113, 50, 26, 225]));
+}
+
+#[tokio::test]
+async fn spoofed_proxy_header_ignored_by_default() {
+    let app = app();
+    let spoofing_peer = "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-spoofpeer001&port=6881&left=0&event=started&compact=1";
+    let requester = "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-requester123&port=6882&left=128&event=started&compact=1";
+
+    let mut req = Request::builder()
+        .uri(spoofing_peer)
+        .header("X-Real-IP", "198.51.100.42")
+        .body(Body::empty())
+        .unwrap();
+    req.extensions_mut()
+        .insert(MockConnectInfo(SocketAddr::from(([127, 0, 0, 1], 6881))));
+    app.clone().oneshot(req).await.unwrap();
+
+    let response = app
+        .oneshot(request_with_connect_info(requester))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    // Spoofed IP must NOT appear; the real socket address is used instead.
+    assert!(!body
+        .windows([198, 51, 100, 42, 26, 225].len())
+        .any(|window| window == [198, 51, 100, 42, 26, 225]));
+    assert!(body
+        .windows([127, 0, 0, 1, 26, 225].len())
+        .any(|window| window == [127, 0, 0, 1, 26, 225]));
 }
 
 #[tokio::test]
@@ -444,6 +488,7 @@ fn blacklist_app_with_token(token: Option<&str>) -> (axum::Router, std::path::Pa
         Some(path.clone()),
         None,
         token.map(str::to_string),
+        false,
     ));
     (router, path)
 }
@@ -916,6 +961,7 @@ async fn corrupted_jsonl_first_line_still_loads() {
         None,
         Some(trends_file),
         None,
+        false,
     );
     let app = router(state);
 
@@ -987,6 +1033,7 @@ async fn corrupted_client_trend_subarray_does_not_panic() {
         None,
         Some(trends_file),
         None,
+        false,
     );
     let app = router(state);
 
@@ -1026,6 +1073,7 @@ async fn blacklist_case_insensitive_hex() {
         Some(path.clone()),
         None,
         None,
+        false,
     );
     let app = router(state);
 

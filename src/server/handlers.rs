@@ -248,10 +248,17 @@ pub(crate) async fn announce(
         return bencoded_response(StatusCode::OK, bencode::failure("torrent is blacklisted"));
     }
 
+    // Proxy headers are only trusted when explicitly enabled; otherwise any
+    // client could spoof them to inject arbitrary IPs into peer lists.
+    let header_ip = if state.trust_proxy_headers {
+        cloudflare_connecting_ip(&headers)
+    } else {
+        None
+    };
     let input = AnnounceInput {
         info_hash: parsed.info_hash,
         peer_id: parsed.peer_id,
-        ip: peer_ip(cloudflare_connecting_ip(&headers), Some(addr)),
+        ip: peer_ip(header_ip, Some(addr)),
         port: parsed.port,
         uploaded: parsed.uploaded,
         downloaded: parsed.downloaded,
