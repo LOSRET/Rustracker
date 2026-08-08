@@ -60,6 +60,7 @@ pub struct AppState {
     pub(crate) blacklist: Arc<RwLock<HashSet<InfoHash>>>,
     pub(crate) blacklist_path: Option<PathBuf>,
     pub(crate) admin_token: Option<String>,
+    pub(crate) trust_proxy_headers: bool,
     pub(crate) started_at: Instant,
     pub(crate) rps_counter: Arc<AtomicU64>,
     pub(crate) current_rps: Arc<AtomicU64>,
@@ -75,6 +76,7 @@ impl AppState {
             blacklist: Arc::new(RwLock::new(HashSet::new())),
             blacklist_path: None,
             admin_token: None,
+            trust_proxy_headers: false,
             started_at: Instant::now(),
             rps_counter: Arc::new(AtomicU64::new(0)),
             current_rps: Arc::new(AtomicU64::new(0)),
@@ -84,7 +86,7 @@ impl AppState {
     }
 
     pub fn sharded(interval: Duration, peer_timeout: Duration, shards: usize) -> Self {
-        Self::sharded_with_blacklist_file(interval, peer_timeout, shards, None, None, None)
+        Self::sharded_with_blacklist_file(interval, peer_timeout, shards, None, None, None, false)
     }
 
     pub fn sharded_with_blacklist_file(
@@ -94,6 +96,7 @@ impl AppState {
         blacklist_path: Option<PathBuf>,
         trends_file: Option<PathBuf>,
         admin_token: Option<String>,
+        trust_proxy_headers: bool,
     ) -> Self {
         let initial = blacklist_path
             .as_deref()
@@ -112,6 +115,7 @@ impl AppState {
             blacklist: Arc::new(RwLock::new(initial)),
             blacklist_path: blacklist_path.clone(),
             admin_token,
+            trust_proxy_headers,
             started_at: Instant::now(),
             rps_counter: Arc::new(AtomicU64::new(0)),
             current_rps: Arc::new(AtomicU64::new(0)),

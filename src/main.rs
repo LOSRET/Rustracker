@@ -55,6 +55,13 @@ struct Args {
     /// Bearer token required for admin API endpoints.
     #[arg(long, env = "RUSTRACKER_ADMIN_TOKEN")]
     admin_token: Option<String>,
+
+    /// Trust proxy headers (CF-Connecting-IP / X-Real-IP / X-Forwarded-For)
+    /// for the announce client IP. Off by default: any client could spoof
+    /// these headers to inject arbitrary IPs into peer lists. Enable only
+    /// when the tracker is reachable exclusively through a trusted proxy.
+    #[arg(long, env = "RUSTRACKER_TRUST_PROXY_HEADERS")]
+    trust_proxy_headers: bool,
 }
 
 #[tokio::main]
@@ -74,6 +81,7 @@ async fn main() -> anyhow::Result<()> {
         args.blacklist,
         args.trends_file,
         args.admin_token,
+        args.trust_proxy_headers,
     ));
     let mut listeners = Vec::with_capacity(args.listen.len());
     for addr in &args.listen {
