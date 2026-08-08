@@ -11,7 +11,7 @@ use axum::body::Body;
 use axum::extract::{ConnectInfo, OriginalUri, State};
 use axum::http::{header, HeaderMap, HeaderValue, Response, StatusCode};
 #[cfg(feature = "dashboard")]
-use axum::response::Html;
+use axum::response::{Html, IntoResponse};
 use axum::Json;
 use serde::{Deserialize, Serialize};
 
@@ -57,17 +57,17 @@ pub(crate) async fn spa_fallback(
         .get(header::ACCEPT)
         .and_then(|value| value.to_str().ok())
         .is_some_and(|value| value.contains("text/html"));
+    // Build responses via IntoResponse tuples (infallible) rather than
+    // `Response::builder()` + `.unwrap()`.
     if method == axum::http::Method::GET && wants_html {
-        Response::builder()
-            .status(StatusCode::OK)
-            .header(header::CONTENT_TYPE, "text/html; charset=utf-8")
-            .body(Body::from(state.versioned_index.clone()))
-            .unwrap()
+        (
+            StatusCode::OK,
+            [(header::CONTENT_TYPE, "text/html; charset=utf-8")],
+            Body::from(state.versioned_index.clone()),
+        )
+            .into_response()
     } else {
-        Response::builder()
-            .status(StatusCode::NOT_FOUND)
-            .body(Body::from("404 Not Found"))
-            .unwrap()
+        (StatusCode::NOT_FOUND, "404 Not Found").into_response()
     }
 }
 

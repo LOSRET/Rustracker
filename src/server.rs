@@ -290,7 +290,13 @@ where
     }
 
     for task in tasks {
-        task.await.expect("server task panicked")?;
+        match task.await {
+            Ok(Ok(())) => {}
+            Ok(Err(err)) => return Err(err),
+            // A panicking server task is a real error; surface it as an io
+            // error instead of re-panicking.
+            Err(join_err) => return Err(io::Error::other(join_err)),
+        }
     }
     Ok(())
 }

@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -13,16 +13,19 @@ use tracing_subscriber::EnvFilter;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
+// Defaults are constructed directly instead of parsing string literals
+// (`[::]:8080` / `0.0.0.0:8080`) so no `.unwrap()` is needed.
+
 #[cfg(target_os = "linux")]
 fn default_listen() -> Vec<SocketAddr> {
-    vec!["[::]:8080".parse().unwrap()]
+    vec![SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 8080)]
 }
 
 #[cfg(not(target_os = "linux"))]
 fn default_listen() -> Vec<SocketAddr> {
     vec![
-        "[::]:8080".parse().unwrap(),
-        "0.0.0.0:8080".parse().unwrap(),
+        SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 8080),
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 8080),
     ]
 }
 
@@ -99,18 +102,27 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn shutdown_signal() {
+    // If a signal handler can't be installed (e.g. OS resource limits), log it
+    // and wait forever on that source instead of panicking — the other signal
+    // source (if any) may still trigger a graceful shutdown.
     let ctrl_c = async {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("failed to install Ctrl+C handler");
+        if let Err(err) = tokio::signal::ctrl_c().await {
+            tracing::error!("failed to install Ctrl+C handler: {err}");
+            std::future::pending::<()>().await;
+        }
     };
 
     #[cfg(unix)]
     let terminate = async {
-        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-            .expect("failed to install signal handler")
-            .recv()
-            .await;
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut signal) => {
+                signal.recv().await;
+            }
+            Err(err) => {
+                tracing::error!("failed to install SIGTERM handler: {err}");
+                std::future::pending::<()>().await;
+            }
+        }
     };
 
     #[cfg(not(unix))]
