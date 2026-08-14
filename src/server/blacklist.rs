@@ -16,6 +16,8 @@ use tokio::time::MissedTickBehavior;
 
 use crate::core::types::InfoHash;
 
+pub(crate) const WATCH_INTERVAL: Duration = Duration::from_secs(5);
+
 pub(crate) struct BlacklistStore {
     path: Option<PathBuf>,
     set: RwLock<HashSet<InfoHash>>,

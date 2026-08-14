@@ -1,9 +1,11 @@
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use tokio::sync::RwLock;
+use tokio::time::MissedTickBehavior;
 
 use crate::core::topk::{Top100All, TopKMerger};
 use crate::core::tracker::{AnnounceInput, Tracker, TrackerSnapshot};
@@ -121,4 +123,19 @@ impl TrackerPool {
             }
         }
     }
+}
+
+const EXPIRE_SWEEP_INTERVAL: Duration = Duration::from_secs(1);
+
+/// Background task: run the peer expiry sweep every second.
+pub(crate) fn spawn_expiry_sweep(tracker: Arc<TrackerPool>) {
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(EXPIRE_SWEEP_INTERVAL);
+        interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+
+        loop {
+            interval.tick().await;
+            tracker.expire_due(Instant::now());
+        }
+    });
 }
