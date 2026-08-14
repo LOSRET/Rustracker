@@ -78,9 +78,10 @@ impl TrendsState {
     }
 
     /// Record a sample point and persist it to disk (sampling task only).
+    /// The write lock is released before the disk write (record is
+    /// idempotent per bucket), so block I/O never stalls sampling readers.
     pub(crate) async fn record_and_persist(&self, now: u64, snapshot: &TrackerSnapshot) {
-        let mut store = self.store.write().await;
-        store.record(now, snapshot);
+        self.store.write().await.record(now, snapshot);
         if let Some(ref path) = self.file {
             let _ = save_trend_point(path, now, snapshot);
         }
@@ -88,8 +89,7 @@ impl TrendsState {
 
     /// Record a client distribution point and persist it (sampling task only).
     pub(crate) async fn record_clients_and_persist(&self, now: u64, clients: &[(u8, u64)]) {
-        let mut store = self.store.write().await;
-        store.record_clients(now, clients);
+        self.store.write().await.record_clients(now, clients);
         if let Some(ref path) = self.top_clients_file {
             let _ = save_client_point(path, now, clients);
         }
