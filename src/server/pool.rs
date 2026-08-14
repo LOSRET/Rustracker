@@ -1,14 +1,13 @@
-use std::cmp::Reverse;
 use std::collections::hash_map::DefaultHasher;
-use std::collections::{BinaryHeap, HashMap};
+use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::time::{Duration, Instant};
 
 use tokio::sync::RwLock;
 
-use crate::core::topk::{self, Top100All};
+use crate::core::topk::{Top100All, TopKMerger};
 use crate::core::tracker::{AnnounceInput, Tracker, TrackerSnapshot};
-use crate::core::types::InfoHash;
+use crate::core::types::{AnnounceOutput, InfoHash};
 
 pub const DEFAULT_TRACKER_SHARDS: usize = 64;
 
@@ -37,7 +36,7 @@ impl TrackerPool {
         info_hash: InfoHash,
         input: AnnounceInput,
         now: Instant,
-    ) -> crate::core::tracker::AnnounceOutput {
+    ) -> AnnounceOutput {
         self.shard(info_hash).write().await.announce(input, now)
     }
 
@@ -68,77 +67,14 @@ impl TrackerPool {
 
     pub(crate) async fn top_torrents_all(&self, limit: usize) -> Top100All {
         if limit == 0 {
-            return Top100All {
-                peers: Vec::new(),
-                seeders: Vec::new(),
-                leechers: Vec::new(),
-                downloaded: Vec::new(),
-            };
+            return Top100All::empty();
         }
 
-        let mut heaps: [BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>>; 4] =
-            std::array::from_fn(|_| BinaryHeap::with_capacity(limit));
-        let mut mins: [u64; 4] = [0; 4];
-
+        let mut merger = TopKMerger::new(limit);
         for shard in &self.shards {
-            let all = shard.read().await.top_torrents_all(limit);
-            for (info_hash, seeders, leechers, downloaded) in all.peers {
-                topk::try_heap_insert(
-                    &mut heaps[0],
-                    &mut mins[0],
-                    limit,
-                    (seeders + leechers) as u64,
-                    info_hash,
-                    seeders,
-                    leechers,
-                    downloaded,
-                );
-            }
-            for (info_hash, seeders, leechers, downloaded) in all.seeders {
-                topk::try_heap_insert(
-                    &mut heaps[1],
-                    &mut mins[1],
-                    limit,
-                    seeders as u64,
-                    info_hash,
-                    seeders,
-                    leechers,
-                    downloaded,
-                );
-            }
-            for (info_hash, seeders, leechers, downloaded) in all.leechers {
-                topk::try_heap_insert(
-                    &mut heaps[2],
-                    &mut mins[2],
-                    limit,
-                    leechers as u64,
-                    info_hash,
-                    seeders,
-                    leechers,
-                    downloaded,
-                );
-            }
-            for (info_hash, seeders, leechers, downloaded) in all.downloaded {
-                topk::try_heap_insert(
-                    &mut heaps[3],
-                    &mut mins[3],
-                    limit,
-                    downloaded,
-                    info_hash,
-                    seeders,
-                    leechers,
-                    downloaded,
-                );
-            }
+            merger.insert(&shard.read().await.top_torrents_all(limit));
         }
-
-        let [hp, hs, hl, hd] = heaps;
-        Top100All {
-            peers: topk::drain_heap_by(hp, 0),
-            seeders: topk::drain_heap_by(hs, 1),
-            leechers: topk::drain_heap_by(hl, 2),
-            downloaded: topk::drain_heap_by(hd, 3),
-        }
+        merger.finish()
     }
 
     pub(crate) async fn snapshot(&self) -> TrackerSnapshot {
@@ -158,14 +94,7 @@ impl TrackerPool {
         combined.totals = Default::default();
         let mut client_map: HashMap<u8, u64> = HashMap::new();
         for snapshot in snapshots {
-            combined.totals.torrents += snapshot.totals.torrents;
-            combined.totals.peers += snapshot.totals.peers;
-            combined.totals.seeders += snapshot.totals.seeders;
-            combined.totals.leechers += snapshot.totals.leechers;
-            combined.totals.downloaded = combined
-                .totals
-                .downloaded
-                .saturating_add(snapshot.totals.downloaded);
+            combined.totals += snapshot.totals;
             for (tag, count) in snapshot.clients {
                 *client_map.entry(tag).or_insert(0) += count;
             }

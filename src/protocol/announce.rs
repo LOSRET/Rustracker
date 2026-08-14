@@ -4,8 +4,7 @@ use std::net::{IpAddr, SocketAddr};
 use thiserror::Error;
 
 use super::bencode::{write_bytes, write_int, write_key};
-use crate::core::tracker::AnnounceOutput;
-use crate::core::types::{AnnounceEvent, InfoHash, PeerId, TorrentStats, ID_LEN};
+use crate::core::types::{AnnounceEvent, AnnounceOutput, InfoHash, PeerId, TorrentStats, ID_LEN};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AnnounceQuery {
@@ -232,7 +231,7 @@ mod tests {
     use std::net::Ipv6Addr;
 
     use super::{announce_response, parse_announce_query, parse_scrape_query};
-    use crate::core::tracker::AnnounceOutput;
+    use crate::core::types::AnnounceOutput;
 
     #[test]
     fn parses_binary_announce_fields() {

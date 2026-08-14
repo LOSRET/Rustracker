@@ -19,99 +19,126 @@ pub(crate) struct Top100All {
     pub downloaded: Vec<(InfoHash, usize, usize, u64)>,
 }
 
-/// Compute Top-K for all four rankings in a single pass over `swarms`.
-pub(crate) fn top_torrents_all(swarms: &BTreeMap<InfoHash, Swarm>, limit: usize) -> Top100All {
-    if limit == 0 {
-        return Top100All {
+impl Top100All {
+    pub(crate) fn empty() -> Self {
+        Top100All {
             peers: Vec::new(),
             seeders: Vec::new(),
             leechers: Vec::new(),
             downloaded: Vec::new(),
-        };
+        }
+    }
+}
+
+/// Merges per-shard [`Top100All`] results into a single top-K, keeping
+/// the heap bookkeeping contained in this module.
+pub(crate) struct TopKMerger {
+    heaps: [BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>>; 4],
+    mins: [u64; 4],
+    limit: usize,
+}
+
+impl TopKMerger {
+    pub(crate) fn new(limit: usize) -> Self {
+        Self {
+            heaps: std::array::from_fn(|_| BinaryHeap::with_capacity(limit)),
+            mins: [0; 4],
+            limit,
+        }
     }
 
-    let mut heap_p: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>> =
-        BinaryHeap::with_capacity(limit);
-    let mut heap_s: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>> =
-        BinaryHeap::with_capacity(limit);
-    let mut heap_l: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>> =
-        BinaryHeap::with_capacity(limit);
-    let mut heap_d: BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>> =
-        BinaryHeap::with_capacity(limit);
-    let mut min_p: u64 = 0;
-    let mut min_s: u64 = 0;
-    let mut min_l: u64 = 0;
-    let mut min_d: u64 = 0;
+    pub(crate) fn insert(&mut self, part: &Top100All) {
+        let dims = [&part.peers, &part.seeders, &part.leechers, &part.downloaded];
+        for (dim, entries) in dims.into_iter().enumerate() {
+            for &(info_hash, seeders, leechers, downloaded) in entries {
+                try_heap_insert(
+                    &mut self.heaps[dim],
+                    &mut self.mins[dim],
+                    self.limit,
+                    dim_key(dim, seeders, leechers, downloaded),
+                    info_hash,
+                    seeders,
+                    leechers,
+                    downloaded,
+                );
+            }
+        }
+    }
+
+    pub(crate) fn finish(self) -> Top100All {
+        let [hp, hs, hl, hd] = self.heaps;
+        Top100All {
+            peers: drain_heap_by(hp, 0),
+            seeders: drain_heap_by(hs, 1),
+            leechers: drain_heap_by(hl, 2),
+            downloaded: drain_heap_by(hd, 3),
+        }
+    }
+}
+
+/// Rank key for each dimension of a torrent entry.
+fn dim_key(dim: usize, seeders: usize, leechers: usize, downloaded: u64) -> u64 {
+    match dim {
+        0 => (seeders + leechers) as u64,
+        1 => seeders as u64,
+        2 => leechers as u64,
+        _ => downloaded,
+    }
+}
+
+/// Compute Top-K for all four rankings in a single pass over `swarms`.
+pub(crate) fn top_torrents_all(swarms: &BTreeMap<InfoHash, Swarm>, limit: usize) -> Top100All {
+    if limit == 0 {
+        return Top100All::empty();
+    }
+
+    let mut heaps: [BinaryHeap<Reverse<(u64, InfoHash, usize, usize, u64)>>; 4] =
+        std::array::from_fn(|_| BinaryHeap::with_capacity(limit));
+    let mut mins = [0u64; 4];
 
     for (info_hash, swarm) in swarms {
         let stats = swarm.stats();
-        let peers = (stats.complete + stats.incomplete) as u64;
-        let seeders = stats.complete as u64;
-        let leechers = stats.incomplete as u64;
-        let downloaded = stats.downloaded as u64;
+        let keys = [
+            (stats.complete + stats.incomplete) as u64,
+            stats.complete as u64,
+            stats.incomplete as u64,
+            stats.downloaded as u64,
+        ];
 
         // Fast path: all four heaps are full and this torrent is
         // below every threshold — skip without constructing entries.
-        if heap_p.len() >= limit
-            && peers <= min_p
-            && heap_s.len() >= limit
-            && seeders <= min_s
-            && heap_l.len() >= limit
-            && leechers <= min_l
-            && heap_d.len() >= limit
-            && downloaded <= min_d
+        if heaps[0].len() >= limit
+            && keys[0] <= mins[0]
+            && heaps[1].len() >= limit
+            && keys[1] <= mins[1]
+            && heaps[2].len() >= limit
+            && keys[2] <= mins[2]
+            && heaps[3].len() >= limit
+            && keys[3] <= mins[3]
         {
             continue;
         }
 
-        let dl = stats.downloaded as u64;
-        try_heap_insert(
-            &mut heap_p,
-            &mut min_p,
-            limit,
-            peers,
-            *info_hash,
-            stats.complete,
-            stats.incomplete,
-            dl,
-        );
-        try_heap_insert(
-            &mut heap_s,
-            &mut min_s,
-            limit,
-            seeders,
-            *info_hash,
-            stats.complete,
-            stats.incomplete,
-            dl,
-        );
-        try_heap_insert(
-            &mut heap_l,
-            &mut min_l,
-            limit,
-            leechers,
-            *info_hash,
-            stats.complete,
-            stats.incomplete,
-            dl,
-        );
-        try_heap_insert(
-            &mut heap_d,
-            &mut min_d,
-            limit,
-            downloaded,
-            *info_hash,
-            stats.complete,
-            stats.incomplete,
-            dl,
-        );
+        for dim in 0..4 {
+            try_heap_insert(
+                &mut heaps[dim],
+                &mut mins[dim],
+                limit,
+                keys[dim],
+                *info_hash,
+                stats.complete,
+                stats.incomplete,
+                stats.downloaded as u64,
+            );
+        }
     }
 
+    let [hp, hs, hl, hd] = heaps;
     Top100All {
-        peers: drain_heap_by(heap_p, 0),
-        seeders: drain_heap_by(heap_s, 1),
-        leechers: drain_heap_by(heap_l, 2),
-        downloaded: drain_heap_by(heap_d, 3),
+        peers: drain_heap_by(hp, 0),
+        seeders: drain_heap_by(hs, 1),
+        leechers: drain_heap_by(hl, 2),
+        downloaded: drain_heap_by(hd, 3),
     }
 }
 

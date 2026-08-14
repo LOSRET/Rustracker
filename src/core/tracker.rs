@@ -1,11 +1,12 @@
 use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, HashMap};
+use std::ops::AddAssign;
 use std::time::{Duration, Instant};
 
 use super::counters::{ExpireResult, TrackerCounters};
 use super::swarm::{PeerEndpoint, Swarm};
 use super::topk::{self, Top100All};
-use super::types::{AnnounceEvent, InfoHash, PeerId, PeerState, TorrentStats};
+use super::types::{AnnounceEvent, AnnounceOutput, InfoHash, PeerId, PeerState, TorrentStats};
 
 const INTERVAL_JITTER_PERCENT: u64 = 10;
 const EXPIRE_SWEEP_INTERVAL: Duration = Duration::from_secs(30);
@@ -25,15 +26,6 @@ pub struct AnnounceInput {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct AnnounceOutput {
-    pub interval: u64,
-    pub complete: usize,
-    pub incomplete: usize,
-    pub downloaded: u32,
-    pub peers: (Vec<u8>, Vec<u8>),
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TrackerSnapshot {
     pub interval: u64,
     pub peer_timeout: u64,
@@ -48,6 +40,16 @@ pub struct TrackerTotals {
     pub seeders: usize,
     pub leechers: usize,
     pub downloaded: u64,
+}
+
+impl AddAssign for TrackerTotals {
+    fn add_assign(&mut self, rhs: Self) {
+        self.torrents += rhs.torrents;
+        self.peers += rhs.peers;
+        self.seeders += rhs.seeders;
+        self.leechers += rhs.leechers;
+        self.downloaded = self.downloaded.saturating_add(rhs.downloaded);
+    }
 }
 
 #[derive(Debug)]

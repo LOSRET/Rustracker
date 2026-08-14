@@ -43,6 +43,18 @@ pub struct TorrentStats {
     pub incomplete: usize,
 }
 
+/// Result of an announce, produced by the tracker engine and encoded
+/// by the protocol layer. Defined here (not in `tracker`) so protocol
+/// code depends on neutral types only.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AnnounceOutput {
+    pub interval: u64,
+    pub complete: usize,
+    pub incomplete: usize,
+    pub downloaded: u32,
+    pub peers: (Vec<u8>, Vec<u8>),
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PeerContact {
     pub ip: IpAddr,
