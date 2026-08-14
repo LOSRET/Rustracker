@@ -55,6 +55,31 @@ pub struct AnnounceOutput {
     pub peers: (Vec<u8>, Vec<u8>),
 }
 
+/// Engine input for an announce, produced by the protocol layer.
+#[derive(Clone, Debug)]
+pub struct AnnounceInput {
+    pub info_hash: InfoHash,
+    pub peer_id: PeerId,
+    pub ip: IpAddr,
+    pub port: u16,
+    pub uploaded: u64,
+    pub downloaded: u64,
+    pub left: u64,
+    pub event: AnnounceEvent,
+    pub numwant: usize,
+    pub client_tag: u8,
+}
+
+impl AnnounceInput {
+    pub(crate) fn into_peer_state(self, now_secs: u32) -> PeerState {
+        PeerState {
+            complete: self.left == 0,
+            last_seen_secs: now_secs,
+            client_tag: self.client_tag,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PeerContact {
     pub ip: IpAddr,

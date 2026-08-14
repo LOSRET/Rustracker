@@ -3,27 +3,16 @@ use std::collections::{BTreeMap, HashMap};
 use std::ops::AddAssign;
 use std::time::{Duration, Instant};
 
-use super::counters::{ExpireResult, TrackerCounters};
+use super::counters::{ExpireResult, PeerUpsert, TrackerCounters};
 use super::swarm::{PeerEndpoint, Swarm};
 use super::topk::{self, Top100All};
-use super::types::{AnnounceEvent, AnnounceOutput, InfoHash, PeerId, PeerState, TorrentStats};
+use super::types::{AnnounceEvent, AnnounceOutput, InfoHash, PeerId, TorrentStats};
+
+// Kept here for backward compatibility (`rustracker::tracker::AnnounceInput`).
+pub use super::types::AnnounceInput;
 
 const INTERVAL_JITTER_PERCENT: u64 = 10;
 const EXPIRE_SWEEP_INTERVAL: Duration = Duration::from_secs(30);
-
-#[derive(Clone, Debug)]
-pub struct AnnounceInput {
-    pub info_hash: InfoHash,
-    pub peer_id: PeerId,
-    pub ip: std::net::IpAddr,
-    pub port: u16,
-    pub uploaded: u64,
-    pub downloaded: u64,
-    pub left: u64,
-    pub event: AnnounceEvent,
-    pub numwant: usize,
-    pub client_tag: u8,
-}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TrackerSnapshot {
@@ -119,27 +108,11 @@ impl Tracker {
                         swarm.downloaded = swarm.downloaded.saturating_add(1);
                         self.counters.add_downloaded();
                     }
-                    if let Some(tag) = upsert.old_tag {
-                        if tag != new_tag {
-                            decr.push(tag);
-                        }
-                    }
-                    if upsert.old_tag != Some(new_tag) {
-                        incr = Some(new_tag);
-                    }
-                    self.counters.apply_upsert(&upsert);
+                    Self::record_upsert(&mut self.counters, &upsert, new_tag, &mut decr, &mut incr);
                 }
                 AnnounceEvent::Started | AnnounceEvent::Empty => {
                     let upsert = swarm.upsert_peer(endpoint, input.into_peer_state(now_secs));
-                    if let Some(tag) = upsert.old_tag {
-                        if tag != new_tag {
-                            decr.push(tag);
-                        }
-                    }
-                    if upsert.old_tag != Some(new_tag) {
-                        incr = Some(new_tag);
-                    }
-                    self.counters.apply_upsert(&upsert);
+                    Self::record_upsert(&mut self.counters, &upsert, new_tag, &mut decr, &mut incr);
                 }
             }
 
@@ -179,6 +152,27 @@ impl Tracker {
         self.verify_counters();
 
         output
+    }
+
+    /// Apply a peer upsert to the counters and collect client-tag changes.
+    /// Takes `&mut TrackerCounters` (not `&mut self`) so it can be called
+    /// while the swarm borrow is still held.
+    fn record_upsert(
+        counters: &mut TrackerCounters,
+        upsert: &PeerUpsert,
+        new_tag: u8,
+        decr: &mut Vec<u8>,
+        incr: &mut Option<u8>,
+    ) {
+        if let Some(tag) = upsert.old_tag {
+            if tag != new_tag {
+                decr.push(tag);
+            }
+        }
+        if upsert.old_tag != Some(new_tag) {
+            *incr = Some(new_tag);
+        }
+        counters.apply_upsert(upsert);
     }
 
     pub fn scrape(&self, info_hashes: &[InfoHash]) -> HashMap<InfoHash, TorrentStats> {
@@ -312,16 +306,6 @@ impl Tracker {
 
     fn elapsed_secs(&self, now: Instant) -> u32 {
         saturating_u32_secs(now.saturating_duration_since(self.started_at))
-    }
-}
-
-impl AnnounceInput {
-    fn into_peer_state(self, now_secs: u32) -> PeerState {
-        PeerState {
-            complete: self.left == 0,
-            last_seen_secs: now_secs,
-            client_tag: self.client_tag,
-        }
     }
 }
 

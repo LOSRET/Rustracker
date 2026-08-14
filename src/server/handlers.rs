@@ -16,7 +16,6 @@ use serde::{Deserialize, Serialize};
 
 use super::trends::{self, ClientsResponse, StatsResponse, TrendsResponse};
 use super::AppState;
-use crate::core::tracker::AnnounceInput;
 use crate::core::types::InfoHash;
 use crate::protocol::announce::{
     announce_response, parse_announce_query, parse_scrape_query, peer_ip, scrape_response,
@@ -253,24 +252,16 @@ pub(crate) async fn announce(
     } else {
         None
     };
-    let input = AnnounceInput {
-        info_hash: parsed.info_hash,
-        peer_id: parsed.peer_id,
-        ip: peer_ip(header_ip, Some(addr)),
-        port: parsed.port,
-        uploaded: parsed.uploaded,
-        downloaded: parsed.downloaded,
-        left: parsed.left,
-        event: parsed.event,
-        numwant: parsed.numwant,
-        client_tag: client_id::identify(parsed.peer_id.as_bytes()),
-    };
+    let compact = parsed.compact;
+    let ip = peer_ip(header_ip, Some(addr));
+    let client_tag = client_id::identify(parsed.peer_id.as_bytes());
+    let input = parsed.into_input(ip, client_tag);
 
     let output = state
         .tracker
-        .announce(parsed.info_hash, input, Instant::now())
+        .announce(input.info_hash, input, Instant::now())
         .await;
-    bencoded_response(StatusCode::OK, announce_response(output, parsed.compact))
+    bencoded_response(StatusCode::OK, announce_response(output, compact))
 }
 
 pub(crate) async fn scrape(

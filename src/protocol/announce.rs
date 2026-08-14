@@ -4,7 +4,9 @@ use std::net::{IpAddr, SocketAddr};
 use thiserror::Error;
 
 use super::bencode::{write_bytes, write_int, write_key};
-use crate::core::types::{AnnounceEvent, AnnounceOutput, InfoHash, PeerId, TorrentStats, ID_LEN};
+use crate::core::types::{
+    AnnounceEvent, AnnounceInput, AnnounceOutput, InfoHash, PeerId, TorrentStats, ID_LEN,
+};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AnnounceQuery {
@@ -23,6 +25,25 @@ pub struct AnnounceQuery {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ScrapeQuery {
     pub info_hashes: Vec<InfoHash>,
+}
+
+impl AnnounceQuery {
+    /// Convert into the engine input. The caller resolves the peer IP
+    /// (query `ip` parameter or remote address) and the client tag.
+    pub fn into_input(self, ip: IpAddr, client_tag: u8) -> AnnounceInput {
+        AnnounceInput {
+            info_hash: self.info_hash,
+            peer_id: self.peer_id,
+            ip,
+            port: self.port,
+            uploaded: self.uploaded,
+            downloaded: self.downloaded,
+            left: self.left,
+            event: self.event,
+            numwant: self.numwant,
+            client_tag,
+        }
+    }
 }
 
 #[derive(Debug, Error, Eq, PartialEq)]
