@@ -1,13 +1,12 @@
 #![allow(clippy::type_complexity)]
 
-use std::collections::HashSet;
 use std::future::Future;
 use std::io;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, Instant};
 
 use axum::routing::get;
 use axum::Router;
@@ -16,7 +15,6 @@ use tokio::sync::RwLock;
 use tokio::time::MissedTickBehavior;
 
 use crate::core::tracker::Tracker;
-use crate::core::types::InfoHash;
 
 mod admin;
 mod blacklist;
@@ -24,6 +22,7 @@ pub(crate) mod handlers;
 mod pool;
 mod trends;
 
+use blacklist::BlacklistStore;
 use pool::TrackerPool;
 pub use pool::DEFAULT_TRACKER_SHARDS;
 
@@ -57,8 +56,7 @@ const BLACKLIST_WATCH_INTERVAL: Duration = Duration::from_secs(5);
 pub struct AppState {
     pub(crate) tracker: Arc<TrackerPool>,
     pub(crate) trends: Arc<RwLock<TrendStore>>,
-    pub(crate) blacklist: Arc<RwLock<HashSet<InfoHash>>>,
-    pub(crate) blacklist_path: Option<PathBuf>,
+    pub(crate) blacklist: Arc<BlacklistStore>,
     pub(crate) admin_token: Option<String>,
     pub(crate) trust_proxy_headers: bool,
     pub(crate) started_at: Instant,
@@ -73,8 +71,7 @@ impl AppState {
         Self {
             tracker: Arc::new(TrackerPool::single(tracker)),
             trends: Arc::new(RwLock::new(load_trends(&trends_file))),
-            blacklist: Arc::new(RwLock::new(HashSet::new())),
-            blacklist_path: None,
+            blacklist: Arc::new(BlacklistStore::new(None)),
             admin_token: None,
             trust_proxy_headers: false,
             started_at: Instant::now(),
@@ -98,22 +95,10 @@ impl AppState {
         admin_token: Option<String>,
         trust_proxy_headers: bool,
     ) -> Self {
-        let initial = blacklist_path
-            .as_deref()
-            .and_then(|path| match blacklist::load_blacklist(path) {
-                Ok(set) => Some(set),
-                Err(err) => {
-                    tracing::warn!("{err}");
-                    None
-                }
-            })
-            .unwrap_or_default();
-
         let state = Self {
             tracker: Arc::new(TrackerPool::new(interval, peer_timeout, shards)),
             trends: Arc::new(RwLock::new(load_trends(&trends_file))),
-            blacklist: Arc::new(RwLock::new(initial)),
-            blacklist_path: blacklist_path.clone(),
+            blacklist: Arc::new(BlacklistStore::new(blacklist_path)),
             admin_token,
             trust_proxy_headers,
             started_at: Instant::now(),
@@ -125,9 +110,7 @@ impl AppState {
 
         state.spawn_maintenance(trends_file);
         state.spawn_rps_sampler();
-        if let Some(path) = blacklist_path {
-            state.spawn_blacklist_watcher(path);
-        }
+        blacklist::spawn_watcher(state.blacklist.clone(), BLACKLIST_WATCH_INTERVAL);
         state
     }
 
@@ -191,34 +174,6 @@ impl AppState {
             }
         });
     }
-
-    fn spawn_blacklist_watcher(&self, path: PathBuf) {
-        let blacklist = self.blacklist.clone();
-        tokio::spawn(async move {
-            let mut interval = tokio::time::interval(BLACKLIST_WATCH_INTERVAL);
-            interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
-            let mut last_mtime = file_mtime(&path);
-
-            loop {
-                interval.tick().await;
-                let mtime = file_mtime(&path);
-                if mtime == last_mtime {
-                    continue;
-                }
-                last_mtime = mtime;
-                match blacklist::load_blacklist(&path) {
-                    Ok(new_set) => {
-                        let count = new_set.len();
-                        *blacklist.write().await = new_set;
-                        tracing::info!(count, "blacklist reloaded");
-                    }
-                    Err(err) => {
-                        tracing::warn!("{err}");
-                    }
-                }
-            }
-        });
-    }
 }
 
 pub fn router(state: AppState) -> Router {
@@ -248,12 +203,6 @@ pub fn router(state: AppState) -> Router {
     let r = r.fallback(handlers::not_found);
 
     r.with_state(state)
-}
-
-fn file_mtime(path: &Path) -> SystemTime {
-    std::fs::metadata(path)
-        .and_then(|m| m.modified())
-        .unwrap_or(SystemTime::UNIX_EPOCH)
 }
 
 pub async fn serve<F>(listeners: Vec<TcpListener>, app: Router, shutdown: F) -> io::Result<()>

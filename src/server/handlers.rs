@@ -244,7 +244,7 @@ pub(crate) async fn announce(
         }
     };
 
-    if state.blacklist.read().await.contains(&parsed.info_hash) {
+    if state.blacklist.contains(&parsed.info_hash).await {
         return bencoded_response(StatusCode::OK, bencode::failure("torrent is blacklisted"));
     }
 
@@ -288,14 +288,7 @@ pub(crate) async fn scrape(
         }
     };
 
-    let bl = state.blacklist.read().await;
-    let allowed: Vec<InfoHash> = parsed
-        .info_hashes
-        .iter()
-        .copied()
-        .filter(|h| !bl.contains(h))
-        .collect();
-    drop(bl);
+    let allowed = state.blacklist.filter_allowed(&parsed.info_hashes).await;
     let stats = state.tracker.scrape(&allowed).await;
     bencoded_response(StatusCode::OK, scrape_response(stats))
 }

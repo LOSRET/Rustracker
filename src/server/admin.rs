@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use axum::extract::State;
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::Json;
@@ -61,7 +59,7 @@ pub(crate) async fn blacklist_status(
         );
     };
 
-    blacklist_status_success(info_hash, state.blacklist.read().await.contains(&info_hash))
+    blacklist_status_success(info_hash, state.blacklist.contains(&info_hash).await)
 }
 
 pub(crate) async fn add_blacklist(
@@ -83,12 +81,12 @@ pub(crate) async fn add_blacklist(
         return blacklist_error(StatusCode::UNAUTHORIZED, "unauthorized");
     }
 
-    let Some(path) = state.blacklist_path.as_deref() else {
+    if state.blacklist.path().is_none() {
         return blacklist_error(
             StatusCode::SERVICE_UNAVAILABLE,
             "blacklist file is not configured",
         );
-    };
+    }
     let Some(info_hash) = InfoHash::from_hex(request.info_hash.trim()) else {
         return blacklist_error(
             StatusCode::BAD_REQUEST,
@@ -96,22 +94,16 @@ pub(crate) async fn add_blacklist(
         );
     };
 
-    if state.blacklist.read().await.contains(&info_hash) {
-        return blacklist_success(info_hash, false);
+    match state.blacklist.insert(info_hash).await {
+        Ok(added) => blacklist_success(info_hash, added),
+        Err(error) => {
+            tracing::warn!(%error, "failed to persist blacklist entry");
+            blacklist_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to persist blacklist entry",
+            )
+        }
     }
-
-    if let Err(error) = append_blacklist_entry(path, info_hash).await {
-        tracing::warn!(%error, path = %path.display(), "failed to persist blacklist entry");
-        return blacklist_error(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "failed to persist blacklist entry",
-        );
-    }
-
-    let mut blacklist = state.blacklist.write().await;
-    blacklist.insert(info_hash);
-
-    blacklist_success(info_hash, true)
 }
 
 fn authorized(headers: &HeaderMap, token: &str) -> bool {
@@ -122,18 +114,6 @@ fn authorized(headers: &HeaderMap, token: &str) -> bool {
         return false;
     };
     header == format!("Bearer {token}")
-}
-
-async fn append_blacklist_entry(path: &Path, info_hash: InfoHash) -> std::io::Result<()> {
-    use tokio::io::AsyncWriteExt;
-
-    let mut file = tokio::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)
-        .await?;
-    file.write_all(format!("{info_hash}\n").as_bytes()).await?;
-    file.flush().await
 }
 
 fn blacklist_success(info_hash: InfoHash, added: bool) -> (StatusCode, Json<AddBlacklistResponse>) {
