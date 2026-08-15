@@ -12,7 +12,13 @@ const { stats, error, lastUpdated, stop } = useStats()
 const sidebarOpen = ref(false)
 const route = useRoute()
 const page = computed(() => route.name as PageKey)
-const dashboardProps = computed(() => (route.name === "dashboard" ? { stats, error, lastUpdated } : {}))
+// Unwrap refs explicitly: values nested inside a v-bind object are passed
+// through verbatim (Vue only unwraps top-level template refs), so binding the
+// refs directly would hand the children Ref objects — always truthy for
+// `error`, always nullish for `stats`.
+const dashboardProps = computed(() =>
+  route.name === "dashboard" ? { stats: stats.value, error: error.value, lastUpdated: lastUpdated.value } : {},
+)
 
 useSeoHead()
 

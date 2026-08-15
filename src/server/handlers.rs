@@ -4,7 +4,6 @@
 //! and JSON stats endpoints.
 
 use std::net::SocketAddr;
-use std::sync::atomic::Ordering;
 use std::time::Instant;
 
 use axum::body::Body;
@@ -17,7 +16,6 @@ use serde::{Deserialize, Serialize};
 
 use super::trends::{self, ClientsResponse, StatsResponse, TrendsResponse};
 use super::AppState;
-use crate::core::tracker::AnnounceInput;
 use crate::core::types::InfoHash;
 use crate::protocol::announce::{
     announce_response, parse_announce_query, parse_scrape_query, peer_ip, scrape_response,
@@ -115,27 +113,26 @@ fn content_type_for(name: &str) -> &'static str {
 pub(crate) async fn stats(State(state): State<AppState>) -> Json<StatsResponse> {
     let snapshot = state.tracker.snapshot().await;
     let uptime_secs = state.started_at.elapsed().as_secs();
-    let rps = f64::from_bits(state.current_rps.load(Ordering::Relaxed));
+    let rps = state.rps.current();
     Json(StatsResponse::from_snapshot(snapshot, uptime_secs, rps))
 }
 
 pub(crate) async fn trends(State(state): State<AppState>) -> Json<TrendsResponse> {
     let snapshot = state.tracker.snapshot().await;
     let now = trends::unix_timestamp();
-    let history = state.trends.write().await.record(now, &snapshot);
+    let history = state.trends.record(now, &snapshot).await;
     Json(TrendsResponse { history })
 }
 
 pub(crate) async fn clients(State(state): State<AppState>) -> Json<ClientsResponse> {
     let snapshot = state.tracker.snapshot().await;
     let now = trends::unix_timestamp();
-    let mut store = state.trends.write().await;
-    let client_data = store.record_clients(now, &snapshot.clients);
+    let client_data = state.trends.record_clients(now, &snapshot.clients).await;
     Json(ClientsResponse {
         timestamp: now,
-        tags: client_data.top_tags.clone(),
-        clients: client_data.top_clients.clone(),
-        history: client_data.history.clone(),
+        tags: client_data.top_tags,
+        clients: client_data.top_clients,
+        history: client_data.history,
     })
 }
 
@@ -235,7 +232,7 @@ pub(crate) async fn announce(
     headers: HeaderMap,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
 ) -> Response<Body> {
-    state.rps_counter.fetch_add(1, Ordering::Relaxed);
+    state.rps.tick();
     let query = uri.query().unwrap_or_default();
     let parsed = match parse_announce_query(query) {
         Ok(parsed) => parsed,
@@ -244,7 +241,7 @@ pub(crate) async fn announce(
         }
     };
 
-    if state.blacklist.read().await.contains(&parsed.info_hash) {
+    if state.blacklist.contains(&parsed.info_hash).await {
         return bencoded_response(StatusCode::OK, bencode::failure("torrent is blacklisted"));
     }
 
@@ -255,31 +252,23 @@ pub(crate) async fn announce(
     } else {
         None
     };
-    let input = AnnounceInput {
-        info_hash: parsed.info_hash,
-        peer_id: parsed.peer_id,
-        ip: peer_ip(header_ip, Some(addr)),
-        port: parsed.port,
-        uploaded: parsed.uploaded,
-        downloaded: parsed.downloaded,
-        left: parsed.left,
-        event: parsed.event,
-        numwant: parsed.numwant,
-        client_tag: client_id::identify(parsed.peer_id.as_bytes()),
-    };
+    let compact = parsed.compact;
+    let ip = peer_ip(header_ip, Some(addr));
+    let client_tag = client_id::identify(parsed.peer_id.as_bytes());
+    let input = parsed.into_input(ip, client_tag);
 
     let output = state
         .tracker
-        .announce(parsed.info_hash, input, Instant::now())
+        .announce(input.info_hash, input, Instant::now())
         .await;
-    bencoded_response(StatusCode::OK, announce_response(output, parsed.compact))
+    bencoded_response(StatusCode::OK, announce_response(output, compact))
 }
 
 pub(crate) async fn scrape(
     State(state): State<AppState>,
     OriginalUri(uri): OriginalUri,
 ) -> Response<Body> {
-    state.rps_counter.fetch_add(1, Ordering::Relaxed);
+    state.rps.tick();
     let query = uri.query().unwrap_or_default();
     let parsed = match parse_scrape_query(query) {
         Ok(parsed) => parsed,
@@ -288,14 +277,7 @@ pub(crate) async fn scrape(
         }
     };
 
-    let bl = state.blacklist.read().await;
-    let allowed: Vec<InfoHash> = parsed
-        .info_hashes
-        .iter()
-        .copied()
-        .filter(|h| !bl.contains(h))
-        .collect();
-    drop(bl);
+    let allowed = state.blacklist.filter_allowed(&parsed.info_hashes).await;
     let stats = state.tracker.scrape(&allowed).await;
     bencoded_response(StatusCode::OK, scrape_response(stats))
 }

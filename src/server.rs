@@ -1,69 +1,40 @@
 #![allow(clippy::type_complexity)]
 
-use std::collections::HashSet;
 use std::future::Future;
 use std::io;
 use std::net::SocketAddr;
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, Instant};
 
 use axum::routing::get;
 use axum::Router;
 use tokio::net::TcpListener;
-use tokio::sync::RwLock;
-use tokio::time::MissedTickBehavior;
 
 use crate::core::tracker::Tracker;
-use crate::core::types::InfoHash;
 
 mod admin;
 mod blacklist;
 pub(crate) mod handlers;
 mod pool;
+mod rps;
 mod trends;
 
+use blacklist::BlacklistStore;
 use pool::TrackerPool;
 pub use pool::DEFAULT_TRACKER_SHARDS;
-
-use trends::TrendStore;
-
-fn load_trends(trends_file: &Option<PathBuf>) -> TrendStore {
-    let top_clients_file = trends_file.as_ref().map(|p| {
-        p.parent()
-            .unwrap_or(Path::new("."))
-            .join("top_clients.jsonl")
-    });
-    match trends_file
-        .as_ref()
-        .map(|p| trends::load_trends_from_file(p, top_clients_file.as_ref()))
-        .transpose()
-    {
-        Ok(Some(store)) => store,
-        Ok(None) => TrendStore::default(),
-        Err(err) => {
-            tracing::warn!("failed to load trend data: {err}");
-            TrendStore::default()
-        }
-    }
-}
-
-const EXPIRE_MAINTENANCE_INTERVAL: Duration = Duration::from_secs(1);
-const TREND_SAMPLE_INTERVAL: Duration = Duration::from_secs(10 * 60);
-const BLACKLIST_WATCH_INTERVAL: Duration = Duration::from_secs(5);
+use rps::RpsMeter;
+use trends::TrendsState;
 
 #[derive(Clone)]
 pub struct AppState {
     pub(crate) tracker: Arc<TrackerPool>,
-    pub(crate) trends: Arc<RwLock<TrendStore>>,
-    pub(crate) blacklist: Arc<RwLock<HashSet<InfoHash>>>,
-    pub(crate) blacklist_path: Option<PathBuf>,
+    pub(crate) trends: TrendsState,
+    pub(crate) blacklist: Arc<BlacklistStore>,
     pub(crate) admin_token: Option<String>,
     pub(crate) trust_proxy_headers: bool,
     pub(crate) started_at: Instant,
-    pub(crate) rps_counter: Arc<AtomicU64>,
-    pub(crate) current_rps: Arc<AtomicU64>,
+    pub(crate) rps: RpsMeter,
     #[cfg(feature = "dashboard")]
     pub(crate) versioned_index: axum::body::Bytes,
 }
@@ -72,14 +43,12 @@ impl AppState {
     pub fn new(tracker: Tracker, trends_file: Option<PathBuf>) -> Self {
         Self {
             tracker: Arc::new(TrackerPool::single(tracker)),
-            trends: Arc::new(RwLock::new(load_trends(&trends_file))),
-            blacklist: Arc::new(RwLock::new(HashSet::new())),
-            blacklist_path: None,
+            trends: TrendsState::new(trends_file),
+            blacklist: Arc::new(BlacklistStore::new(None)),
             admin_token: None,
             trust_proxy_headers: false,
             started_at: Instant::now(),
-            rps_counter: Arc::new(AtomicU64::new(0)),
-            current_rps: Arc::new(AtomicU64::new(0)),
+            rps: RpsMeter::new(),
             #[cfg(feature = "dashboard")]
             versioned_index: handlers::make_versioned_index(),
         }
@@ -98,126 +67,23 @@ impl AppState {
         admin_token: Option<String>,
         trust_proxy_headers: bool,
     ) -> Self {
-        let initial = blacklist_path
-            .as_deref()
-            .and_then(|path| match blacklist::load_blacklist(path) {
-                Ok(set) => Some(set),
-                Err(err) => {
-                    tracing::warn!("{err}");
-                    None
-                }
-            })
-            .unwrap_or_default();
-
         let state = Self {
             tracker: Arc::new(TrackerPool::new(interval, peer_timeout, shards)),
-            trends: Arc::new(RwLock::new(load_trends(&trends_file))),
-            blacklist: Arc::new(RwLock::new(initial)),
-            blacklist_path: blacklist_path.clone(),
+            trends: TrendsState::new(trends_file),
+            blacklist: Arc::new(BlacklistStore::new(blacklist_path)),
             admin_token,
             trust_proxy_headers,
             started_at: Instant::now(),
-            rps_counter: Arc::new(AtomicU64::new(0)),
-            current_rps: Arc::new(AtomicU64::new(0)),
+            rps: RpsMeter::new(),
             #[cfg(feature = "dashboard")]
             versioned_index: handlers::make_versioned_index(),
         };
 
-        state.spawn_maintenance(trends_file);
-        state.spawn_rps_sampler();
-        if let Some(path) = blacklist_path {
-            state.spawn_blacklist_watcher(path);
-        }
+        pool::spawn_expiry_sweep(state.tracker.clone());
+        state.trends.spawn_sampling(state.tracker.clone());
+        state.rps.spawn_sampler();
+        blacklist::spawn_watcher(state.blacklist.clone(), blacklist::WATCH_INTERVAL);
         state
-    }
-
-    fn spawn_maintenance(&self, trends_file: Option<PathBuf>) {
-        let tracker = self.tracker.clone();
-
-        tokio::spawn(async move {
-            let mut interval = tokio::time::interval(EXPIRE_MAINTENANCE_INTERVAL);
-            interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
-
-            loop {
-                interval.tick().await;
-                tracker.expire_due(Instant::now());
-            }
-        });
-
-        let tracker = self.tracker.clone();
-        let trends = self.trends.clone();
-
-        tokio::spawn(async move {
-            let mut interval = tokio::time::interval(TREND_SAMPLE_INTERVAL);
-            interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
-            interval.tick().await;
-
-            loop {
-                interval.tick().await;
-                let snapshot = tracker.snapshot().await;
-                let now = trends::unix_timestamp();
-                let mut store = trends.write().await;
-                store.record(now, &snapshot);
-                if let Some(ref path) = trends_file {
-                    let _ = trends::save_trend_point(path, now, &snapshot);
-                }
-                store.record_clients(now, &snapshot.clients);
-                if let Some(ref path) = trends_file {
-                    let _ = trends::save_client_point(
-                        &path
-                            .parent()
-                            .unwrap_or(Path::new("."))
-                            .join("top_clients.jsonl"),
-                        now,
-                        &snapshot.clients,
-                    );
-                }
-            }
-        });
-    }
-
-    fn spawn_rps_sampler(&self) {
-        let rps_counter = self.rps_counter.clone();
-        let current_rps = self.current_rps.clone();
-
-        tokio::spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_secs(1));
-            interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
-
-            loop {
-                interval.tick().await;
-                let count = rps_counter.swap(0, Ordering::Relaxed);
-                current_rps.store((count as f64).to_bits(), Ordering::Relaxed);
-            }
-        });
-    }
-
-    fn spawn_blacklist_watcher(&self, path: PathBuf) {
-        let blacklist = self.blacklist.clone();
-        tokio::spawn(async move {
-            let mut interval = tokio::time::interval(BLACKLIST_WATCH_INTERVAL);
-            interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
-            let mut last_mtime = file_mtime(&path);
-
-            loop {
-                interval.tick().await;
-                let mtime = file_mtime(&path);
-                if mtime == last_mtime {
-                    continue;
-                }
-                last_mtime = mtime;
-                match blacklist::load_blacklist(&path) {
-                    Ok(new_set) => {
-                        let count = new_set.len();
-                        *blacklist.write().await = new_set;
-                        tracing::info!(count, "blacklist reloaded");
-                    }
-                    Err(err) => {
-                        tracing::warn!("{err}");
-                    }
-                }
-            }
-        });
     }
 }
 
@@ -248,12 +114,6 @@ pub fn router(state: AppState) -> Router {
     let r = r.fallback(handlers::not_found);
 
     r.with_state(state)
-}
-
-fn file_mtime(path: &Path) -> SystemTime {
-    std::fs::metadata(path)
-        .and_then(|m| m.modified())
-        .unwrap_or(SystemTime::UNIX_EPOCH)
 }
 
 pub async fn serve<F>(listeners: Vec<TcpListener>, app: Router, shutdown: F) -> io::Result<()>
