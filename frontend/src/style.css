@@ -28,7 +28,7 @@
   --color-peers: #475569;
 
   --font-sans: "Segoe UI", Arial, sans-serif;
-  --font-display: Sora, sans-serif;
+  --font-display: "Segoe UI", Arial, sans-serif;
   --font-mono: "SFMono-Regular", Consolas, monospace;
 
   --animate-rps-pulse: rps-pulse 2s ease-in-out infinite;

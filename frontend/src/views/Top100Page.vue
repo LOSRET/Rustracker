@@ -1,14 +1,23 @@
 <script setup lang="ts">
-import { computed, h, onMounted } from "vue"
+import { computed, h, onMounted, ref } from "vue"
 import type { TableColumn } from "@nuxt/ui"
+import UTooltip from "@nuxt/ui/runtime/components/Tooltip.vue"
+import { useClipboard } from "@vueuse/core"
 import type { SortKey, Top100Entry } from "../types/api"
 import { useTop100 } from "../composables/useTop100"
 import { useI18n } from "../composables/useI18n"
 
 const { t, number, d } = useI18n()
 const { data, loading, error, sort, lastUpdated, load } = useTop100()
+const { copied, copy } = useClipboard({ copiedDuring: 1500, legacy: true })
+const copiedHash = ref<string | null>(null)
 
 onMounted(load)
+
+function copyHash(hash: string) {
+  copiedHash.value = hash
+  copy(hash)
+}
 
 const rows = computed(() => {
   if (!data.value) return []
@@ -43,8 +52,33 @@ const columns = computed<TableColumn<Top100Entry>[]>(() => [
     accessorKey: "info_hash",
     header: t("col_hash"),
     meta: { class: { td: "font-mono text-xs break-all" } },
-    cell: ({ row }) =>
-      h("code", { class: "bg-code-bg px-1.5 py-0.5 rounded-sm text-xs" }, String(row.getValue("info_hash"))),
+    cell: ({ row }) => {
+      const hash = String(row.getValue("info_hash"))
+      const isCopied = copied.value && copiedHash.value === hash
+
+      return h(
+        UTooltip,
+        {
+          text: t("copied"),
+          open: isCopied,
+          content: { side: "top", sideOffset: 8 },
+        },
+        () =>
+          h(
+            "button",
+            {
+              type: "button",
+              class: [
+                "inline-block max-w-full border-0 bg-code-bg px-1.5 py-0.5 text-left font-mono text-xs break-all rounded-sm cursor-pointer transition-colors focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-1",
+                isCopied ? "text-good" : "text-ink hover:text-accent",
+              ],
+              "aria-label": `${hash} (${isCopied ? t("copied") : t("copy_hash")})`,
+              onClick: () => copyHash(hash),
+            },
+            hash,
+          ),
+      )
+    },
   },
   {
     accessorKey: "peers",

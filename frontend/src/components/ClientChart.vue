@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { computed } from "vue"
 import VChart from "vue-echarts"
-import "echarts"
 import { usePreferredDark } from "@vueuse/core"
 import type { ClientsResponse, RangeKey } from "../types/api"
 import { useI18n } from "../composables/useI18n"
 import { baseChart, emptyChartOption, filterRange, lineSeries } from "../utils/chart"
 
-const props = defineProps<{
+const {
+  data,
+  range,
+  error = null,
+} = defineProps<{
   data: ClientsResponse | null
   range: RangeKey
   error?: string | null
@@ -55,13 +58,13 @@ function brandColor(name: string): string {
 }
 
 const option = computed(() => {
-  const historyAll = props.data?.history ?? []
+  const historyAll = data?.history ?? []
   if (!historyAll.length) {
-    return emptyChartOption(props.error ? t("top100_error") : t("top100_empty"))
+    return emptyChartOption(error ? t("top100_error") : t("top100_empty"))
   }
 
-  const names = props.data?.clients ?? []
-  const history = filterRange(historyAll, props.range)
+  const names = data?.clients ?? []
+  const history = filterRange(historyAll, range)
   const labels = history.map((item) => d(item.timestamp * 1000, "chart"))
 
   return {

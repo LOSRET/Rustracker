@@ -3,7 +3,7 @@ import type { StatsResponse } from "../types/api"
 import { useClipboard } from "@vueuse/core"
 import { useI18n } from "../composables/useI18n"
 
-const props = defineProps<{
+const { stats, error, lastUpdated } = defineProps<{
   stats: StatsResponse | null
   error: string | null
   lastUpdated: number | null
@@ -19,7 +19,7 @@ function copyAddr() {
 }
 
 function lastUpdateText() {
-  const ts = props.lastUpdated
+  const ts = lastUpdated
   if (ts == null) return t("loading")
   return `${t("last_update")} ${d(ts, "time")}`
 }
@@ -55,7 +55,7 @@ function lastUpdateText() {
         <i class="w-[7px] h-[7px] bg-good rounded-full shrink-0 animate-rps-pulse"></i>
         RPS
       </div>
-      <strong class="text-[22px] leading-none text-ink max-[900px]:text-xl">{{ number(props.stats?.rps ?? 0) }}</strong>
+      <strong class="text-[22px] leading-none text-ink max-[900px]:text-xl">{{ number(stats?.rps ?? 0) }}</strong>
     </div>
   </section>
 </template>

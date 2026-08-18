@@ -1,7 +1,4 @@
 import { createRouter, createWebHistory } from "vue-router"
-import DashboardView from "../views/DashboardView.vue"
-import Top100Page from "../views/Top100Page.vue"
-import ClientsPage from "../views/ClientsPage.vue"
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -9,9 +6,9 @@ export const router = createRouter({
     return savedPosition || { top: 0 }
   },
   routes: [
-    { path: "/", name: "dashboard", component: DashboardView },
-    { path: "/top100", name: "top100", component: Top100Page },
-    { path: "/clients", name: "clients", component: ClientsPage },
+    { path: "/", name: "dashboard", component: () => import("../views/DashboardView.vue") },
+    { path: "/top100", name: "top100", component: () => import("../views/Top100Page.vue") },
+    { path: "/clients", name: "clients", component: () => import("../views/ClientsPage.vue") },
     { path: "/:pathMatch(.*)*", redirect: "/" },
   ],
 })

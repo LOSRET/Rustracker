@@ -37,11 +37,19 @@ export default defineConfig({
   build: {
     outDir: "../dist",
     emptyOutDir: true,
-    rollupOptions: {
+    rolldownOptions: {
       output: {
-        manualChunks(id) {
-          if (id.includes("node_modules/echarts") || id.includes("node_modules/vue-echarts")) return "echarts";
-          if (id.includes("node_modules/vue/")) return "vue";
+        codeSplitting: {
+          groups: [
+            {
+              name: "echarts",
+              test: /node_modules[\\/]echarts[\\/]|node_modules[\\/]vue-echarts[\\/]/,
+            },
+            {
+              name: "vue",
+              test: /node_modules[\\/]vue[\\/]/,
+            },
+          ],
         },
       },
     },

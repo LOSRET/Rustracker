@@ -1,4 +1,10 @@
+import { LineChart } from "echarts/charts"
+import { use } from "echarts/core"
+import { GridComponent, LegendComponent, TitleComponent, TooltipComponent } from "echarts/components"
+import { SVGRenderer } from "echarts/renderers"
 import type { RangeKey } from "../types/api"
+
+use([LineChart, GridComponent, LegendComponent, TitleComponent, TooltipComponent, SVGRenderer])
 
 const RANGE_SECS: Record<RangeKey, number> = {
   "24h": 86400,

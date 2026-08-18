@@ -11,7 +11,11 @@ import Disclaimer from "./components/Disclaimer.vue"
 const { stats, error, lastUpdated, stop } = useStats()
 const sidebarOpen = ref(false)
 const route = useRoute()
-const page = computed(() => route.name as PageKey)
+const page = computed<PageKey>(() => {
+  const name = route.name
+  if (name === "dashboard" || name === "top100" || name === "clients") return name
+  return "dashboard"
+})
 // Unwrap refs explicitly: values nested inside a v-bind object are passed
 // through verbatim (Vue only unwraps top-level template refs), so binding the
 // refs directly would hand the children Ref objects — always truthy for

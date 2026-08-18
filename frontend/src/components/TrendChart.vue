@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue"
 import VChart from "vue-echarts"
-import "echarts"
 import { usePreferredDark } from "@vueuse/core"
 import type { TrendsResponse, RangeKey } from "../types/api"
 import { useI18n } from "../composables/useI18n"
@@ -9,16 +8,15 @@ import { baseChart, emptyChartOption, filterRange, lineSeries } from "../utils/c
 
 const props = defineProps<{
   data: TrendsResponse | null
-  range: RangeKey
   error?: string | null
 }>()
-const emit = defineEmits<{ "update:range": [range: RangeKey] }>()
+const range = defineModel<RangeKey>("range", { required: true })
 
 const { t, d } = useI18n()
 const isDark = usePreferredDark()
 
 const option = computed(() => {
-  const history = filterRange(props.data?.history ?? [], props.range)
+  const history = filterRange(props.data?.history ?? [], range.value)
   if (!history.length) {
     return emptyChartOption(props.error ? t("top100_error") : t("top100_empty"))
   }
@@ -50,10 +48,6 @@ const option = computed(() => {
   }
 })
 
-function setRange(r: RangeKey) {
-  emit("update:range", r)
-}
-
 const rangeItems = computed(() =>
   (["24h", "3d", "7d"] as RangeKey[]).map((r) => ({ label: t(`range_${r}`), value: r })),
 )
@@ -67,7 +61,7 @@ const rangeItems = computed(() =>
         <span class="text-muted text-xs">{{ t("chart_note") }}</span>
       </div>
       <URadioGroup
-        :model-value="range"
+        v-model="range"
         :items="rangeItems"
         variant="table"
         orientation="horizontal"
@@ -81,7 +75,6 @@ const rangeItems = computed(() =>
           wrapper: () => 'contents',
           label: () => 'text-inherit font-normal',
         }"
-        @update:model-value="setRange"
       />
     </div>
     <div class="w-full h-[440px] max-[900px]:h-[330px] max-[560px]:h-[275px]">
