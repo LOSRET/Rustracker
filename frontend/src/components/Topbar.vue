@@ -36,15 +36,17 @@ function lastUpdateText() {
       <div class="flex items-center flex-wrap gap-1 mb-5">
         <span class="text-muted text-sm font-normal whitespace-nowrap">{{ t("tracker_addr_label") }}</span>
         <UTooltip :text="t('copied')" :open="copied" :content="{ side: 'top', sideOffset: 8 }">
-          <span
+          <button
+            type="button"
             :class="[
-              'tracker-addr text-base font-bold break-all cursor-pointer border-b border-dashed border-line transition-colors',
+              'tracker-addr text-left text-base font-bold break-all cursor-pointer border-b border-dashed border-line transition-colors focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-1',
               copied ? 'text-good' : 'text-ink hover:text-accent',
             ]"
+            :aria-label="`${trackerUrl} (${copied ? t('copied') : t('copy_tracker')})`"
             @click="copyAddr"
           >
             {{ trackerUrl }}
-          </span>
+          </button>
         </UTooltip>
       </div>
     </div>

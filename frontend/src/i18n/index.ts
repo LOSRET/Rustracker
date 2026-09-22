@@ -2,6 +2,7 @@ import { createI18n } from "vue-i18n"
 import type { LangKey } from "../types/api"
 
 const zh = {
+  menu: "菜单",
   monitoring: "监控",
   overview: "Tracker 概览",
   running: "运行中",
@@ -38,6 +39,7 @@ const zh = {
   clients_col_name: "客户端",
   clients_col_share: "占比",
   refresh: "刷新",
+  copy_tracker: "点击复制 Tracker 地址",
   tracker_addr_label: "Tracker 地址：",
   copied: "已复制",
   disc_title: "Tracker 免责说明",
@@ -61,6 +63,7 @@ const zh = {
 }
 
 const en = {
+  menu: "Menu",
   monitoring: "Monitoring",
   overview: "Tracker Overview",
   running: "Running",
@@ -97,6 +100,7 @@ const en = {
   clients_col_name: "Client",
   clients_col_share: "Share",
   refresh: "Refresh",
+  copy_tracker: "Click to copy tracker URL",
   tracker_addr_label: "Tracker URL: ",
   copied: "Copied!",
   disc_title: "Disclaimer",
@@ -122,6 +126,7 @@ const en = {
 }
 
 const ja = {
+  menu: "メニュー",
   monitoring: "モニタリング",
   overview: "Tracker概要",
   running: "稼働中",
@@ -158,6 +163,7 @@ const ja = {
   clients_col_name: "クライアント",
   clients_col_share: "シェア",
   refresh: "更新",
+  copy_tracker: "クリックしてTrackerアドレスをコピー",
   tracker_addr_label: "Trackerアドレス：",
   copied: "コピーしました",
   disc_title: "免責事項",
@@ -183,6 +189,7 @@ const ja = {
 }
 
 const ru = {
+  menu: "Меню",
   monitoring: "Мониторинг",
   overview: "Обзор трекера",
   running: "Работает",
@@ -219,6 +226,7 @@ const ru = {
   clients_col_name: "Клиент",
   clients_col_share: "Доля",
   refresh: "Обновить",
+  copy_tracker: "Нажмите, чтобы скопировать адрес трекера",
   tracker_addr_label: "Адрес трекера: ",
   copied: "Скопировано",
   disc_title: "Отказ от ответственности",
@@ -244,6 +252,7 @@ const ru = {
 }
 
 const de = {
+  menu: "Menü",
   monitoring: "Überwachung",
   overview: "Tracker-Übersicht",
   running: "Läuft",
@@ -280,6 +289,7 @@ const de = {
   clients_col_name: "Client",
   clients_col_share: "Anteil",
   refresh: "Aktualisieren",
+  copy_tracker: "Klicken, um die Tracker-Adresse zu kopieren",
   tracker_addr_label: "Tracker-Adresse: ",
   copied: "Kopiert",
   disc_title: "Haftungsausschluss",
@@ -305,6 +315,7 @@ const de = {
 }
 
 const uk = {
+  menu: "Меню",
   monitoring: "Моніторинг",
   overview: "Огляд трекера",
   running: "Працює",
@@ -341,6 +352,7 @@ const uk = {
   clients_col_name: "Клієнт",
   clients_col_share: "Частка",
   refresh: "Оновити",
+  copy_tracker: "Натисніть, щоб скопіювати адресу трекера",
   tracker_addr_label: "Адреса трекера: ",
   copied: "Скопійовано",
   disc_title: "Відмова від відповідальності",

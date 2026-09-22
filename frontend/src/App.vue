@@ -2,7 +2,7 @@
 import { computed, onUnmounted, ref, watch } from "vue"
 import { useRoute } from "vue-router"
 import type { PageKey } from "./types/api"
-import { useSeoHead } from "./composables/useI18n"
+import { useI18n, useSeoHead } from "./composables/useI18n"
 import { useStats } from "./composables/useStats"
 import Sidebar from "./components/Sidebar.vue"
 import AppFooter from "./components/AppFooter.vue"
@@ -24,6 +24,8 @@ const dashboardProps = computed(() =>
   route.name === "dashboard" ? { stats: stats.value, error: error.value, lastUpdated: lastUpdated.value } : {},
 )
 
+const { t } = useI18n()
+
 useSeoHead()
 
 watch(
@@ -40,7 +42,7 @@ onUnmounted(stop)
   <UApp>
     <button
       class="hidden max-[900px]:block fixed top-[14px] left-[14px] z-[999] bg-side text-side-fg border-0 p-2 cursor-pointer rounded-md leading-none"
-      aria-label="Menu"
+      :aria-label="t('menu')"
       @click="sidebarOpen = !sidebarOpen"
     >
       <UIcon name="i-lucide-menu" class="size-6" />
