@@ -475,22 +475,82 @@ fn temp_blacklist_path() -> std::path::PathBuf {
 }
 
 fn blacklist_app_with_token(token: Option<&str>) -> (axum::Router, std::path::PathBuf) {
+    blacklist_app_with_options(token, true)
+}
+
+fn blacklist_app_with_options(
+    token: Option<&str>,
+    mcp_enabled: bool,
+) -> (axum::Router, std::path::PathBuf) {
     let path = temp_blacklist_path();
     std::fs::write(
         &path,
         "# test blacklist\n6161616161616161616161616161616161616161\n",
     )
     .unwrap();
-    let router = router(AppState::sharded_with_blacklist_file(
-        Duration::from_secs(1800),
-        Duration::from_secs(3000),
-        16,
-        Some(path.clone()),
-        None,
-        token.map(str::to_string),
-        false,
-    ));
+    let router = router(
+        AppState::sharded_with_blacklist_file(
+            Duration::from_secs(1800),
+            Duration::from_secs(3000),
+            16,
+            Some(path.clone()),
+            None,
+            token.map(str::to_string),
+            false,
+        )
+        .with_mcp(mcp_enabled),
+    );
     (router, path)
+}
+
+fn audit_path(blacklist_path: &std::path::Path) -> std::path::PathBuf {
+    blacklist_path.with_extension("audit.jsonl")
+}
+
+fn cleanup(path: &std::path::Path) {
+    let _ = std::fs::remove_file(path);
+    let _ = std::fs::remove_file(audit_path(path));
+}
+
+async fn json_body(response: axum::response::Response) -> serde_json::Value {
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    serde_json::from_slice(&body).unwrap()
+}
+
+fn mcp_request(token: Option<&str>, body: serde_json::Value) -> Request<Body> {
+    let mut builder = Request::builder()
+        .method("POST")
+        .uri("/mcp")
+        .header(header::HOST, "localhost")
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::ACCEPT, "application/json, text/event-stream")
+        .header("MCP-Protocol-Version", "2025-06-18");
+    if let Some(token) = token {
+        builder = builder.header(header::AUTHORIZATION, format!("Bearer {token}"));
+    }
+    builder.body(Body::from(body.to_string())).unwrap()
+}
+
+fn mcp_initialize() -> serde_json::Value {
+    serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-06-18",
+            "capabilities": {},
+            "clientInfo": {"name": "rustracker-test", "version": "0.0.0"}
+        }
+    })
+}
+
+fn mcp_tool_call(id: u64, name: &str, arguments: serde_json::Value) -> serde_json::Value {
+    serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": id,
+        "method": "tools/call",
+        "params": {"name": name, "arguments": arguments}
+    })
 }
 
 fn blacklisted_app() -> (axum::Router, std::path::PathBuf) {
@@ -576,7 +636,7 @@ async fn add_blacklist_rejects_missing_token() {
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
-    let _ = std::fs::remove_file(&path);
+    cleanup(&path);
 }
 
 #[tokio::test]
@@ -598,7 +658,7 @@ async fn blacklist_status_returns_true_when_entry_exists() {
     let body = response.into_body().collect().await.unwrap().to_bytes();
     let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(parsed["blacklisted"], true);
-    let _ = std::fs::remove_file(&path);
+    cleanup(&path);
 }
 
 #[tokio::test]
@@ -620,7 +680,7 @@ async fn blacklist_status_returns_false_when_entry_is_missing() {
     let body = response.into_body().collect().await.unwrap().to_bytes();
     let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(parsed["blacklisted"], false);
-    let _ = std::fs::remove_file(&path);
+    cleanup(&path);
 }
 
 #[tokio::test]
@@ -638,7 +698,7 @@ async fn blacklist_status_rejects_missing_token() {
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
-    let _ = std::fs::remove_file(&path);
+    cleanup(&path);
 }
 
 #[tokio::test]
@@ -657,7 +717,7 @@ async fn blacklist_status_rejects_invalid_info_hash() {
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-    let _ = std::fs::remove_file(&path);
+    cleanup(&path);
 }
 
 #[tokio::test]
@@ -677,7 +737,7 @@ async fn add_blacklist_rejects_invalid_info_hash() {
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-    let _ = std::fs::remove_file(&path);
+    cleanup(&path);
 }
 
 #[tokio::test]
@@ -717,7 +777,7 @@ async fn add_blacklist_persists_entry_and_blocks_announce() {
     assert!(body
         .windows(b"torrent is blacklisted".len())
         .any(|w| w == b"torrent is blacklisted"));
-    let _ = std::fs::remove_file(&path);
+    cleanup(&path);
 }
 
 #[tokio::test]
@@ -742,7 +802,7 @@ async fn add_blacklist_returns_not_added_when_entry_exists() {
     let body = response.into_body().collect().await.unwrap().to_bytes();
     let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(parsed["added"], false);
-    let _ = std::fs::remove_file(&path);
+    cleanup(&path);
 }
 
 #[tokio::test]
@@ -764,7 +824,393 @@ async fn add_blacklist_requires_configured_token() {
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
-    let _ = std::fs::remove_file(&path);
+    cleanup(&path);
+}
+
+#[tokio::test]
+async fn blacklist_list_is_sorted_and_paginated() {
+    let (app, path) = blacklist_app_with_token(Some("secret-token"));
+
+    for hash in [
+        "6363636363636363636363636363636363636363",
+        "6262626262626262626262626262626262626262",
+    ] {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/blacklist")
+                    .header(header::AUTHORIZATION, "Bearer secret-token")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(format!(r#"{{"info_hash":"{hash}"}}"#)))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/api/blacklist?offset=0&limit=2")
+                .header(header::AUTHORIZATION, "Bearer secret-token")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let parsed = json_body(response).await;
+    assert_eq!(parsed["ok"], true);
+    assert_eq!(parsed["total"], 3);
+    assert_eq!(parsed["offset"], 0);
+    assert_eq!(parsed["limit"], 2);
+    assert_eq!(
+        parsed["entries"][0],
+        "6161616161616161616161616161616161616161"
+    );
+    assert_eq!(
+        parsed["entries"][1],
+        "6262626262626262626262626262626262626262"
+    );
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/api/blacklist?offset=2&limit=2")
+                .header(header::AUTHORIZATION, "Bearer secret-token")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let parsed = json_body(response).await;
+    assert_eq!(parsed["total"], 3);
+    assert_eq!(
+        parsed["entries"][0],
+        "6363636363636363636363636363636363636363"
+    );
+    cleanup(&path);
+}
+
+#[tokio::test]
+async fn blacklist_list_requires_token() {
+    let (app, path) = blacklist_app_with_token(Some("secret-token"));
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/api/blacklist")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    let parsed = json_body(response).await;
+    assert_eq!(parsed["ok"], false);
+    assert_eq!(parsed["error"], "unauthorized");
+    cleanup(&path);
+}
+
+#[tokio::test]
+async fn remove_blacklist_deletes_entry_and_unblocks_announce() {
+    let (app, path) = blacklist_app_with_token(Some("secret-token"));
+    let announce_uri = "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-abcdefgh1234&port=6881&left=0&event=started&compact=1";
+    let info_hash = "6161616161616161616161616161616161616161";
+
+    let response = app
+        .clone()
+        .oneshot(request_with_connect_info(announce_uri))
+        .await
+        .unwrap();
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    assert!(body
+        .windows(b"torrent is blacklisted".len())
+        .any(|w| w == b"torrent is blacklisted"));
+
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!("/api/blacklist?info_hash={info_hash}"))
+                .header(header::AUTHORIZATION, "Bearer secret-token")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let parsed = json_body(response).await;
+    assert_eq!(parsed["ok"], true);
+    assert_eq!(parsed["removed"], true);
+
+    let file = std::fs::read_to_string(&path).unwrap();
+    assert!(file.contains("# test blacklist"));
+    assert!(!file.contains(info_hash));
+
+    let response = app
+        .clone()
+        .oneshot(request_with_connect_info(announce_uri))
+        .await
+        .unwrap();
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    assert!(!body
+        .windows(b"torrent is blacklisted".len())
+        .any(|w| w == b"torrent is blacklisted"));
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!("/api/blacklist?info_hash={info_hash}"))
+                .header(header::AUTHORIZATION, "Bearer secret-token")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let parsed = json_body(response).await;
+    assert_eq!(parsed["removed"], false);
+    cleanup(&path);
+}
+
+#[tokio::test]
+async fn audit_log_records_http_mutations() {
+    let (app, path) = blacklist_app_with_token(Some("secret-token"));
+    let hash = "6262626262626262626262626262626262626262";
+
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/blacklist")
+                .header(header::AUTHORIZATION, "Bearer secret-token")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(format!(r#"{{"info_hash":"{hash}"}}"#)))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!("/api/blacklist?info_hash={hash}"))
+                .header(header::AUTHORIZATION, "Bearer secret-token")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let content = std::fs::read_to_string(audit_path(&path)).unwrap();
+    let entries: Vec<serde_json::Value> = content
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    assert_eq!(entries.len(), 2);
+    assert_eq!(entries[0]["action"], "add");
+    assert_eq!(entries[0]["info_hash"], hash);
+    assert_eq!(entries[0]["source"], "http");
+    assert_eq!(entries[0]["result"], "ok");
+    assert_eq!(entries[0]["added"], true);
+    assert_eq!(entries[1]["action"], "remove");
+    assert_eq!(entries[1]["removed"], true);
+    cleanup(&path);
+}
+
+#[tokio::test]
+async fn mcp_requires_bearer_token() {
+    let (app, path) = blacklist_app_with_token(Some("secret-token"));
+    let response = app
+        .oneshot(mcp_request(None, mcp_initialize()))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    cleanup(&path);
+}
+
+#[tokio::test]
+async fn mcp_manages_blacklist_tools() {
+    let (app, path) = blacklist_app_with_token(Some("secret-token"));
+    let hash = "6262626262626262626262626262626262626262";
+
+    let response = app
+        .clone()
+        .oneshot(mcp_request(Some("secret-token"), mcp_initialize()))
+        .await
+        .unwrap();
+    let status = response.status();
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "initialize body: {}",
+        String::from_utf8_lossy(&body)
+    );
+    let initialized: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(initialized["result"]["serverInfo"]["name"], "rustracker");
+
+    let response = app
+        .clone()
+        .oneshot(mcp_request(
+            Some("secret-token"),
+            serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 2,
+                "method": "tools/list",
+                "params": {}
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let listed = json_body(response).await;
+    let names: Vec<&str> = listed["result"]["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|tool| tool["name"].as_str().unwrap())
+        .collect();
+    for expected in [
+        "blacklist_add",
+        "blacklist_check",
+        "blacklist_list",
+        "blacklist_remove",
+    ] {
+        assert!(names.contains(&expected), "missing {expected}: {names:?}");
+    }
+
+    let response = app
+        .clone()
+        .oneshot(mcp_request(
+            Some("secret-token"),
+            mcp_tool_call(3, "blacklist_add", serde_json::json!({"info_hash": hash})),
+        ))
+        .await
+        .unwrap();
+    let added = json_body(response).await;
+    assert_ne!(added["result"]["isError"], true);
+    assert_eq!(added["result"]["structuredContent"]["added"], true);
+
+    let response = app
+        .clone()
+        .oneshot(mcp_request(
+            Some("secret-token"),
+            mcp_tool_call(4, "blacklist_check", serde_json::json!({"info_hash": hash})),
+        ))
+        .await
+        .unwrap();
+    let checked = json_body(response).await;
+    assert_eq!(checked["result"]["structuredContent"]["blacklisted"], true);
+
+    let response = app
+        .clone()
+        .oneshot(mcp_request(
+            Some("secret-token"),
+            mcp_tool_call(
+                5,
+                "blacklist_list",
+                serde_json::json!({"offset": 0, "limit": 10}),
+            ),
+        ))
+        .await
+        .unwrap();
+    let listed = json_body(response).await;
+    let entries = listed["result"]["structuredContent"]["entries"]
+        .as_array()
+        .unwrap();
+    assert!(entries.iter().any(|entry| entry == hash));
+
+    let response = app
+        .clone()
+        .oneshot(mcp_request(
+            Some("secret-token"),
+            mcp_tool_call(
+                6,
+                "blacklist_remove",
+                serde_json::json!({"info_hash": hash}),
+            ),
+        ))
+        .await
+        .unwrap();
+    let removed = json_body(response).await;
+    assert_eq!(removed["result"]["structuredContent"]["removed"], true);
+
+    let response = app
+        .oneshot(mcp_request(
+            Some("secret-token"),
+            mcp_tool_call(7, "blacklist_check", serde_json::json!({"info_hash": hash})),
+        ))
+        .await
+        .unwrap();
+    let checked = json_body(response).await;
+    assert_eq!(checked["result"]["structuredContent"]["blacklisted"], false);
+
+    let content = std::fs::read_to_string(audit_path(&path)).unwrap();
+    let last: serde_json::Value = serde_json::from_str(content.lines().last().unwrap()).unwrap();
+    assert_eq!(last["source"], "mcp");
+    assert_eq!(last["action"], "remove");
+    cleanup(&path);
+}
+
+#[tokio::test]
+async fn mcp_tool_errors_are_visible_to_the_caller() {
+    let (app, path) = blacklist_app_with_token(Some("secret-token"));
+
+    let response = app
+        .oneshot(mcp_request(
+            Some("secret-token"),
+            mcp_tool_call(
+                2,
+                "blacklist_check",
+                serde_json::json!({"info_hash": "not-a-hash"}),
+            ),
+        ))
+        .await
+        .unwrap();
+    let parsed = json_body(response).await;
+    assert_eq!(parsed["result"]["isError"], true);
+    let text = parsed["result"]["content"][0]["text"].as_str().unwrap();
+    assert!(text.contains("40-char hex"), "unexpected error: {text}");
+    cleanup(&path);
+}
+
+#[tokio::test]
+async fn no_mcp_flag_disables_endpoint() {
+    let (app, path) = blacklist_app_with_options(Some("secret-token"), false);
+    let response = app
+        .oneshot(mcp_request(Some("secret-token"), mcp_initialize()))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    cleanup(&path);
+}
+
+#[tokio::test]
+async fn mcp_is_not_mounted_without_admin_token() {
+    let (app, path) = blacklist_app_with_token(None);
+    let response = app
+        .oneshot(mcp_request(None, mcp_initialize()))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    cleanup(&path);
 }
 
 #[tokio::test]
@@ -1098,7 +1544,7 @@ async fn blacklist_case_insensitive_hex() {
         String::from_utf8_lossy(&body),
     );
 
-    let _ = std::fs::remove_file(&path);
+    cleanup(&path);
 }
 
 // ── 协议正确性补测 ─────────────────────────────────────────────────────────
