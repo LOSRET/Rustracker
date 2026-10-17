@@ -72,7 +72,8 @@ cargo run --release -- --listen 127.0.0.1:8080
 | `--peer-timeout-secs` | `RUSTRACKER_PEER_TIMEOUT_SECS` | `3000` | Peer 过期超时（秒） |
 | `--blacklist` | `RUSTRACKER_BLACKLIST` | — | 种子黑名单文件路径 |
 | `--trends-file` | `RUSTRACKER_TRENDS_FILE` | — | 趋势数据 JSONL 持久化路径 |
-| `--admin-token` | `RUSTRACKER_ADMIN_TOKEN` | — | 管理接口所需的 Bearer Token |
+| `--admin-token` | `RUSTRACKER_ADMIN_TOKEN` | — | 管理接口和 MCP 接口所需的 Bearer Token |
+| `--no-mcp` | `RUSTRACKER_NO_MCP` | `false` | 即使配置了 admin token 也禁用 `/mcp` |
 
 每个参数均可通过环境变量或命令行参数设置，命令行优先。
 
@@ -196,6 +197,67 @@ curl -X POST http://127.0.0.1:8080/api/blacklist \
 
 接口会先把 40 字符十六进制 `info_hash` 追加写入黑名单文件，再更新内存黑名单。重复添加会返回成功，但 `"added": false`。
 
+列出黑名单（按字典序，分页返回；`limit` 默认 100，最大 1000）：
+
+```bash
+curl "http://127.0.0.1:8080/api/blacklist?limit=100&offset=0" \
+  -H "Authorization: Bearer $RUSTRACKER_ADMIN_TOKEN"
+```
+
+响应形如 `{"ok":true,"total":1,"offset":0,"limit":100,"entries":["0123..."],"error":null}`。
+
+删除条目：
+
+```bash
+curl -X DELETE "http://127.0.0.1:8080/api/blacklist?info_hash=0123456789abcdef0123456789abcdef01234567" \
+  -H "Authorization: Bearer $RUSTRACKER_ADMIN_TOKEN"
+```
+
+删除会原子重写文件。`"removed": true` 表示确实删除了条目，`"removed": false` 表示本来就不存在。
+
+每次添加/删除（包括失败）都会追加到黑名单文件同目录的 `<blacklist-stem>.audit.jsonl`（例如 `blacklist.txt` → `blacklist.audit.jsonl`），每行一个 JSON 对象，包含时间、动作、info_hash、来源（`http` 或 `mcp`）、结果和可用时的客户端 IP。
+
+黑名单文件按单实例设计。如果多个 tracker 进程共享同一个文件，需要在外部协调写入；删除操作是读改写，没有跨进程锁。
+
+### MCP 接口
+
+配置 `RUSTRACKER_ADMIN_TOKEN` 后，tracker 还会在 `/mcp` 暴露一个 MCP 服务，使用 Streamable HTTP 传输（无状态、JSON 响应），复用 admin Bearer token，提供四个工具：
+
+| 工具 | 说明 |
+|------|------|
+| `blacklist_check` | 查询 info_hash 是否在黑名单（只读） |
+| `blacklist_add` | 添加 info_hash（幂等） |
+| `blacklist_list` | 分页列出 info_hash（`offset`/`limit`） |
+| `blacklist_remove` | 删除 info_hash（幂等） |
+
+使用 `--no-mcp` 或 `RUSTRACKER_NO_MCP=1` 可禁用。token 少于 32 字符时启动日志会给出警告。
+
+OpenCode（`opencode.json`）：
+
+```json
+{
+  "mcp": {
+    "rustracker": {
+      "type": "remote",
+      "url": "https://tracker.example.com/mcp",
+      "enabled": true,
+      "headers": {
+        "Authorization": "Bearer <admin-token>"
+      }
+    }
+  }
+}
+```
+
+Claude Code：
+
+```bash
+claude mcp add --transport http rustracker https://tracker.example.com/mcp \
+  --header "Authorization: Bearer $RUSTRACKER_ADMIN_TOKEN"
+```
+
+MCP 是可写的管理面：请使用 HTTPS 和强 token，并让 `/mcp` 继续走现有的反向代理或 Cloudflare。Host 头校验被有意放宽以适配公网部署，访问边界由 Bearer token 承担。
+
 ## 趋势数据持久化
 
 默认情况下，趋势数据（种子数、peer 数、做种数、下载数、客户端分布）存储在内存中，重启后丢失。要启用持久化：
@@ -247,7 +309,7 @@ rustracker/
 ├── src/
 │   ├── core/          # 追踪引擎（无 I/O）：types、tracker、swarm、topk、counters
 │   ├── protocol/      # BT 协议：bencode、announce、client_id（102 种客户端）
-│   └── server/        # HTTP 层：handlers、admin、pool（64 分片）、blacklist、trends
+│   └── server/        # HTTP 层：handlers、admin、mcp、pool（64 分片）、blacklist、audit、trends
 ├── frontend/          # Vue 3 + Vite + Tailwind 面板 SPA（编译时内嵌）
 ├── examples/          # 负载测试与性能基准
 ├── tests/             # 集成测试
@@ -276,6 +338,8 @@ Tracker 可从 peer ID 前缀识别 **102 种 BitTorrent 客户端**，包括：
 
 发布包中包含 `install-linux.sh`。将 Linux 二进制文件和脚本放在同一目录下，运行 `sudo sh install-linux.sh` 即可进入交互菜单（安装/更新、启动/停止/重启、配置、系统优化）。也支持 `install`、`start`、`stop`、`status` 等非交互式命令。
 
+安装脚本会询问是否启用 `/mcp` 管理端点。选择否则写入 `RUSTRACKER_NO_MCP=1`；默认保持启用。
+
 **安装后的默认文件布局：**
 
 | 路径 | 说明 |
@@ -283,6 +347,7 @@ Tracker 可从 peer ID 前缀识别 **102 种 BitTorrent 客户端**，包括：
 | `/opt/rustracker/rustracker` | 二进制文件 |
 | `/etc/rustracker.env` | 环境变量配置，包含自动生成的 Admin Token |
 | `/etc/rustracker/blacklist.txt` | 种子黑名单 |
+| `/etc/rustracker/blacklist.audit.jsonl` | 黑名单变更审计日志（首次写入时创建） |
 | `/var/lib/rustracker/trends.jsonl` | 趋势数据 |
 | `/etc/systemd/system/rustracker.service` | systemd 服务单元 |
 

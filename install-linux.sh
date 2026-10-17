@@ -11,6 +11,7 @@ DEFAULT_INTERVAL="1800"
 DEFAULT_TIMEOUT="3000"
 DEFAULT_MALLOC_CONF="background_thread:true,dirty_decay_ms:5000,muzzy_decay_ms:5000,narenas:4"
 BLACKLIST_PATH="/etc/rustracker/blacklist.txt"
+BLACKLIST_AUDIT_PATH="/etc/rustracker/blacklist.audit.jsonl"
 TRENDS_FILE_PATH="/var/lib/rustracker/trends.jsonl"
 SYSCTL_PATH="/etc/sysctl.d/99-rustracker.conf"
 LIMITS_PATH="/etc/security/limits.d/rustracker.conf"
@@ -20,6 +21,7 @@ load_existing_config() {
     INTERVAL_DEFAULT=$DEFAULT_INTERVAL
     TIMEOUT_DEFAULT=$DEFAULT_TIMEOUT
     MALLOC_CONF_DEFAULT=$DEFAULT_MALLOC_CONF
+    MCP_DEFAULT=true
 
     if [ -f "$ENV_PATH" ]; then
         LISTEN_DEFAULT=$(grep '^RUSTRACKER_LISTEN=' "$ENV_PATH" | tail -n 1 | cut -d= -f2- || true)
@@ -29,6 +31,10 @@ load_existing_config() {
         ADMIN_TOKEN_DEFAULT=$(grep '^RUSTRACKER_ADMIN_TOKEN=' "$ENV_PATH" | tail -n 1 | cut -d= -f2- || true)
         MALLOC_CONF_DEFAULT=$(grep '^MALLOC_CONF=' "$ENV_PATH" | tail -n 1 | cut -d= -f2- || true)
         TRUST_PROXY_DEFAULT=$(grep '^RUSTRACKER_TRUST_PROXY_HEADERS=' "$ENV_PATH" | tail -n 1 | cut -d= -f2- || true)
+        case "$(grep '^RUSTRACKER_NO_MCP=' "$ENV_PATH" | tail -n 1 | cut -d= -f2- || true)" in
+            1|true|TRUE|yes|YES|on|ON) MCP_DEFAULT=false ;;
+            *) MCP_DEFAULT=true ;;
+        esac
 
         LISTEN_DEFAULT=${LISTEN_DEFAULT:-$DEFAULT_LISTEN}
         INTERVAL_DEFAULT=${INTERVAL_DEFAULT:-$DEFAULT_INTERVAL}
@@ -124,6 +130,14 @@ write_env() {
     read TRUST_PROXY || true
     TRUST_PROXY=${TRUST_PROXY:-$TRUST_PROXY_DEFAULT}
 
+    printf "启用 MCP 管理端点 /mcp（需要 admin token）[%s]（true/false）: " "$MCP_DEFAULT"
+    read MCP_ENABLED || true
+    MCP_ENABLED=${MCP_ENABLED:-$MCP_DEFAULT}
+    case "$MCP_ENABLED" in
+        false|FALSE|False|0|no|NO|n|N) MCP_NO=1 ;;
+        *) MCP_NO=0 ;;
+    esac
+
     ADMIN_TOKEN=${ADMIN_TOKEN_DEFAULT:-$(generate_admin_token)}
 
     cat > "$ENV_PATH" <<EOF
@@ -134,6 +148,7 @@ RUSTRACKER_BLACKLIST=$BLACKLIST_PATH
 RUSTRACKER_TRENDS_FILE=$TRENDS
 RUSTRACKER_ADMIN_TOKEN=$ADMIN_TOKEN
 RUSTRACKER_TRUST_PROXY_HEADERS=$TRUST_PROXY
+RUSTRACKER_NO_MCP=$MCP_NO
 MALLOC_CONF=$MALLOC_CONF_DEFAULT
 EOF
     chmod 0600 "$ENV_PATH"
@@ -215,6 +230,12 @@ install_app() {
     echo "服务：$APP_NAME"
     echo "配置：$ENV_PATH"
     echo "黑名单：$BLACKLIST_PATH"
+    if [ "${MCP_NO:-0}" = "1" ]; then
+        echo "MCP：已禁用"
+    else
+        echo "MCP：/mcp（需要 Admin Token）"
+    fi
+    echo "审计日志：$BLACKLIST_AUDIT_PATH（首次写入时创建）"
     echo "趋势数据：$TRENDS_FILE_PATH"
     echo "目录：$INSTALL_DIR"
 }
@@ -230,6 +251,11 @@ configure_app() {
 
     echo "配置已更新。"
     echo "配置：$ENV_PATH"
+    if [ "${MCP_NO:-0}" = "1" ]; then
+        echo "MCP：已禁用"
+    else
+        echo "MCP：/mcp（需要 Admin Token）"
+    fi
 }
 
 uninstall_app() {
@@ -254,10 +280,10 @@ uninstall_app() {
         y|Y|yes|YES) rm -f "$ENV_PATH" ;;
     esac
 
-    printf "是否删除黑名单文件 %s？[y/N]: " "$BLACKLIST_PATH"
+    printf "是否删除黑名单文件及审计日志（%s / %s）？[y/N]: " "$BLACKLIST_PATH" "$BLACKLIST_AUDIT_PATH"
     read CONFIRM || true
     case "$CONFIRM" in
-        y|Y|yes|YES) rm -f "$BLACKLIST_PATH" ;;
+        y|Y|yes|YES) rm -f "$BLACKLIST_PATH" "$BLACKLIST_AUDIT_PATH" ;;
     esac
 
     echo "卸载完成。"
@@ -284,6 +310,24 @@ show_config() {
         if grep -q '^RUSTRACKER_ADMIN_TOKEN=' "$ENV_PATH"; then
             echo "RUSTRACKER_ADMIN_TOKEN=<hidden>"
         fi
+
+        MCP_DISABLED=0
+        case "$(grep '^RUSTRACKER_NO_MCP=' "$ENV_PATH" | tail -n 1 | cut -d= -f2- || true)" in
+            1|true|TRUE|yes|YES|on|ON) MCP_DISABLED=1 ;;
+        esac
+        TOKEN_SET=0
+        case "$(grep '^RUSTRACKER_ADMIN_TOKEN=' "$ENV_PATH" | tail -n 1 | cut -d= -f2- || true)" in
+            "") ;;
+            *) TOKEN_SET=1 ;;
+        esac
+        echo ""
+        if [ "$MCP_DISABLED" = "1" ]; then
+            echo "MCP 端点：已禁用"
+        elif [ "$TOKEN_SET" = "1" ]; then
+            echo "MCP 端点：已启用（/mcp）"
+        else
+            echo "MCP 端点：未启用（未配置 Admin Token）"
+        fi
     else
         echo "未找到配置文件：$ENV_PATH"
     fi
@@ -291,6 +335,12 @@ show_config() {
         COUNT=$(grep -cvE '^#|^$' "$BLACKLIST_PATH" 2>/dev/null || echo 0)
         echo ""
         echo "黑名单文件：$BLACKLIST_PATH（$COUNT 条）"
+    fi
+    if [ -f "$BLACKLIST_AUDIT_PATH" ]; then
+        LINES=$(wc -l < "$BLACKLIST_AUDIT_PATH" 2>/dev/null || echo 0)
+        SIZE=$(du -h "$BLACKLIST_AUDIT_PATH" 2>/dev/null | cut -f1)
+        echo ""
+        echo "审计日志：$BLACKLIST_AUDIT_PATH（$LINES 行，$SIZE）"
     fi
     if [ -f "$TRENDS_FILE_PATH" ]; then
         LINES=$(wc -l < "$TRENDS_FILE_PATH" 2>/dev/null || echo 0)
@@ -319,7 +369,7 @@ show_admin_token() {
 
     TOKEN=$(grep '^RUSTRACKER_ADMIN_TOKEN=' "$ENV_PATH" | tail -n 1 | cut -d= -f2- || true)
     if [ -z "$TOKEN" ]; then
-        echo "未配置 RUSTRACKER_ADMIN_TOKEN。"
+        echo "未配置 RUSTRACKER_ADMIN_TOKEN（管理接口和 MCP 均不可用）。"
     else
         echo "$TOKEN"
     fi
