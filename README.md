@@ -1,5 +1,7 @@
 [中文](./README-zh.md) | English
 
+> **AI agents:** for a Linux production install runbook, see [agent-install.md](./agent-install.md).
+
 # Rustracker
 
 [![Version](https://img.shields.io/github/v/release/LOSRET/Rustracker?color=blue&label=version)](https://github.com/LOSRET/Rustracker/releases)
@@ -41,7 +43,7 @@ A lightweight, high-performance HTTP BitTorrent tracker with a real-time dashboa
 ### Prerequisites
 
 - [Rust](https://www.rust-lang.org/tools/install) 1.85+ (edition 2021)
-- [Node.js](https://nodejs.org/) 20+ and npm (only needed when building with the `dashboard` feature, which is on by default)
+- [Node.js](https://nodejs.org/) 20.19+ or 22.12+ and npm (only needed when building with the `dashboard` feature, which is on by default)
 
 ### Build & Run
 
@@ -74,6 +76,7 @@ Download the latest release from [GitHub Releases](https://github.com/LOSRET/Rus
 | `--trends-file` | `RUSTRACKER_TRENDS_FILE` | — | Path to persist trend JSONL data |
 | `--admin-token` | `RUSTRACKER_ADMIN_TOKEN` | — | Bearer token required for admin API and MCP endpoints |
 | `--no-mcp` | `RUSTRACKER_NO_MCP` | `false` | Disable `/mcp` even when an admin token is configured |
+| `--trust-proxy-headers` | `RUSTRACKER_TRUST_PROXY_HEADERS` | `false` | Trust `CF-Connecting-IP` / `X-Real-IP` / `X-Forwarded-For` for the announce client IP; enable only behind a trusted proxy |
 
 Every flag can be set via environment variable or command-line argument. Command-line takes precedence.
 
@@ -331,7 +334,11 @@ Client tags are exposed in the `/api/clients` endpoint and the dashboard's clien
 
 ## Linux Installation
 
-Release packages include `install-linux.sh`. Place the Linux binary and the script in the same directory, then run `sudo sh install-linux.sh` for an interactive menu (install/update, start/stop/restart, config, system tuning). Non-interactive commands like `install`, `start`, `stop`, `status` are also supported.
+Release packages include `install-linux.sh`. Place the Linux binary and the script in the same directory, then run `sudo sh install-linux.sh` for an interactive menu (install/update, start/stop/restart, config, system tuning). Service commands like `start`, `stop`, and `status` are also supported.
+
+For unattended installs, run `sudo sh install-linux.sh install --yes`. Defaults can be overridden with `RUSTRACKER_LISTEN`, `RUSTRACKER_INTERVAL_SECS`, `RUSTRACKER_PEER_TIMEOUT_SECS`, `RUSTRACKER_TRENDS_FILE`, `RUSTRACKER_TRUST_PROXY_HEADERS`, and `RUSTRACKER_NO_MCP`. See [agent-install.md](./agent-install.md) for the full runbook.
+
+The Linux installer enables `RUSTRACKER_TRUST_PROXY_HEADERS` by default. Set it to `false` when the tracker is directly exposed to the internet without a trusted reverse proxy.
 
 The installer asks whether to enable the `/mcp` endpoint. Choosing no writes `RUSTRACKER_NO_MCP=true` to `/etc/rustracker.env`; the default keeps MCP enabled. Both `true`/`false` and `1`/`0` are accepted.
 

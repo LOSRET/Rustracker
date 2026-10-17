@@ -73,12 +73,14 @@ Rustracker is a lightweight, high-performance HTTP BitTorrent tracker written in
 
 **Requirements:** Rust 1.85+ (edition 2021)
 
+**Production install:** see [agent-install.md](./agent-install.md) for the Linux agent runbook (`install-linux.sh install --yes`).
+
 ## Build & Development Commands
 
 ```bash
 # Build (release, includes embedded dashboard)
 # NOTE: dashboard feature triggers `npm run build` in frontend/ via build.rs.
-# Requires Node 20+ and frontend/node_modules installed (run `npm install` in frontend/ first).
+# Requires Node 20.19+ or 22.12+ and frontend/node_modules installed (run `npm install` in frontend/ first).
 cargo build --release
 
 # Build without dashboard (smaller binary, no frontend bundled, no Node needed)

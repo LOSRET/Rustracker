@@ -1,5 +1,7 @@
 [English](./README.md) | 中文
 
+> **AI Agent：** Linux 生产安装请见 [agent-install.md](./agent-install.md)。
+
 # Rustracker
 
 [![Version](https://img.shields.io/github/v/release/LOSRET/Rustracker?color=blue&label=version)](https://github.com/LOSRET/Rustracker/releases)
@@ -41,7 +43,7 @@
 ### 前置要求
 
 - [Rust](https://www.rust-lang.org/tools/install) 1.85+（edition 2021）
-- [Node.js](https://nodejs.org/) 20+ 及 npm（仅在使用默认的 `dashboard` feature 构建时需要）
+- [Node.js](https://nodejs.org/) 20.19+ 或 22.12+ 及 npm（仅在使用默认的 `dashboard` feature 构建时需要）
 
 ### 从源码构建并运行
 
@@ -74,6 +76,7 @@ cargo run --release -- --listen 127.0.0.1:8080
 | `--trends-file` | `RUSTRACKER_TRENDS_FILE` | — | 趋势数据 JSONL 持久化路径 |
 | `--admin-token` | `RUSTRACKER_ADMIN_TOKEN` | — | 管理接口和 MCP 接口所需的 Bearer Token |
 | `--no-mcp` | `RUSTRACKER_NO_MCP` | `false` | 即使配置了 admin token 也禁用 `/mcp` |
+| `--trust-proxy-headers` | `RUSTRACKER_TRUST_PROXY_HEADERS` | `false` | 信任 `CF-Connecting-IP` / `X-Real-IP` / `X-Forwarded-For` 作为 announce 客户端 IP；仅在可信反向代理后启用 |
 
 每个参数均可通过环境变量或命令行参数设置，命令行优先。
 
@@ -331,7 +334,11 @@ Tracker 可从 peer ID 前缀识别 **102 种 BitTorrent 客户端**，包括：
 
 ## Linux 安装
 
-发布包中包含 `install-linux.sh`。将 Linux 二进制文件和脚本放在同一目录下，运行 `sudo sh install-linux.sh` 即可进入交互菜单（安装/更新、启动/停止/重启、配置、系统优化）。也支持 `install`、`start`、`stop`、`status` 等非交互式命令。
+发布包中包含 `install-linux.sh`。将 Linux 二进制文件和脚本放在同一目录下，运行 `sudo sh install-linux.sh` 即可进入交互菜单（安装/更新、启动/停止/重启、配置、系统优化）。也支持 `start`、`stop`、`status` 等服务管理命令。
+
+无人值守安装使用 `sudo sh install-linux.sh install --yes`。默认值可通过 `RUSTRACKER_LISTEN`、`RUSTRACKER_INTERVAL_SECS`、`RUSTRACKER_PEER_TIMEOUT_SECS`、`RUSTRACKER_TRENDS_FILE`、`RUSTRACKER_TRUST_PROXY_HEADERS`、`RUSTRACKER_NO_MCP` 覆盖。完整流程见 [agent-install.md](./agent-install.md)。
+
+Linux 安装脚本默认启用 `RUSTRACKER_TRUST_PROXY_HEADERS`。如果 Tracker 直接暴露公网、前面没有可信反向代理，请设为 `false`。
 
 安装脚本会询问是否启用 `/mcp` 管理端点。选择否会写入 `RUSTRACKER_NO_MCP=true`；默认保持启用。`true`/`false` 和 `1`/`0` 均可使用。
 
