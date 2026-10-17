@@ -174,16 +174,16 @@ Three-layer design with clear separation of concerns:
 
 - **`protocol/`** — BitTorrent protocol encoding, no network dependency. Custom bencode serializer (`bencode.rs`), BEP 3 announce/scrape query parsing (`announce.rs`), and compile-time 256×256 lookup table for Azureus-style peer ID client identification (`client_id.rs`).
 
-- **`server/`** — Axum HTTP layer. `pool.rs` defines `TrackerPool`, which wraps 64 `Tracker` shards with per-shard `RwLock` (shard selected via `DefaultHasher(info_hash) % 64`) to minimize contention. `handlers.rs` routes `/announce`, `/scrape`, `/healthz`, `/api/*`, and dashboard static files. `admin.rs` implements the authenticated `GET`/`POST /api/blacklist` endpoints. `blacklist.rs` hot-reloads a torrent blacklist file every 5 seconds. `trends.rs` manages a 7-day ring buffer with optional JSONL persistence (10-min sampling).
+- **`server/`** — Axum HTTP layer. `pool.rs` defines `TrackerPool`, which wraps 64 `Tracker` shards with per-shard `RwLock` (shard selected via `DefaultHasher(info_hash) % 64`) to minimize contention. `handlers.rs` routes `/announce`, `/scrape`, `/healthz`, `/api/*`, and dashboard static files. `admin.rs` implements the authenticated `GET`/`POST`/`DELETE /api/blacklist` endpoints and the shared `BlacklistAdmin` service. `mcp.rs` exposes the same four operations as MCP tools at `/mcp` using rmcp's Streamable HTTP transport (stateless, JSON responses). `audit.rs` appends mutation records to `<blacklist-stem>.audit.jsonl` in the blacklist directory. `blacklist.rs` hot-reloads a torrent blacklist file every 5 seconds; all mutations are serialized by a write mutex and removal uses a temp file + atomic rename. `trends.rs` manages a 7-day ring buffer with optional JSONL persistence (10-min sampling).
 
-`AppState` (in `server.rs`) is the shared state clone passed to all handlers, containing `Arc<TrackerPool>`, `Arc<RwLock<TrendStore>>`, `Arc<RwLock<Arc<HashSet<InfoHash>>>>` for the blacklist, and `Arc<AtomicU64>` for the real-time RPS counter updated on every announce/scrape request.
+`AppState` (in `server.rs`) is the shared state clone passed to all handlers, containing `Arc<TrackerPool>`, `TrendsState`, `Arc<BlacklistStore>`, `Arc<AuditLog>`, the admin token, `mcp_enabled`, and the RPS meter. MCP is mounted only when `mcp_enabled` is true and a non-empty admin token is configured; `--no-mcp` sets `mcp_enabled = false`.
 
 ## Key Design Decisions
 
 - **Sharding**: 64 shards chosen via `DefaultHasher(info_hash) % 64` to minimize lock contention
 - **Peer storage**: Packed binary, no heap allocation per peer — stored inline in `Vec<u8>`
 - **Shrink strategy (`shrink_if_idle`)**: After peer expiry sweeps, each `Swarm`'s `Vec<u8>` checks if `cap > floor * entry_size` (skip tiny vecs), then computes `target = next_power_of_two(entries).max(floor) * entry_size`. Shrinks to target only if `target < cap`, yielding 50–100% post-shrink utilization. This is tighter than opentracker's approach (waits until <25% utilization, then halves).
-- **Background tasks**: Peer expiry sweeps every 1s, trend sampling every 10min, blacklist file watch every 5s
+- **Background tasks**: Peer expiry sweeps every 1s, trend sampling every 10min, blacklist file watch every 5s (a failed reload leaves the mtime unchanged so it retries on the next tick)
 - **Allocator**: `tikv-jemallocator` is installed as the global allocator on Linux only (`#[global_allocator]` in `main.rs`); other platforms use the system allocator. Memory benchmarks (`memory_tracker_bench` vs `memory_jemalloc_bench` vs `memory_mimalloc_bench`) compare these.
 - **build.rs**: When the `dashboard` feature is on, runs `npm run build` in `frontend/`, then copies `dist/index.html` to `$OUT_DIR/index.html` and `dist/assets/*` to `$OUT_DIR/assets/`, generating an `assets_manifest.rs` of `include_bytes!` calls. The `personal-contact` feature is handled at Vite build time via the `VITE_PERSONAL_CONTACT=true` env var — `vite.config.ts` inlines contact info (blog URL + email) into the JS bundle via `define: { __CONTACT__: ... }` (an object when enabled, `null` when not); the `Disclaimer.vue` component renders it with `v-if` and real `<a>` tags using i18n labels (`t.blog_label`/`t.contact_label`). This means the contact info distinction is compile-time (public releases have no contact info in the binary at all), controlled by whether CI sets the env var.
 - **Features**: `dashboard` (default) enables web UI routes and embeds the Vue SPA at compile time; `personal-contact` injects contact info into the frontend bundle via `VITE_PERSONAL_CONTACT` env var (set by `sync-deploy.yml`, not set by `release.yml`)
@@ -203,6 +203,8 @@ Recorded by the user in `.trae/rules/project_rules.md` and `.trae/memory/project
 Integration tests in `tests/tracker_http.rs` use `axum::Router::oneshot()` with `tower::ServiceExt` — no real TCP server needed. Tests create `AppState::new()` or `AppState::sharded()` directly.
 
 Helper functions: `app()` creates a single-tracker router, `sharded_app()` creates a 16-shard router, `request_with_connect_info()` attaches a mock `SocketAddr` (required because handlers extract client IP from connect info).
+
+MCP tests drive `/mcp` with raw JSON-RPC via `Router::oneshot()`: send `initialize`, then `tools/list` / `tools/call` with an `MCP-Protocol-Version: 2025-06-18` header. `tower::oneshot` requests must also include a `Host` header because rmcp validates it even when the host allowlist is disabled.
 
 **Running tests:**
 ```bash
@@ -231,7 +233,8 @@ GitHub Actions workflows:
 --peer-timeout-secs       RUSTRACKER_PEER_TIMEOUT_SECS       default: 3000
 --blacklist               RUSTRACKER_BLACKLIST               optional: path to blacklist file
 --trends-file             RUSTRACKER_TRENDS_FILE             optional: path to trends JSONL
---admin-token             RUSTRACKER_ADMIN_TOKEN             optional: bearer token for admin API
+--admin-token             RUSTRACKER_ADMIN_TOKEN             optional: bearer token for admin API and MCP
+--no-mcp                  RUSTRACKER_NO_MCP                  default: false — set to disable /mcp even when an admin token is configured
 --trust-proxy-headers     RUSTRACKER_TRUST_PROXY_HEADERS     default: false — trust CF-Connecting-IP / X-Real-IP / X-Forwarded-For for the announce client IP; enable only when reachable exclusively through a trusted proxy (any client can spoof these headers otherwise)
 ```
 
@@ -248,5 +251,10 @@ All flags support env var fallback. CLI takes precedence over env vars. `--inter
 - `GET /api/clients/list` — All connected client types sorted by current peer count (snapshot)
 - `GET /api/top100` — Top 100 torrents by peers/seeders/leechers/downloaded (`limit` query param, max 500)
 - `GET /api/blacklist?info_hash=<40-char-hex>` — Authenticated read-only blacklist status endpoint; returns `blacklisted: true/false`
+- `GET /api/blacklist?offset=<n>&limit=<n>` — Authenticated paginated listing (sorted, default limit 100, max 1000); returns `total`, `offset`, `limit`, `entries`
 - `POST /api/blacklist` — Authenticated admin endpoint that appends a 40-char hex `info_hash` to the configured blacklist file, then updates the in-memory blacklist; requires `Authorization: Bearer <admin-token>`
+- `DELETE /api/blacklist?info_hash=<40-char-hex>` — Authenticated, idempotent removal; atomically rewrites the file and returns `removed: true/false`
+- `POST /mcp` — MCP Streamable HTTP endpoint (stateless, JSON responses). Requires the same Bearer token. Tools: `blacklist_check`, `blacklist_add`, `blacklist_list`, `blacklist_remove`. Mounted only when an admin token is configured and `--no-mcp` is not set.
 - `GET /` — Web dashboard (requires `dashboard` feature)
+
+Blacklist mutations append JSONL audit records to `<blacklist>.audit.jsonl`. MCP uses the same `BlacklistAdmin` service as the HTTP handlers, so validation, persistence, and audit behavior are shared.

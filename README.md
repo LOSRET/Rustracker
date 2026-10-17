@@ -72,7 +72,8 @@ Download the latest release from [GitHub Releases](https://github.com/LOSRET/Rus
 | `--peer-timeout-secs` | `RUSTRACKER_PEER_TIMEOUT_SECS` | `3000` | Peer expiry timeout (seconds) |
 | `--blacklist` | `RUSTRACKER_BLACKLIST` | — | Path to torrent blacklist file |
 | `--trends-file` | `RUSTRACKER_TRENDS_FILE` | — | Path to persist trend JSONL data |
-| `--admin-token` | `RUSTRACKER_ADMIN_TOKEN` | — | Bearer token required for admin API endpoints |
+| `--admin-token` | `RUSTRACKER_ADMIN_TOKEN` | — | Bearer token required for admin API and MCP endpoints |
+| `--no-mcp` | `RUSTRACKER_NO_MCP` | `false` | Disable `/mcp` even when an admin token is configured |
 
 Every flag can be set via environment variable or command-line argument. Command-line takes precedence.
 
@@ -196,6 +197,67 @@ curl -X POST http://127.0.0.1:8080/api/blacklist \
 
 The endpoint appends the 40-character hex `info_hash` to the blacklist file first, then updates the in-memory blacklist. Duplicate entries return success with `"added": false`.
 
+List entries (sorted, paginated; `limit` defaults to 100 and is capped at 1000):
+
+```bash
+curl "http://127.0.0.1:8080/api/blacklist?limit=100&offset=0" \
+  -H "Authorization: Bearer $RUSTRACKER_ADMIN_TOKEN"
+```
+
+The response is `{"ok":true,"total":1,"offset":0,"limit":100,"entries":["0123..."],"error":null}`.
+
+Remove an entry:
+
+```bash
+curl -X DELETE "http://127.0.0.1:8080/api/blacklist?info_hash=0123456789abcdef0123456789abcdef01234567" \
+  -H "Authorization: Bearer $RUSTRACKER_ADMIN_TOKEN"
+```
+
+Removal rewrites the file atomically. `"removed": true` means an entry existed; `"removed": false` means the call was already a no-op.
+
+Every add/remove attempt is appended to `<blacklist-stem>.audit.jsonl` next to the blacklist file (for example, `blacklist.txt` → `blacklist.audit.jsonl`), one JSON object per line: timestamp, action, info_hash, source (`http` or `mcp`), result, and client IP when available.
+
+The blacklist file is designed for a single tracker process. If multiple instances share it, coordinate writes externally; removal performs a read-modify-write and has no cross-process lock.
+
+### MCP endpoint
+
+When `RUSTRACKER_ADMIN_TOKEN` is set, the tracker also exposes an MCP server at `/mcp` using the Streamable HTTP transport (stateless, JSON responses). It reuses the admin Bearer token and provides four tools:
+
+| Tool | Description |
+|------|-------------|
+| `blacklist_check` | Check whether an info_hash is blacklisted (read-only) |
+| `blacklist_add` | Add an info_hash (idempotent) |
+| `blacklist_list` | List info_hashes with `offset`/`limit` |
+| `blacklist_remove` | Remove an info_hash (idempotent) |
+
+Disable it with `--no-mcp` or `RUSTRACKER_NO_MCP=1`. Tokens shorter than 32 characters trigger a startup warning.
+
+OpenCode (`opencode.json`):
+
+```json
+{
+  "mcp": {
+    "rustracker": {
+      "type": "remote",
+      "url": "https://tracker.example.com/mcp",
+      "enabled": true,
+      "headers": {
+        "Authorization": "Bearer <admin-token>"
+      }
+    }
+  }
+}
+```
+
+Claude Code:
+
+```bash
+claude mcp add --transport http rustracker https://tracker.example.com/mcp \
+  --header "Authorization: Bearer $RUSTRACKER_ADMIN_TOKEN"
+```
+
+MCP is a write-capable admin surface: use HTTPS and a strong token, and keep `/mcp` behind your existing reverse proxy or Cloudflare setup. Host-header validation is intentionally permissive so public deployments work; the bearer token is the access boundary.
+
 ## Trend Data Persistence
 
 By default, trend data (torrents, peers, seeders, leechers, client distribution) lives in memory and is lost on restart. To persist:
@@ -247,7 +309,7 @@ rustracker/
 ├── src/
 │   ├── core/          # Tracker engine (no I/O): types, tracker, swarm, topk, counters
 │   ├── protocol/      # BT protocol: bencode, announce, client_id (102 clients)
-│   └── server/        # HTTP layer: handlers, admin, pool (64 shards), blacklist, trends
+│   └── server/        # HTTP layer: handlers, admin, mcp, pool (64 shards), blacklist, audit, trends
 ├── frontend/          # Vue 3 + Vite + Tailwind dashboard SPA (embedded at compile time)
 ├── examples/          # Load testing and benchmarking tools
 ├── tests/             # Integration tests
@@ -276,6 +338,8 @@ Client tags are exposed in the `/api/clients` endpoint and the dashboard's clien
 
 Release packages include `install-linux.sh`. Place the Linux binary and the script in the same directory, then run `sudo sh install-linux.sh` for an interactive menu (install/update, start/stop/restart, config, system tuning). Non-interactive commands like `install`, `start`, `stop`, `status` are also supported.
 
+The installer asks whether to enable the `/mcp` endpoint. Choosing no writes `RUSTRACKER_NO_MCP=1` to `/etc/rustracker.env`; the default keeps MCP enabled.
+
 **Default file layout after installation:**
 
 | Path | Description |
@@ -283,6 +347,7 @@ Release packages include `install-linux.sh`. Place the Linux binary and the scri
 | `/opt/rustracker/rustracker` | Binary |
 | `/etc/rustracker.env` | Environment config, including the generated Admin Token |
 | `/etc/rustracker/blacklist.txt` | Torrent blacklist |
+| `/etc/rustracker/blacklist.audit.jsonl` | Blacklist mutation audit log (created on first write) |
 | `/var/lib/rustracker/trends.jsonl` | Trend data |
 | `/etc/systemd/system/rustracker.service` | systemd unit |
 
