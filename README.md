@@ -1,6 +1,6 @@
 [中文](./README-zh.md) | English
 
-> **AI agents:** for a Linux production install runbook, see [agent-install.md](./agent-install.md).
+> **AI agents:** for a Linux production install runbook that asks for the required settings, see [agent-install.md](./agent-install.md).
 
 # Rustracker
 

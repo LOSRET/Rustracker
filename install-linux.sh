@@ -253,7 +253,9 @@ install_app() {
         printf '# rustracker torrent blacklist\n# one 40-char hex info_hash per line\n' > "$BLACKLIST_PATH"
     fi
 
-    mkdir -p "$(dirname "$TRENDS_FILE_PATH")"
+    if [ -n "${TRENDS:-}" ]; then
+        mkdir -p "$(dirname "$TRENDS")"
+    fi
 
     systemctl daemon-reload
     systemctl enable "$APP_NAME" >/dev/null 2>&1 || true
