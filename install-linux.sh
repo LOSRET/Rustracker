@@ -15,19 +15,26 @@ BLACKLIST_AUDIT_PATH="/etc/rustracker/blacklist.audit.jsonl"
 TRENDS_FILE_PATH="/var/lib/rustracker/trends.jsonl"
 SYSCTL_PATH="/etc/sysctl.d/99-rustracker.conf"
 LIMITS_PATH="/etc/security/limits.d/rustracker.conf"
+# install --yes: skip prompts; use environment variables, existing config, then defaults.
+NON_INTERACTIVE=false
 
 load_existing_config() {
     LISTEN_DEFAULT=$DEFAULT_LISTEN
     INTERVAL_DEFAULT=$DEFAULT_INTERVAL
     TIMEOUT_DEFAULT=$DEFAULT_TIMEOUT
+    TRENDS_DEFAULT=$TRENDS_FILE_PATH
+    ADMIN_TOKEN_DEFAULT=""
     MALLOC_CONF_DEFAULT=$DEFAULT_MALLOC_CONF
+    TRUST_PROXY_DEFAULT=true
     MCP_DEFAULT=true
 
     if [ -f "$ENV_PATH" ]; then
         LISTEN_DEFAULT=$(grep '^RUSTRACKER_LISTEN=' "$ENV_PATH" | tail -n 1 | cut -d= -f2- || true)
         INTERVAL_DEFAULT=$(grep '^RUSTRACKER_INTERVAL_SECS=' "$ENV_PATH" | tail -n 1 | cut -d= -f2- || true)
         TIMEOUT_DEFAULT=$(grep '^RUSTRACKER_PEER_TIMEOUT_SECS=' "$ENV_PATH" | tail -n 1 | cut -d= -f2- || true)
-        TRENDS_DEFAULT=$(grep '^RUSTRACKER_TRENDS_FILE=' "$ENV_PATH" | tail -n 1 | cut -d= -f2- || true)
+        if grep -q '^RUSTRACKER_TRENDS_FILE=' "$ENV_PATH"; then
+            TRENDS_DEFAULT=$(grep '^RUSTRACKER_TRENDS_FILE=' "$ENV_PATH" | tail -n 1 | cut -d= -f2- || true)
+        fi
         ADMIN_TOKEN_DEFAULT=$(grep '^RUSTRACKER_ADMIN_TOKEN=' "$ENV_PATH" | tail -n 1 | cut -d= -f2- || true)
         MALLOC_CONF_DEFAULT=$(grep '^MALLOC_CONF=' "$ENV_PATH" | tail -n 1 | cut -d= -f2- || true)
         TRUST_PROXY_DEFAULT=$(grep '^RUSTRACKER_TRUST_PROXY_HEADERS=' "$ENV_PATH" | tail -n 1 | cut -d= -f2- || true)
@@ -39,13 +46,8 @@ load_existing_config() {
         LISTEN_DEFAULT=${LISTEN_DEFAULT:-$DEFAULT_LISTEN}
         INTERVAL_DEFAULT=${INTERVAL_DEFAULT:-$DEFAULT_INTERVAL}
         TIMEOUT_DEFAULT=${TIMEOUT_DEFAULT:-$DEFAULT_TIMEOUT}
-        TRENDS_DEFAULT=${TRENDS_DEFAULT:-$TRENDS_FILE_PATH}
         MALLOC_CONF_DEFAULT=${MALLOC_CONF_DEFAULT:-$DEFAULT_MALLOC_CONF}
         TRUST_PROXY_DEFAULT=${TRUST_PROXY_DEFAULT:-true}
-    else
-        TRENDS_DEFAULT=$TRENDS_FILE_PATH
-        ADMIN_TOKEN_DEFAULT=""
-        TRUST_PROXY_DEFAULT=true
     fi
 }
 
@@ -78,6 +80,18 @@ pause() {
     read _
 }
 
+ask() {
+    # $1: prompt, $2: default value. Sets ASK_REPLY.
+    ASK_REPLY=$2
+    if [ "$NON_INTERACTIVE" = "true" ]; then
+        return 0
+    fi
+    printf "%s [%s]: " "$1" "$2"
+    # shellcheck disable=SC2162
+    read ASK_REPLY || true
+    ASK_REPLY=${ASK_REPLY:-$2}
+}
+
 find_binary() {
     if [ -n "${RUSTRACKER_BINARY:-}" ] && [ -f "$RUSTRACKER_BINARY" ]; then
         printf '%s\n' "$RUSTRACKER_BINARY"
@@ -106,40 +120,47 @@ find_binary() {
 write_env() {
     load_existing_config
 
-    printf "监听地址或端口 [%s]: " "$LISTEN_DEFAULT"
-    read LISTEN || true
-    LISTEN=${LISTEN:-$LISTEN_DEFAULT}
-    LISTEN=$(normalize_listen "$LISTEN")
+    if [ "$NON_INTERACTIVE" = "true" ]; then
+        LISTEN_DEFAULT=${RUSTRACKER_LISTEN:-$LISTEN_DEFAULT}
+        INTERVAL_DEFAULT=${RUSTRACKER_INTERVAL_SECS:-$INTERVAL_DEFAULT}
+        TIMEOUT_DEFAULT=${RUSTRACKER_PEER_TIMEOUT_SECS:-$TIMEOUT_DEFAULT}
+        TRENDS_DEFAULT=${RUSTRACKER_TRENDS_FILE:-$TRENDS_DEFAULT}
+        TRUST_PROXY_DEFAULT=${RUSTRACKER_TRUST_PROXY_HEADERS:-$TRUST_PROXY_DEFAULT}
+        ADMIN_TOKEN_DEFAULT=${RUSTRACKER_ADMIN_TOKEN:-$ADMIN_TOKEN_DEFAULT}
+
+        case "${RUSTRACKER_NO_MCP:-}" in
+            1|true|TRUE|yes|YES|on|ON) MCP_DEFAULT=false ;;
+            0|false|FALSE|no|NO|off|OFF) MCP_DEFAULT=true ;;
+        esac
+    fi
+
+    ask "监听地址或端口" "$LISTEN_DEFAULT"
+    LISTEN=$(normalize_listen "$ASK_REPLY")
     [ -n "$LISTEN" ] || LISTEN=$DEFAULT_LISTEN
 
-    printf "上报间隔秒数 [%s]: " "$INTERVAL_DEFAULT"
-    read INTERVAL || true
-    INTERVAL=${INTERVAL:-$INTERVAL_DEFAULT}
+    ask "上报间隔秒数" "$INTERVAL_DEFAULT"
+    INTERVAL=$ASK_REPLY
     case "$INTERVAL" in
         ''|*[!0-9]*) INTERVAL=$INTERVAL_DEFAULT ;;
     esac
 
-    printf "Peer 超时秒数 [%s]: " "$TIMEOUT_DEFAULT"
-    read TIMEOUT || true
-    TIMEOUT=${TIMEOUT:-$TIMEOUT_DEFAULT}
+    ask "Peer 超时秒数" "$TIMEOUT_DEFAULT"
+    TIMEOUT=$ASK_REPLY
     case "$TIMEOUT" in
         ''|*[!0-9]*) TIMEOUT=$TIMEOUT_DEFAULT ;;
     esac
 
-    printf "趋势数据落盘路径（输入 none 禁用）[%s]: " "$TRENDS_DEFAULT"
-    read TRENDS || true
-    TRENDS=${TRENDS:-$TRENDS_DEFAULT}
+    ask "趋势数据落盘路径（输入 none 禁用）" "$TRENDS_DEFAULT"
+    TRENDS=$ASK_REPLY
     case "$TRENDS" in
         none|NONE|None) TRENDS="" ;;
     esac
 
-    printf "信任代理头（CF-Connecting-IP / X-Real-IP / X-Forwarded-For）[%s]（true/false）: " "$TRUST_PROXY_DEFAULT"
-    read TRUST_PROXY || true
-    TRUST_PROXY=${TRUST_PROXY:-$TRUST_PROXY_DEFAULT}
+    ask "信任代理头（CF-Connecting-IP / X-Real-IP / X-Forwarded-For）（true/false）" "$TRUST_PROXY_DEFAULT"
+    TRUST_PROXY=$ASK_REPLY
 
-    printf "启用 MCP 管理端点 /mcp（需要 admin token）[%s]（true/false）: " "$MCP_DEFAULT"
-    read MCP_ENABLED || true
-    MCP_ENABLED=${MCP_ENABLED:-$MCP_DEFAULT}
+    ask "启用 MCP 管理端点 /mcp（需要 admin token）（true/false）" "$MCP_DEFAULT"
+    MCP_ENABLED=$ASK_REPLY
     case "$MCP_ENABLED" in
         false|FALSE|False|0|no|NO|n|N) MCP_NO=true ;;
         *) MCP_NO=false ;;
@@ -248,7 +269,11 @@ install_app() {
         echo "MCP：/mcp（需要 Admin Token）"
     fi
     echo "审计日志：$BLACKLIST_AUDIT_PATH（首次写入时创建）"
-    echo "趋势数据：$TRENDS_FILE_PATH"
+    if [ -n "${TRENDS:-}" ]; then
+        echo "趋势数据：$TRENDS"
+    else
+        echo "趋势数据：已禁用"
+    fi
     echo "目录：$INSTALL_DIR"
 }
 
@@ -425,7 +450,21 @@ menu() {
 }
 
 case "${1:-menu}" in
-    install) install_app ;;
+    install)
+        shift || true
+        while [ "$#" -gt 0 ]; do
+            case "$1" in
+                --yes|-y|--non-interactive) NON_INTERACTIVE=true ;;
+                *)
+                    echo "未知参数：$1" >&2
+                    echo "用法：sh install-linux.sh install [--yes]" >&2
+                    exit 1
+                    ;;
+            esac
+            shift
+        done
+        install_app
+        ;;
     uninstall) uninstall_app ;;
     start) service_action start ;;
     stop) service_action stop ;;
@@ -437,7 +476,7 @@ case "${1:-menu}" in
     tune) need_root; apply_sysctl; apply_limits; echo "系统优化已应用。" ;;
     menu) menu ;;
     *)
-        echo "用法：sh install-linux.sh [menu|install|uninstall|start|stop|restart|status|config|configure|token|tune]"
+        echo "用法：sh install-linux.sh [menu|install [--yes]|uninstall|start|stop|restart|status|config|configure|token|tune]"
         exit 1
         ;;
 esac
