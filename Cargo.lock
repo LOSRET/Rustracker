@@ -1441,7 +1441,7 @@ dependencies = [
 
 [[package]]
 name = "rustracker"
-version = "0.2.36"
+version = "0.2.37"
 dependencies = [
  "anyhow",
  "axum",
