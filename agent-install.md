@@ -162,7 +162,7 @@ sudo env \
 | `RUSTRACKER_LISTEN` | `[::]:8080` | 监听地址（IP:端口）；只写端口时自动补成 `[::]:端口` |
 | `RUSTRACKER_INTERVAL_SECS` | `1800` | 返回给 peer 的 announce 间隔 |
 | `RUSTRACKER_PEER_TIMEOUT_SECS` | `3000` | peer 过期时间 |
-| `RUSTRACKER_TRENDS_FILE` | `/var/lib/rustracker/trends.jsonl` | 趋势数据路径；设为 `none` 禁用持久化 |
+| `RUSTRACKER_TRENDS_FILE` | `/var/lib/rustracker/trends.jsonl` | 趋势数据路径；安装器会创建父目录；设为 `none` 禁用持久化 |
 | `RUSTRACKER_TRUST_PROXY_HEADERS` | `true` | 仅在可信反向代理后设为 `true`；直连公网应设为 `false` |
 | `RUSTRACKER_NO_MCP` | `false` | 设为 `true` 禁用 `/mcp` |
 
