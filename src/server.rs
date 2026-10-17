@@ -14,12 +14,15 @@ use tokio::net::TcpListener;
 use crate::core::tracker::Tracker;
 
 mod admin;
+mod audit;
 mod blacklist;
 pub(crate) mod handlers;
+mod mcp;
 mod pool;
 mod rps;
 mod trends;
 
+use audit::AuditLog;
 use blacklist::BlacklistStore;
 use pool::TrackerPool;
 pub use pool::DEFAULT_TRACKER_SHARDS;
@@ -31,8 +34,10 @@ pub struct AppState {
     pub(crate) tracker: Arc<TrackerPool>,
     pub(crate) trends: TrendsState,
     pub(crate) blacklist: Arc<BlacklistStore>,
+    pub(crate) audit: Arc<AuditLog>,
     pub(crate) admin_token: Option<String>,
     pub(crate) trust_proxy_headers: bool,
+    pub(crate) mcp_enabled: bool,
     pub(crate) started_at: Instant,
     pub(crate) rps: RpsMeter,
     #[cfg(feature = "dashboard")]
@@ -45,8 +50,10 @@ impl AppState {
             tracker: Arc::new(TrackerPool::single(tracker)),
             trends: TrendsState::new(trends_file),
             blacklist: Arc::new(BlacklistStore::new(None)),
+            audit: Arc::new(AuditLog::new(None)),
             admin_token: None,
             trust_proxy_headers: false,
+            mcp_enabled: true,
             started_at: Instant::now(),
             rps: RpsMeter::new(),
             #[cfg(feature = "dashboard")]
@@ -67,12 +74,15 @@ impl AppState {
         admin_token: Option<String>,
         trust_proxy_headers: bool,
     ) -> Self {
+        let audit = Arc::new(AuditLog::new(blacklist_path.as_deref()));
         let state = Self {
             tracker: Arc::new(TrackerPool::new(interval, peer_timeout, shards)),
             trends: TrendsState::new(trends_file),
             blacklist: Arc::new(BlacklistStore::new(blacklist_path)),
+            audit,
             admin_token,
             trust_proxy_headers,
+            mcp_enabled: true,
             started_at: Instant::now(),
             rps: RpsMeter::new(),
             #[cfg(feature = "dashboard")]
@@ -85,10 +95,17 @@ impl AppState {
         blacklist::spawn_watcher(state.blacklist.clone(), blacklist::WATCH_INTERVAL);
         state
     }
+
+    /// Enable or disable the MCP endpoint. MCP still requires an admin token
+    /// to be configured; this only provides an explicit opt-out.
+    pub fn with_mcp(mut self, enabled: bool) -> Self {
+        self.mcp_enabled = enabled;
+        self
+    }
 }
 
 pub fn router(state: AppState) -> Router {
-    let r = Router::new()
+    let mut r = Router::new()
         .route("/api/stats", get(handlers::stats))
         .route("/api/trends", get(handlers::trends))
         .route("/api/clients", get(handlers::clients))
@@ -96,22 +113,42 @@ pub fn router(state: AppState) -> Router {
         .route("/api/top100", get(handlers::top100))
         .route(
             "/api/blacklist",
-            get(admin::blacklist_status).post(admin::add_blacklist),
+            get(admin::blacklist_get)
+                .post(admin::add_blacklist)
+                .delete(admin::remove_blacklist),
         )
         .route("/announce", get(handlers::announce))
         .route("/scrape", get(handlers::scrape))
         .route("/healthz", get(handlers::healthz));
 
     #[cfg(feature = "dashboard")]
-    let r = r
-        .route("/", get(handlers::index))
-        .route("/assets/{*name}", get(handlers::asset));
-
-    #[cfg(feature = "dashboard")]
-    let r = r.fallback(handlers::spa_fallback);
+    {
+        r = r
+            .route("/", get(handlers::index))
+            .route("/assets/{*name}", get(handlers::asset))
+            .fallback(handlers::spa_fallback);
+    }
 
     #[cfg(not(feature = "dashboard"))]
-    let r = r.fallback(handlers::not_found);
+    {
+        r = r.fallback(handlers::not_found);
+    }
+
+    let mcp_enabled = state.mcp_enabled
+        && state
+            .admin_token
+            .as_deref()
+            .is_some_and(|token| !token.is_empty());
+    if mcp_enabled {
+        // Auth is layered on a dedicated sub-router so it only guards /mcp.
+        let mcp_router = Router::new()
+            .nest_service("/mcp", mcp::service(state.clone()))
+            .layer(axum::middleware::from_fn_with_state(
+                state.clone(),
+                admin::mcp_auth,
+            ));
+        r = r.merge(mcp_router);
+    }
 
     r.with_state(state)
 }

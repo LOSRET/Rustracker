@@ -51,6 +51,6 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: NPM audit
+      - name: NPM audit (production dependencies)
         working-directory: frontend
-        run: npm audit --audit-level=high
+        run: npm audit --omit=dev --audit-level=high

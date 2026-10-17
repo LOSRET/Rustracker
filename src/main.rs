@@ -61,6 +61,10 @@ struct Args {
     #[arg(long, env = "RUSTRACKER_ADMIN_TOKEN")]
     admin_token: Option<String>,
 
+    /// Disable the MCP endpoint even when an admin token is configured.
+    #[arg(long, env = "RUSTRACKER_NO_MCP")]
+    no_mcp: bool,
+
     /// Trust proxy headers (CF-Connecting-IP / X-Real-IP / X-Forwarded-For)
     /// for the announce client IP. Off by default: any client could spoof
     /// these headers to inject arbitrary IPs into peer lists. Enable only
@@ -79,15 +83,34 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
 
-    let app = router(AppState::sharded_with_blacklist_file(
-        Duration::from_secs(args.interval_secs),
-        Duration::from_secs(args.peer_timeout_secs),
-        DEFAULT_TRACKER_SHARDS,
-        args.blacklist,
-        args.trends_file,
-        args.admin_token,
-        args.trust_proxy_headers,
-    ));
+    if !args.no_mcp {
+        if let Some(token) = args
+            .admin_token
+            .as_deref()
+            .filter(|token| !token.is_empty())
+        {
+            if token.len() < 32 {
+                tracing::warn!(
+                    token_len = token.len(),
+                    "admin token is shorter than 32 characters; the MCP endpoint is enabled with a weak token"
+                );
+            }
+            info!("MCP endpoint enabled at /mcp");
+        }
+    }
+
+    let app = router(
+        AppState::sharded_with_blacklist_file(
+            Duration::from_secs(args.interval_secs),
+            Duration::from_secs(args.peer_timeout_secs),
+            DEFAULT_TRACKER_SHARDS,
+            args.blacklist,
+            args.trends_file,
+            args.admin_token,
+            args.trust_proxy_headers,
+        )
+        .with_mcp(!args.no_mcp),
+    );
     let mut listeners = Vec::with_capacity(args.listen.len());
     for addr in &args.listen {
         let listener = TcpListener::bind(addr)
