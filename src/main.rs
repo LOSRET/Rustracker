@@ -62,14 +62,30 @@ struct Args {
     admin_token: Option<String>,
 
     /// Disable the MCP endpoint even when an admin token is configured.
-    #[arg(long, env = "RUSTRACKER_NO_MCP")]
+    #[arg(
+        long,
+        env = "RUSTRACKER_NO_MCP",
+        action = clap::ArgAction::Set,
+        num_args = 0..=1,
+        default_missing_value = "true",
+        default_value_t = false,
+        value_parser = clap::builder::BoolishValueParser::new()
+    )]
     no_mcp: bool,
 
     /// Trust proxy headers (CF-Connecting-IP / X-Real-IP / X-Forwarded-For)
     /// for the announce client IP. Off by default: any client could spoof
     /// these headers to inject arbitrary IPs into peer lists. Enable only
     /// when the tracker is reachable exclusively through a trusted proxy.
-    #[arg(long, env = "RUSTRACKER_TRUST_PROXY_HEADERS")]
+    #[arg(
+        long,
+        env = "RUSTRACKER_TRUST_PROXY_HEADERS",
+        action = clap::ArgAction::Set,
+        num_args = 0..=1,
+        default_missing_value = "true",
+        default_value_t = false,
+        value_parser = clap::builder::BoolishValueParser::new()
+    )]
     trust_proxy_headers: bool,
 }
 
@@ -156,5 +172,23 @@ async fn shutdown_signal() {
     tokio::select! {
         _ = ctrl_c => {},
         _ = terminate => {},
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bool_env_vars_accept_boolish_values() {
+        for (value, expected) in [("1", true), ("0", false), ("true", true), ("false", false)] {
+            std::env::set_var("RUSTRACKER_NO_MCP", value);
+            std::env::set_var("RUSTRACKER_TRUST_PROXY_HEADERS", value);
+            let args = Args::try_parse_from(["rustracker"]).expect("parse boolish env values");
+            assert_eq!(args.no_mcp, expected);
+            assert_eq!(args.trust_proxy_headers, expected);
+        }
+        std::env::remove_var("RUSTRACKER_NO_MCP");
+        std::env::remove_var("RUSTRACKER_TRUST_PROXY_HEADERS");
     }
 }

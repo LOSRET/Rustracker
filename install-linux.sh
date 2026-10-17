@@ -110,14 +110,21 @@ write_env() {
     read LISTEN || true
     LISTEN=${LISTEN:-$LISTEN_DEFAULT}
     LISTEN=$(normalize_listen "$LISTEN")
+    [ -n "$LISTEN" ] || LISTEN=$DEFAULT_LISTEN
 
     printf "上报间隔秒数 [%s]: " "$INTERVAL_DEFAULT"
     read INTERVAL || true
     INTERVAL=${INTERVAL:-$INTERVAL_DEFAULT}
+    case "$INTERVAL" in
+        ''|*[!0-9]*) INTERVAL=$INTERVAL_DEFAULT ;;
+    esac
 
     printf "Peer 超时秒数 [%s]: " "$TIMEOUT_DEFAULT"
     read TIMEOUT || true
     TIMEOUT=${TIMEOUT:-$TIMEOUT_DEFAULT}
+    case "$TIMEOUT" in
+        ''|*[!0-9]*) TIMEOUT=$TIMEOUT_DEFAULT ;;
+    esac
 
     printf "趋势数据落盘路径（输入 none 禁用）[%s]: " "$TRENDS_DEFAULT"
     read TRENDS || true
@@ -134,8 +141,13 @@ write_env() {
     read MCP_ENABLED || true
     MCP_ENABLED=${MCP_ENABLED:-$MCP_DEFAULT}
     case "$MCP_ENABLED" in
-        false|FALSE|False|0|no|NO|n|N) MCP_NO=1 ;;
-        *) MCP_NO=0 ;;
+        false|FALSE|False|0|no|NO|n|N) MCP_NO=true ;;
+        *) MCP_NO=false ;;
+    esac
+
+    case "$TRUST_PROXY" in
+        1|true|TRUE|yes|YES|on|ON) TRUST_PROXY=true ;;
+        *) TRUST_PROXY=false ;;
     esac
 
     ADMIN_TOKEN=${ADMIN_TOKEN_DEFAULT:-$(generate_admin_token)}
@@ -230,7 +242,7 @@ install_app() {
     echo "服务：$APP_NAME"
     echo "配置：$ENV_PATH"
     echo "黑名单：$BLACKLIST_PATH"
-    if [ "${MCP_NO:-0}" = "1" ]; then
+    if [ "${MCP_NO:-false}" = "true" ]; then
         echo "MCP：已禁用"
     else
         echo "MCP：/mcp（需要 Admin Token）"
@@ -251,7 +263,7 @@ configure_app() {
 
     echo "配置已更新。"
     echo "配置：$ENV_PATH"
-    if [ "${MCP_NO:-0}" = "1" ]; then
+    if [ "${MCP_NO:-false}" = "true" ]; then
         echo "MCP：已禁用"
     else
         echo "MCP：/mcp（需要 Admin Token）"

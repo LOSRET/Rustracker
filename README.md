@@ -338,7 +338,7 @@ Client tags are exposed in the `/api/clients` endpoint and the dashboard's clien
 
 Release packages include `install-linux.sh`. Place the Linux binary and the script in the same directory, then run `sudo sh install-linux.sh` for an interactive menu (install/update, start/stop/restart, config, system tuning). Non-interactive commands like `install`, `start`, `stop`, `status` are also supported.
 
-The installer asks whether to enable the `/mcp` endpoint. Choosing no writes `RUSTRACKER_NO_MCP=1` to `/etc/rustracker.env`; the default keeps MCP enabled.
+The installer asks whether to enable the `/mcp` endpoint. Choosing no writes `RUSTRACKER_NO_MCP=true` to `/etc/rustracker.env`; the default keeps MCP enabled. Both `true`/`false` and `1`/`0` are accepted.
 
 **Default file layout after installation:**
 

@@ -338,7 +338,7 @@ Tracker 可从 peer ID 前缀识别 **102 种 BitTorrent 客户端**，包括：
 
 发布包中包含 `install-linux.sh`。将 Linux 二进制文件和脚本放在同一目录下，运行 `sudo sh install-linux.sh` 即可进入交互菜单（安装/更新、启动/停止/重启、配置、系统优化）。也支持 `install`、`start`、`stop`、`status` 等非交互式命令。
 
-安装脚本会询问是否启用 `/mcp` 管理端点。选择否则写入 `RUSTRACKER_NO_MCP=1`；默认保持启用。
+安装脚本会询问是否启用 `/mcp` 管理端点。选择否会写入 `RUSTRACKER_NO_MCP=true`；默认保持启用。`true`/`false` 和 `1`/`0` 均可使用。
 
 **安装后的默认文件布局：**
 
