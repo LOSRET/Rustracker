@@ -230,31 +230,26 @@ When `RUSTRACKER_ADMIN_TOKEN` is set, the tracker also exposes an MCP server at 
 | `blacklist_list` | List info_hashes with `offset`/`limit` |
 | `blacklist_remove` | Remove an info_hash (idempotent) |
 
+The endpoint returns server `instructions` during MCP initialization, so a client knows what the four tools do and that `info_hash` is a 40-character hex string without extra prompting.
+
 Disable it with `--no-mcp` or `RUSTRACKER_NO_MCP=1`. Tokens shorter than 32 characters trigger a startup warning.
 
-OpenCode (`opencode.json`):
+### Client setup
 
-```json
-{
-  "mcp": {
-    "rustracker": {
-      "type": "remote",
-      "url": "https://tracker.example.com/mcp",
-      "enabled": true,
-      "headers": {
-        "Authorization": "Bearer <admin-token>"
-      }
-    }
-  }
-}
+`/mcp` speaks MCP Streamable HTTP and authenticates with the same admin token as the REST admin API — send it as a static request header:
+
+```http
+Authorization: Bearer <admin-token>
 ```
 
-Claude Code:
+The endpoint does not implement OAuth, so configure that header as a static credential rather than signing in.
 
-```bash
-claude mcp add --transport http rustracker https://tracker.example.com/mcp \
-  --header "Authorization: Bearer $RUSTRACKER_ADMIN_TOKEN"
-```
+Client configuration syntax changes between releases — OpenCode, for example, moved server entries under `mcp.servers` in v2 — so take the snippet from the client's own documentation instead of copying one from here:
+
+- [OpenCode — MCP servers](https://opencode.ai/v2/docs/mcp-servers)
+- [Claude Code — Connect to tools via MCP](https://code.claude.com/docs/en/mcp)
+- [DeepSeek Harness — MCP client (`@deepseek-ai/dsh-mcp-client`)](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/mcp/mcp-client/README.md)
+- [Other clients — Connect to remote MCP servers](https://modelcontextprotocol.io/docs/develop/connect-remote-servers)
 
 MCP is a write-capable admin surface: use HTTPS and a strong token, and keep `/mcp` behind your existing reverse proxy or Cloudflare setup. Host-header validation is intentionally permissive so public deployments work; the bearer token is the access boundary.
 

@@ -230,31 +230,26 @@ curl -X DELETE "http://127.0.0.1:8080/api/blacklist?info_hash=0123456789abcdef01
 | `blacklist_list` | 分页列出 info_hash（`offset`/`limit`） |
 | `blacklist_remove` | 删除 info_hash（幂等） |
 
+端点会在 MCP 初始化时返回服务端 `instructions`，客户端无需额外提示就能知道这四个工具的用途，以及 `info_hash` 是 40 位十六进制字符串。
+
 使用 `--no-mcp` 或 `RUSTRACKER_NO_MCP=1` 可禁用。token 少于 32 字符时启动日志会给出警告。
 
-OpenCode（`opencode.json`）：
+### 客户端接入
 
-```json
-{
-  "mcp": {
-    "rustracker": {
-      "type": "remote",
-      "url": "https://tracker.example.com/mcp",
-      "enabled": true,
-      "headers": {
-        "Authorization": "Bearer <admin-token>"
-      }
-    }
-  }
-}
+`/mcp` 使用 MCP Streamable HTTP，鉴权复用 admin token —— 以静态请求头发送：
+
+```http
+Authorization: Bearer <admin-token>
 ```
 
-Claude Code：
+端点不实现 OAuth，因此把这个头配成静态凭据，不要走登录流程。
 
-```bash
-claude mcp add --transport http rustracker https://tracker.example.com/mcp \
-  --header "Authorization: Bearer $RUSTRACKER_ADMIN_TOKEN"
-```
+客户端配置语法会随版本变化（例如 OpenCode 在 v2 把服务条目移到了 `mcp.servers` 下），所以请以客户端自己的文档为准，不要照抄本 README：
+
+- [OpenCode —— MCP servers](https://opencode.ai/v2/docs/mcp-servers)
+- [Claude Code —— Connect to tools via MCP](https://code.claude.com/docs/en/mcp)
+- [DeepSeek Harness —— MCP client（`@deepseek-ai/dsh-mcp-client`）](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/mcp/mcp-client/README.md)
+- [其他客户端 —— Connect to remote MCP servers](https://modelcontextprotocol.io/docs/develop/connect-remote-servers)
 
 MCP 是可写的管理面：请使用 HTTPS 和强 token，并让 `/mcp` 继续走现有的反向代理或 Cloudflare。Host 头校验被有意放宽以适配公网部署，访问边界由 Bearer token 承担。
 
