@@ -1,6 +1,6 @@
 [English](./README.md) | 中文
 
-> **AI Agent：** Linux 生产安装请见 [agent-install.md](./agent-install.md)。
+> **AI Agent：** Linux 生产安装（会先向用户确认配置）请见 [agent-install.md](./agent-install.md)。
 
 # Rustracker
 
