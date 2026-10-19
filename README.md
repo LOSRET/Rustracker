@@ -249,6 +249,17 @@ Authorization: Bearer <admin-token>
 
 The endpoint does not implement OAuth, so configure that header as a static credential rather than signing in.
 
+Requests must look like this:
+
+```http
+POST /mcp
+Authorization: Bearer <admin-token>
+Content-Type: application/json
+Accept: application/json, text/event-stream
+```
+
+The `Accept` header has to list **both** media types even though the server only ever replies with JSON — that is part of the MCP Streamable HTTP transport, and a client that sends `Accept: application/json` alone is rejected with `406 Not Acceptable`. A non-JSON `Content-Type` is rejected with `415 Unsupported Media Type`. The `MCP-Protocol-Version` header is optional; if you send it, it must be a version the server knows, and on `initialize` it must match the `protocolVersion` in the request body.
+
 Client configuration syntax changes between releases — OpenCode, for example, moved server entries under `mcp.servers` in v2 — so take the snippet from the client's own documentation instead of copying one from here:
 
 - [OpenCode — MCP servers](https://opencode.ai/v2/docs/mcp-servers)
@@ -291,7 +302,7 @@ cargo run --release -- --trends-file /var/lib/rustracker/trends.jsonl
 │  │  BTreeMap<       │  │     ┌─────────────────────────┐
 │  │   InfoHash,      │  │     │   Blacklist Watcher      │
 │  │   Swarm          │  │     │  (5-sec file reload)     │
-│  │  >               │  │     │  HashSet<InfoHash>        │
+│  │  >               │  │     │  BTreeSet<InfoHash>       │
 │  └─────────────────┘  │     └─────────────────────────┘
 │  ... (×64 shards)     │
 └───────────────────────┘

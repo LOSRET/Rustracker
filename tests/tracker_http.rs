@@ -463,14 +463,24 @@ async fn invalid_announce_returns_bencoded_failure() {
         .any(|w| w == b"failure reason"));
 }
 
+/// Unique suffix for temp paths.
+///
+/// The system clock is far too coarse here to keep parallel tests apart: on
+/// this machine 100k back-to-back `SystemTime::now()` calls yielded only
+/// ~25.7k distinct nanosecond values, so two tests routinely picked the
+/// same name, shared one blacklist file, and deleted each other's audit
+/// records. A monotonic counter is unique within the process, and the pid
+/// keeps it unique across processes.
+fn temp_path_seq() -> u64 {
+    static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+}
+
 fn temp_blacklist_path() -> std::path::PathBuf {
     std::env::temp_dir().join(format!(
         "rustracker-test-bl-{}-{}.txt",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        temp_path_seq()
     ))
 }
 
@@ -1248,6 +1258,57 @@ async fn mcp_reports_unconfigured_blacklist_file() {
     );
 }
 
+/// Pins the request contract the README documents for MCP clients.
+#[tokio::test]
+async fn mcp_enforces_streamable_http_request_contract() {
+    let (app, path) = blacklist_app_with_token(Some("secret-token"));
+
+    // `Accept` has to list both media types, even though only JSON is used.
+    let mut request = mcp_request(Some("secret-token"), mcp_initialize());
+    request.headers_mut().insert(
+        header::ACCEPT,
+        header::HeaderValue::from_static("application/json"),
+    );
+    let response = app.clone().oneshot(request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::NOT_ACCEPTABLE);
+
+    // The body has to be JSON.
+    let mut request = mcp_request(Some("secret-token"), mcp_initialize());
+    request.headers_mut().insert(
+        header::CONTENT_TYPE,
+        header::HeaderValue::from_static("text/plain"),
+    );
+    let response = app.clone().oneshot(request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
+
+    // On `initialize` the version header has to match the request body.
+    let mut request = mcp_request(Some("secret-token"), mcp_initialize());
+    request.headers_mut().insert(
+        "MCP-Protocol-Version",
+        header::HeaderValue::from_static("2025-03-26"),
+    );
+    let response = app.clone().oneshot(request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    // An unknown protocol version is rejected.
+    let mut request = mcp_request(
+        Some("secret-token"),
+        mcp_tool_call(
+            2,
+            "blacklist_check",
+            serde_json::json!({"info_hash": "6161616161616161616161616161616161616161"}),
+        ),
+    );
+    request.headers_mut().insert(
+        "MCP-Protocol-Version",
+        header::HeaderValue::from_static("1999-01-01"),
+    );
+    let response = app.oneshot(request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    cleanup(&path);
+}
+
 #[tokio::test]
 async fn no_mcp_flag_disables_endpoint() {
     let (app, path) = blacklist_app_with_options(Some("secret-token"), false);
@@ -1440,10 +1501,7 @@ async fn corrupted_jsonl_first_line_still_loads() {
     let dir = std::env::temp_dir().join(format!(
         "rustracker-test-jsonl-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        temp_path_seq()
     ));
     std::fs::create_dir_all(&dir).unwrap();
 
@@ -1501,10 +1559,7 @@ async fn corrupted_client_trend_subarray_does_not_panic() {
     let dir = std::env::temp_dir().join(format!(
         "rustracker-test-jsonl-client-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        temp_path_seq()
     ));
     std::fs::create_dir_all(&dir).unwrap();
 
@@ -1564,10 +1619,7 @@ async fn blacklist_case_insensitive_hex() {
     let path = std::env::temp_dir().join(format!(
         "rustracker-test-bl-case-{}-{}.txt",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        temp_path_seq()
     ));
     // Use uppercase hex for info_hash
     std::fs::write(&path, "6161616161616161616161616161616161616161\n").unwrap();

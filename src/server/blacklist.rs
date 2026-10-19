@@ -11,7 +11,7 @@
 //! temporary file and renames it over the original, so readers (including
 //! the hot-reload watcher) never observe a half-written blacklist.
 
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -29,7 +29,7 @@ pub(crate) const MAX_LIST_LIMIT: usize = 1000;
 
 pub(crate) struct BlacklistStore {
     path: Option<PathBuf>,
-    set: RwLock<HashSet<InfoHash>>,
+    set: RwLock<BTreeSet<InfoHash>>,
     write_lock: Mutex<()>,
 }
 
@@ -70,7 +70,8 @@ impl BlacklistStore {
     }
 
     /// Return `(total, page)` with entries sorted lexicographically by
-    /// info_hash, so list responses are stable across calls.
+    /// info_hash, so list responses are stable across calls. The store is a
+    /// `BTreeSet`, so the order comes for free — no per-call sort.
     pub(crate) async fn page(&self, offset: usize, limit: usize) -> (usize, Vec<InfoHash>) {
         let set = self.set.read().await;
         let total = set.len();
@@ -78,9 +79,7 @@ impl BlacklistStore {
             return (total, Vec::new());
         }
 
-        let mut hashes: Vec<_> = set.iter().copied().collect();
-        hashes.sort_unstable();
-        let entries = hashes.into_iter().skip(offset).take(limit).collect();
+        let entries = set.iter().copied().skip(offset).take(limit).collect();
         (total, entries)
     }
 
@@ -189,10 +188,10 @@ pub(crate) fn spawn_watcher(store: Arc<BlacklistStore>, interval: Duration) {
 }
 
 /// Parse a blacklist file. Each non-empty, non-comment line is a 40-char hex info_hash.
-pub(crate) fn load_blacklist(path: &Path) -> anyhow::Result<HashSet<InfoHash>> {
+pub(crate) fn load_blacklist(path: &Path) -> anyhow::Result<BTreeSet<InfoHash>> {
     let content = std::fs::read_to_string(path)
         .map_err(|e| anyhow::anyhow!("failed to read {}: {e}", path.display()))?;
-    let set: HashSet<_> = content
+    let set: BTreeSet<_> = content
         .lines()
         .enumerate()
         .filter(|(_, line)| {
@@ -296,16 +295,15 @@ fn file_mtime(path: &Path) -> SystemTime {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     fn temp_path(name: &str) -> PathBuf {
+        // A monotonic counter rather than a timestamp: the system clock is
+        // too coarse to keep parallel tests from picking the same name.
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+        let seq = COUNTER.fetch_add(1, Ordering::Relaxed);
         std::env::temp_dir().join(format!(
-            "rustracker-bl-unit-{}-{}-{name}.txt",
-            std::process::id(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
+            "rustracker-bl-unit-{}-{seq}-{name}.txt",
+            std::process::id()
         ))
     }
 
@@ -384,6 +382,62 @@ mod tests {
         let (total, second) = store.page(2, 2).await;
         assert_eq!(total, 3);
         assert_eq!(second, vec![a]);
+
+        let _ = std::fs::remove_file(&path);
+    }
+
+    /// The listing is ordered by the raw 20-byte key, which has to agree
+    /// with the lexicographic order of the hex strings clients see.
+    #[tokio::test]
+    async fn page_lists_entries_in_lexicographic_hex_order() {
+        let path = temp_path("order");
+        // The keys differ in the first, middle, and last byte, so the
+        // expected order depends on the whole key and not just a prefix.
+        let hashes = [
+            InfoHash::new([
+                0xff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff,
+            ]),
+            InfoHash::new([
+                0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            ]),
+            InfoHash::new([
+                0x7f, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            ]),
+            InfoHash::new([0u8; 20]),
+            InfoHash::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff,
+            ]),
+        ];
+        let mut expected: Vec<String> = hashes.iter().map(|hash| hash.to_string()).collect();
+        expected.sort();
+
+        // Write the entries out of order so the store has to order them.
+        let content: String = hashes
+            .iter()
+            .rev()
+            .map(|hash| format!("{hash}\n"))
+            .collect();
+        std::fs::write(&path, content).unwrap();
+        let store = BlacklistStore::new(Some(path.clone()));
+
+        let (total, page) = store.page(0, 100).await;
+        assert_eq!(total, 5);
+        let listed: Vec<String> = page.iter().map(|hash| hash.to_string()).collect();
+        assert_eq!(listed, expected);
+
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[tokio::test]
+    async fn duplicate_lines_are_deduplicated() {
+        let path = temp_path("dedup");
+        let a = hash("6161616161616161616161616161616161616161");
+        std::fs::write(&path, format!("{a}\n{a}\n{a}\n")).unwrap();
+        let store = BlacklistStore::new(Some(path.clone()));
+
+        let (total, page) = store.page(0, 10).await;
+        assert_eq!(total, 1);
+        assert_eq!(page, vec![a]);
 
         let _ = std::fs::remove_file(&path);
     }

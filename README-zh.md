@@ -249,6 +249,17 @@ Authorization: Bearer <admin-token>
 
 端点不实现 OAuth，因此把这个头配成静态凭据，不要走登录流程。
 
+请求需要长这样：
+
+```http
+POST /mcp
+Authorization: Bearer <admin-token>
+Content-Type: application/json
+Accept: application/json, text/event-stream
+```
+
+`Accept` 头必须**同时**列出两种媒体类型，尽管服务端只会返回 JSON —— 这是 MCP Streamable HTTP 传输本身的要求，只发 `Accept: application/json` 的客户端会被以 `406 Not Acceptable` 拒绝。`Content-Type` 不是 JSON 会被以 `415 Unsupported Media Type` 拒绝。`MCP-Protocol-Version` 头是可选的；如果发送，必须是服务端认识的版本，且在 `initialize` 请求中要和 body 里的 `protocolVersion` 一致。
+
 客户端配置语法会随版本变化（例如 OpenCode 在 v2 把服务条目移到了 `mcp.servers` 下），所以请以客户端自己的文档为准，不要照抄本 README：
 
 - [OpenCode —— MCP servers](https://opencode.ai/v2/docs/mcp-servers)
@@ -291,7 +302,7 @@ cargo run --release -- --trends-file /var/lib/rustracker/trends.jsonl
 │  │  BTreeMap<       │  │     ┌─────────────────────────┐
 │  │   InfoHash,      │  │     │   黑名单监视器            │
 │  │   Swarm          │  │     │  (5 秒文件重载)           │
-│  │  >               │  │     │  HashSet<InfoHash>        │
+│  │  >               │  │     │  BTreeSet<InfoHash>       │
 │  └─────────────────┘  │     └─────────────────────────┘
 │  ... (×64 分片)       │
 └───────────────────────┘
