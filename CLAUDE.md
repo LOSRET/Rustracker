@@ -127,7 +127,7 @@ cd frontend && npm run typecheck
 
 > **Note:** `cargo build --release` with the `dashboard` feature will automatically run `npm run build` in `frontend/`. Ensure `frontend/node_modules/` exists (run `npm install` once after cloning). CI workflows handle this automatically via `setup-node` + `npm ci`.
 
-> **Note:** `.githooks/commit-msg` strips solitary `@` lines from commit messages (PowerShell here-string artifact). Enable with `git config core.hooksPath .githooks` after cloning.
+> **Note**: `.githooks/` holds the repository's git hooks — `commit-msg` strips solitary `@` lines from commit messages (PowerShell here-string artifact), and `post-commit` auto-pushes the checked-out branch to its upstream. Enable them with `git config core.hooksPath .githooks` after cloning. Both are committed with the executable bit set so they also run on Linux/macOS.
 
 ## Load Testing / Benchmarks
 
@@ -198,7 +198,7 @@ Recorded by the user in `.trae/rules/project_rules.md` and `.trae/memory/project
 - **Verify before committing**: run `cargo check` (or `cargo build`) after writing code to catch compile errors.
 - **Commit granularity**: small changes (single file, simple bug fix, small tweak) commit directly to the current branch; large changes (multi-file, new feature, refactor, version bump) go on a new branch via `gh pr create`.
 - **Git sync before editing**: `git fetch` first, check `git status`; if clean `git pull`, if dirty `git stash` (or commit) then `git pull`.
-- **Push preference**: the user generally wants code committed and pushed without extra confirmation — a `.git/hooks/post-commit` hook auto-pushes after each commit.
+- **Push preference**: the user generally wants code committed and pushed without extra confirmation — the `.githooks/post-commit` hook auto-pushes the checked-out branch to its upstream.
 
 ## Testing Pattern
 

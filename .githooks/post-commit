@@ -1,0 +1,16 @@
+#!/bin/sh
+# Post-commit hook: auto-push to remote.
+#
+# The repository integrates on `main`, and the user expects commits to be
+# pushed without a separate confirmation step. Push the checked-out branch
+# to its upstream; a branch without one is pushed to origin under its own
+# name, so committing on a feature branch never pushes `main` by accident.
+#
+# Enable with: git config core.hooksPath .githooks
+echo "Auto-pushing to remote..."
+branch=$(git rev-parse --abbrev-ref HEAD)
+if git rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
+    git push
+else
+    git push origin "$branch"
+fi
