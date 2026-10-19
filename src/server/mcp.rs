@@ -6,6 +6,7 @@
 //! persistence, and auditing cannot drift between the two surfaces.
 
 use std::net::SocketAddr;
+use std::sync::Arc;
 
 use axum::extract::connect_info::ConnectInfo;
 use axum::http::request::Parts;
@@ -18,15 +19,25 @@ use rmcp::{schemars, tool, tool_handler, tool_router, Json, RoleServer, ServerHa
 use serde::{Deserialize, Serialize};
 
 use super::admin::BlacklistAdmin;
-use super::audit::AuditContext;
-use super::blacklist::{DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT};
+use super::audit::{AuditContext, AuditLog};
+use super::blacklist::{BlacklistStore, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT};
 use super::handlers::cloudflare_connecting_ip;
 use super::AppState;
 use crate::core::types::InfoHash;
 
+/// The slice of [`AppState`] the MCP tools actually need. Holding the whole
+/// app state would drag the tracker pool and the trend store into every
+/// tool handler for no reason.
+#[derive(Clone)]
+struct McpState {
+    blacklist: Arc<BlacklistStore>,
+    audit: Arc<AuditLog>,
+    trust_proxy_headers: bool,
+}
+
 #[derive(Clone)]
 pub(crate) struct BlacklistMcp {
-    state: AppState,
+    state: McpState,
     tool_router: ToolRouter<Self>,
 }
 
@@ -42,6 +53,7 @@ pub(crate) struct ListArgs {
     #[serde(default)]
     pub offset: usize,
     /// Maximum entries to return. Defaults to 100, capped at 1000.
+    #[serde(default)]
     pub limit: Option<usize>,
 }
 
@@ -73,9 +85,13 @@ pub(crate) struct RemoveOutput {
 
 #[tool_router]
 impl BlacklistMcp {
-    pub(crate) fn new(state: AppState) -> Self {
+    pub(crate) fn new(state: &AppState) -> Self {
         Self {
-            state,
+            state: McpState {
+                blacklist: state.blacklist.clone(),
+                audit: state.audit.clone(),
+                trust_proxy_headers: state.trust_proxy_headers,
+            },
             tool_router: Self::tool_router(),
         }
     }
@@ -202,7 +218,7 @@ impl ServerHandler for BlacklistMcp {}
 
 pub(crate) fn service(state: AppState) -> StreamableHttpService<BlacklistMcp, NeverSessionManager> {
     StreamableHttpService::new(
-        move || Ok(BlacklistMcp::new(state.clone())),
+        move || Ok(BlacklistMcp::new(&state)),
         NeverSessionManager::default().into(),
         StreamableHttpServerConfig::default()
             // Stateless: no Mcp-Session-Id and no session affinity required.
@@ -222,11 +238,11 @@ fn parse_info_hash(raw: &str) -> Result<InfoHash, String> {
         .ok_or_else(|| "info_hash must be a 40-char hex string".to_string())
 }
 
-fn audit_context(state: &AppState, context: &RequestContext<RoleServer>) -> AuditContext {
+fn audit_context(state: &McpState, context: &RequestContext<RoleServer>) -> AuditContext {
     audit_context_from_parts(state, context.extensions.get::<Parts>())
 }
 
-fn audit_context_from_parts(state: &AppState, parts: Option<&Parts>) -> AuditContext {
+fn audit_context_from_parts(state: &McpState, parts: Option<&Parts>) -> AuditContext {
     let header_ip = if state.trust_proxy_headers {
         parts.and_then(|parts| cloudflare_connecting_ip(&parts.headers))
     } else {
@@ -254,13 +270,25 @@ mod tests {
 
     const HASH: &str = "abcdef0123456789abcdef0123456789abcdef01";
 
-    fn test_state(trust_proxy_headers: bool) -> AppState {
-        let mut state = AppState::new(
+    fn test_state(trust_proxy_headers: bool) -> McpState {
+        McpState {
+            blacklist: Arc::new(BlacklistStore::new(None)),
+            audit: Arc::new(AuditLog::new(None)),
+            trust_proxy_headers,
+        }
+    }
+
+    #[test]
+    fn new_carries_the_proxy_trust_flag_from_the_app_state() {
+        let mut app_state = AppState::new(
             Tracker::new(Duration::from_secs(1800), Duration::from_secs(3000)),
             None,
         );
-        state.trust_proxy_headers = trust_proxy_headers;
-        state
+        app_state.trust_proxy_headers = true;
+
+        let mcp = BlacklistMcp::new(&app_state);
+
+        assert!(mcp.state.trust_proxy_headers);
     }
 
     /// Build the request parts rmcp hands to a tool handler, with the
