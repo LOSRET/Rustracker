@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 use std::time::Duration;
 
 use axum::body::Body;
-use axum::extract::connect_info::MockConnectInfo;
+use axum::extract::connect_info::{ConnectInfo, MockConnectInfo};
 use axum::http::{header, Request, StatusCode};
 use http_body_util::BodyExt;
 use rustracker::server::{router, AppState};
@@ -1187,6 +1187,65 @@ async fn mcp_tool_errors_are_visible_to_the_caller() {
     let text = parsed["result"]["content"][0]["text"].as_str().unwrap();
     assert!(text.contains("40-char hex"), "unexpected error: {text}");
     cleanup(&path);
+}
+
+#[tokio::test]
+async fn mcp_audit_records_client_ip() {
+    let (app, path) = blacklist_app_with_token(Some("secret-token"));
+    let hash = "6363636363636363636363636363636363636363";
+
+    let mut request = mcp_request(
+        Some("secret-token"),
+        mcp_tool_call(3, "blacklist_add", serde_json::json!({"info_hash": hash})),
+    );
+    request
+        .extensions_mut()
+        .insert(ConnectInfo(SocketAddr::from(([198, 51, 100, 1], 4242))));
+
+    let response = app.oneshot(request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let content = std::fs::read_to_string(audit_path(&path)).unwrap();
+    let last: serde_json::Value = serde_json::from_str(content.lines().last().unwrap()).unwrap();
+    assert_eq!(last["source"], "mcp");
+    assert_eq!(last["client_ip"], "198.51.100.1");
+    cleanup(&path);
+}
+
+#[tokio::test]
+async fn mcp_reports_unconfigured_blacklist_file() {
+    let app = router(
+        AppState::sharded_with_blacklist_file(
+            Duration::from_secs(1800),
+            Duration::from_secs(3000),
+            16,
+            None,
+            None,
+            Some("secret-token".to_string()),
+            false,
+        )
+        .with_mcp(true),
+    );
+
+    let response = app
+        .oneshot(mcp_request(
+            Some("secret-token"),
+            mcp_tool_call(
+                2,
+                "blacklist_add",
+                serde_json::json!({"info_hash": "6363636363636363636363636363636363636363"}),
+            ),
+        ))
+        .await
+        .unwrap();
+
+    let parsed = json_body(response).await;
+    assert_eq!(parsed["result"]["isError"], true);
+    let text = parsed["result"]["content"][0]["text"].as_str().unwrap();
+    assert!(
+        text.contains("blacklist file is not configured"),
+        "unexpected error: {text}"
+    );
 }
 
 #[tokio::test]

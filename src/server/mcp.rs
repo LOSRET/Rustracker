@@ -47,21 +47,18 @@ pub(crate) struct ListArgs {
 
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub(crate) struct CheckOutput {
-    pub ok: bool,
     pub blacklisted: bool,
     pub info_hash: String,
 }
 
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub(crate) struct AddOutput {
-    pub ok: bool,
     pub added: bool,
     pub info_hash: String,
 }
 
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub(crate) struct ListOutput {
-    pub ok: bool,
     pub total: usize,
     pub offset: usize,
     pub limit: usize,
@@ -70,7 +67,6 @@ pub(crate) struct ListOutput {
 
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub(crate) struct RemoveOutput {
-    pub ok: bool,
     pub removed: bool,
     pub info_hash: String,
 }
@@ -96,7 +92,6 @@ impl BlacklistMcp {
         let info_hash = parse_info_hash(&args.info_hash)?;
         let blacklisted = self.state.blacklist.contains(&info_hash).await;
         Ok(Json(CheckOutput {
-            ok: true,
             blacklisted,
             info_hash: info_hash.to_string(),
         }))
@@ -116,16 +111,19 @@ impl BlacklistMcp {
         Parameters(args): Parameters<HashArgs>,
         context: RequestContext<RoleServer>,
     ) -> Result<Json<AddOutput>, String> {
+        self.ensure_blacklist_configured()?;
         let info_hash = parse_info_hash(&args.info_hash)?;
         let audit_context = audit_context(&self.state, &context);
         let admin = self.admin();
         match admin.add(info_hash, &audit_context).await {
             Ok(added) => Ok(Json(AddOutput {
-                ok: true,
                 added,
                 info_hash: info_hash.to_string(),
             })),
-            Err(error) => Err(format!("failed to persist blacklist entry: {error}")),
+            Err(error) => {
+                tracing::warn!(%error, "failed to persist blacklist entry via MCP");
+                Err(format!("failed to persist blacklist entry: {error}"))
+            }
         }
     }
 
@@ -143,7 +141,6 @@ impl BlacklistMcp {
         let (total, hashes) = self.state.blacklist.page(offset, limit).await;
         let entries = hashes.into_iter().map(|hash| hash.to_string()).collect();
         Ok(Json(ListOutput {
-            ok: true,
             total,
             offset,
             limit,
@@ -165,21 +162,34 @@ impl BlacklistMcp {
         Parameters(args): Parameters<HashArgs>,
         context: RequestContext<RoleServer>,
     ) -> Result<Json<RemoveOutput>, String> {
+        self.ensure_blacklist_configured()?;
         let info_hash = parse_info_hash(&args.info_hash)?;
         let audit_context = audit_context(&self.state, &context);
         let admin = self.admin();
         match admin.remove(info_hash, &audit_context).await {
             Ok(removed) => Ok(Json(RemoveOutput {
-                ok: true,
                 removed,
                 info_hash: info_hash.to_string(),
             })),
-            Err(error) => Err(format!("failed to remove blacklist entry: {error}")),
+            Err(error) => {
+                tracing::warn!(%error, "failed to remove blacklist entry via MCP");
+                Err(format!("failed to remove blacklist entry: {error}"))
+            }
         }
     }
 
     fn admin(&self) -> BlacklistAdmin {
         BlacklistAdmin::new(self.state.blacklist.clone(), self.state.audit.clone())
+    }
+
+    /// Mutations need a blacklist file to write to. The HTTP admin surface
+    /// answers `503` in that case; MCP reports the same condition as a tool
+    /// error so a misconfiguration is not mistaken for a failed write.
+    fn ensure_blacklist_configured(&self) -> Result<(), String> {
+        if self.state.blacklist.path().is_none() {
+            return Err("blacklist file is not configured".to_string());
+        }
+        Ok(())
     }
 }
 
@@ -213,7 +223,10 @@ fn parse_info_hash(raw: &str) -> Result<InfoHash, String> {
 }
 
 fn audit_context(state: &AppState, context: &RequestContext<RoleServer>) -> AuditContext {
-    let parts = context.extensions.get::<Parts>();
+    audit_context_from_parts(state, context.extensions.get::<Parts>())
+}
+
+fn audit_context_from_parts(state: &AppState, parts: Option<&Parts>) -> AuditContext {
     let header_ip = if state.trust_proxy_headers {
         parts.and_then(|parts| cloudflare_connecting_ip(&parts.headers))
     } else {
@@ -225,5 +238,108 @@ fn audit_context(state: &AppState, context: &RequestContext<RoleServer>) -> Audi
     AuditContext {
         source: "mcp",
         client_ip: header_ip.or(peer_ip),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::net::IpAddr;
+    use std::time::Duration;
+
+    use axum::http::Request;
+
+    use crate::core::tracker::Tracker;
+
+    const HASH: &str = "abcdef0123456789abcdef0123456789abcdef01";
+
+    fn test_state(trust_proxy_headers: bool) -> AppState {
+        let mut state = AppState::new(
+            Tracker::new(Duration::from_secs(1800), Duration::from_secs(3000)),
+            None,
+        );
+        state.trust_proxy_headers = trust_proxy_headers;
+        state
+    }
+
+    /// Build the request parts rmcp hands to a tool handler, with the
+    /// connect info a real server attaches.
+    fn request_parts(proxy_ip: Option<&str>, peer: SocketAddr) -> Parts {
+        let mut builder = Request::builder();
+        if let Some(proxy_ip) = proxy_ip {
+            builder = builder.header("cf-connecting-ip", proxy_ip);
+        }
+        let (mut parts, _) = builder.body(()).unwrap().into_parts();
+        parts.extensions.insert(ConnectInfo(peer));
+        parts
+    }
+
+    #[test]
+    fn parse_info_hash_accepts_trimmed_hex_in_any_case() {
+        let lower = parse_info_hash(HASH).expect("valid hash");
+        assert_eq!(lower.to_string(), HASH);
+
+        let upper = parse_info_hash(&HASH.to_ascii_uppercase()).expect("valid hash");
+        assert_eq!(upper.to_string(), HASH);
+
+        let padded = parse_info_hash(&format!("  {HASH}\n")).expect("valid hash");
+        assert_eq!(padded.to_string(), HASH);
+    }
+
+    #[test]
+    fn parse_info_hash_rejects_malformed_input() {
+        let cases = [
+            String::new(),
+            "not-a-hash".to_string(),
+            "a".repeat(39),
+            "a".repeat(41),
+            "z".repeat(40),
+            format!("{}zz", "a".repeat(38)),
+        ];
+        for raw in &cases {
+            assert!(
+                parse_info_hash(raw).is_err(),
+                "expected {raw:?} to be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn audit_context_uses_peer_ip_when_proxy_headers_are_untrusted() {
+        let state = test_state(false);
+        let parts = request_parts(
+            Some("203.0.113.7"),
+            SocketAddr::from(([198, 51, 100, 1], 4242)),
+        );
+
+        let context = audit_context_from_parts(&state, Some(&parts));
+
+        assert_eq!(context.source, "mcp");
+        assert_eq!(context.client_ip, Some(IpAddr::from([198, 51, 100, 1])));
+    }
+
+    #[test]
+    fn audit_context_prefers_proxy_header_when_trusted() {
+        let state = test_state(true);
+        let parts = request_parts(
+            Some("203.0.113.7"),
+            SocketAddr::from(([198, 51, 100, 1], 4242)),
+        );
+
+        let context = audit_context_from_parts(&state, Some(&parts));
+
+        assert_eq!(context.source, "mcp");
+        assert_eq!(context.client_ip, Some(IpAddr::from([203, 0, 113, 7])));
+    }
+
+    #[test]
+    fn audit_context_without_request_parts_has_no_client_ip() {
+        let state = test_state(true);
+
+        let context = audit_context_from_parts(&state, None);
+
+        assert_eq!(context.source, "mcp");
+        assert_eq!(context.client_ip, None);
     }
 }

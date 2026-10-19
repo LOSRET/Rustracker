@@ -235,6 +235,8 @@ When `RUSTRACKER_ADMIN_TOKEN` is set, the tracker also exposes an MCP server at 
 
 The endpoint returns server `instructions` during MCP initialization, so a client knows what the four tools do and that `info_hash` is a 40-character hex string without extra prompting.
 
+Successful calls return the tool's `structuredContent` (`blacklisted`, `added`, `removed`, `entries`, …). There is no `ok` field: a failed call is reported the MCP way — `isError: true` plus a text message explaining the failure (malformed `info_hash`, or `blacklist file is not configured` when the tracker was started without `--blacklist`).
+
 Disable it with `--no-mcp` or `RUSTRACKER_NO_MCP=1`. Tokens shorter than 32 characters trigger a startup warning.
 
 ### Client setup

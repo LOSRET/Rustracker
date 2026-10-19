@@ -235,6 +235,8 @@ curl -X DELETE "http://127.0.0.1:8080/api/blacklist?info_hash=0123456789abcdef01
 
 端点会在 MCP 初始化时返回服务端 `instructions`，客户端无需额外提示就能知道这四个工具的用途，以及 `info_hash` 是 40 位十六进制字符串。
 
+调用成功时返回工具的 `structuredContent`（`blacklisted`、`added`、`removed`、`entries` 等），没有 `ok` 字段：失败按 MCP 的方式上报 —— `isError: true` 加一段说明原因的文本（`info_hash` 格式非法，或 tracker 未配置 `--blacklist` 时提示 `blacklist file is not configured`）。
+
 使用 `--no-mcp` 或 `RUSTRACKER_NO_MCP=1` 可禁用。token 少于 32 字符时启动日志会给出警告。
 
 ### 客户端接入
