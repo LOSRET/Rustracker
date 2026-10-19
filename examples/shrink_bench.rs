@@ -32,7 +32,7 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 mod mem {
     use std::mem;
     #[repr(C)]
-    struct PMC {
+    struct Pmc {
         cb: u32,
         pfc: u32,
         pws: usize,
@@ -47,12 +47,12 @@ mod mem {
     #[link(name = "psapi")]
     extern "system" {
         fn GetCurrentProcess() -> isize;
-        fn GetProcessMemoryInfo(p: isize, c: *mut PMC, b: u32) -> i32;
+        fn GetProcessMemoryInfo(p: isize, c: *mut Pmc, b: u32) -> i32;
     }
     pub fn rss_bytes() -> usize {
         unsafe {
-            let mut i: PMC = mem::zeroed();
-            i.cb = mem::size_of::<PMC>() as u32;
+            let mut i: Pmc = mem::zeroed();
+            i.cb = mem::size_of::<Pmc>() as u32;
             GetProcessMemoryInfo(GetCurrentProcess(), &mut i, i.cb);
             i.ws
         }
@@ -106,7 +106,11 @@ fn announce(
             port,
             uploaded: 0,
             downloaded: 0,
-            left: if peer_seed % 3 == 0 { 0 } else { 1_000_000_000 },
+            left: if peer_seed.is_multiple_of(3) {
+                0
+            } else {
+                1_000_000_000
+            },
             event: AnnounceEvent::Started,
             numwant: 50,
             client_tag: (peer_seed % 250) as u8,
