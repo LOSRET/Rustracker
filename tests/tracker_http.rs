@@ -1968,6 +1968,27 @@ async fn duplicate_completed_does_not_increment() {
 }
 
 #[tokio::test]
+async fn announce_without_left_counts_as_leecher() {
+    let app = app();
+
+    let response = app
+        .oneshot(request_with_connect_info(
+            "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-abcdefgh1234&port=6881&event=started",
+        ))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    assert!(body
+        .windows(b"8:completei0e".len())
+        .any(|w| w == b"8:completei0e"));
+    assert!(body
+        .windows(b"10:incompletei1e".len())
+        .any(|w| w == b"10:incompletei1e"));
+}
+
+#[tokio::test]
 async fn announce_ip_query_parameter_does_not_spoof_peer_address() {
     let app = app();
     // The BEP 3 `ip` parameter is deliberately ignored: any client could

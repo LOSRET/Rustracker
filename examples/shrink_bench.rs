@@ -104,11 +104,7 @@ fn announce(
             peer_id: make_peer_id(peer_seed),
             ip,
             port,
-            left: if peer_seed.is_multiple_of(3) {
-                0
-            } else {
-                1_000_000_000
-            },
+            complete: peer_seed.is_multiple_of(3),
             event: AnnounceEvent::Started,
             numwant: 50,
             client_tag: (peer_seed % 250) as u8,

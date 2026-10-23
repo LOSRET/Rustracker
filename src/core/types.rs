@@ -62,7 +62,9 @@ pub struct AnnounceInput {
     pub peer_id: PeerId,
     pub ip: IpAddr,
     pub port: u16,
-    pub left: u64,
+    /// Seeder when true. Resolved by the protocol layer from the announce
+    /// `left` parameter: only an explicit zero counts as a seeder.
+    pub complete: bool,
     pub event: AnnounceEvent,
     pub numwant: usize,
     pub client_tag: u8,
@@ -71,7 +73,7 @@ pub struct AnnounceInput {
 impl AnnounceInput {
     pub(crate) fn into_peer_state(self, now_secs: u32) -> PeerState {
         PeerState {
-            complete: self.left == 0,
+            complete: self.complete,
             last_seen_secs: now_secs,
             client_tag: self.client_tag,
         }

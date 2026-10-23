@@ -13,7 +13,10 @@ pub struct AnnounceQuery {
     pub info_hash: InfoHash,
     pub peer_id: PeerId,
     pub port: u16,
-    pub left: u64,
+    /// Bytes the peer still has to download, when reported. Only an
+    /// explicit zero marks the peer as a seeder; a missing `left`
+    /// counts as a leecher.
+    pub left: Option<u64>,
     pub event: AnnounceEvent,
     pub numwant: usize,
 }
@@ -35,7 +38,7 @@ impl AnnounceQuery {
             peer_id: self.peer_id,
             ip,
             port: self.port,
-            left: self.left,
+            complete: self.left == Some(0),
             event: self.event,
             numwant: self.numwant,
             client_tag,
@@ -90,7 +93,7 @@ pub fn parse_announce_query(raw_query: &str) -> Result<AnnounceQuery, ProtocolEr
         info_hash: info_hash.ok_or(ProtocolError::Missing("info_hash"))?,
         peer_id: peer_id.ok_or(ProtocolError::Missing("peer_id"))?,
         port: port.ok_or(ProtocolError::Missing("port"))?,
-        left: left.unwrap_or(0),
+        left,
         event: event.unwrap_or(AnnounceEvent::Empty),
         numwant: numwant.unwrap_or(100).min(400),
     })
@@ -222,10 +225,34 @@ fn hex_decode(byte: u8) -> Option<u8> {
 
 #[cfg(test)]
 mod tests {
-    use std::net::Ipv6Addr;
+    use std::net::{IpAddr, Ipv6Addr};
 
     use super::{announce_response, parse_announce_query, parse_scrape_query};
     use crate::core::types::AnnounceOutput;
+
+    #[test]
+    fn missing_left_counts_as_leecher() {
+        let info_hash = "info_hash=%00%01%02%03%04%05%06%07%08%09%0A%0B%0C%0D%0E%0F%10%11%12%13";
+        let peer_id = "peer_id=-RT0001-abcdefgh1234";
+
+        let without_left =
+            parse_announce_query(&format!("{info_hash}&{peer_id}&port=6881")).unwrap();
+        assert_eq!(without_left.left, None);
+        assert!(
+            !without_left
+                .into_input(IpAddr::from([127, 0, 0, 1]), 0)
+                .complete
+        );
+
+        let zero_left =
+            parse_announce_query(&format!("{info_hash}&{peer_id}&port=6881&left=0")).unwrap();
+        assert_eq!(zero_left.left, Some(0));
+        assert!(
+            zero_left
+                .into_input(IpAddr::from([127, 0, 0, 1]), 0)
+                .complete
+        );
+    }
 
     #[test]
     fn parses_binary_announce_fields() {

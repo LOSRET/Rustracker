@@ -172,7 +172,7 @@ fn run_bench(label: &str, torrents: usize, total_peers: usize, max_peers: usize)
                 peer_id: PeerId::new(pid),
                 ip,
                 port,
-                left: if j % 3 == 0 { 0 } else { 1_000_000_000 },
+                complete: j % 3 == 0,
                 event: AnnounceEvent::Started,
                 numwant: 50,
                 client_tag: 1,
