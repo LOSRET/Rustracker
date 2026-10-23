@@ -113,8 +113,12 @@ fn content_type_for(name: &str) -> &'static str {
 pub(crate) async fn stats(State(state): State<AppState>) -> Json<StatsResponse> {
     let snapshot = state.tracker.snapshot().await;
     let uptime_secs = state.started_at.elapsed().as_secs();
-    let rps = state.rps.current();
-    Json(StatsResponse::from_snapshot(snapshot, uptime_secs, rps))
+    let tracker_rps = state.rps.current();
+    Json(StatsResponse::from_snapshot(
+        snapshot,
+        uptime_secs,
+        tracker_rps,
+    ))
 }
 
 pub(crate) async fn trends(State(state): State<AppState>) -> Json<TrendsResponse> {

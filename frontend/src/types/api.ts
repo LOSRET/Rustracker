@@ -4,7 +4,7 @@ export interface StatsResponse {
   leechers: number
   torrents: number
   completed: number
-  rps: number
+  tracker_rps: number
   version: string
   uptime_secs: number
 }

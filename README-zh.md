@@ -140,7 +140,7 @@ d5:filesd20:<info_hash>d8:completei5e10:downloadedi10e10:incompletei3eeee
 
 | 端点 | 说明 |
 |------|------|
-| `GET /api/stats` | 实时计数：peers、seeders、leechers、torrents、completed、rps、version、uptime |
+| `GET /api/stats` | 实时计数：peers、seeders、leechers、torrents、completed、tracker_rps、version、uptime |
 | `GET /api/trends` | 历史趋势数据（7 天保留，10 分钟采样） |
 | `GET /api/clients` | Top 15 客户端类型及时序历史 |
 | `GET /api/clients/list` | 所有已连接客户端类型，按 peer 数降序（当前快照） |

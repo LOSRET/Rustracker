@@ -140,7 +140,7 @@ d5:filesd20:<info_hash>d8:completei5e10:downloadedi10e10:incompletei3eeee
 
 | Endpoint | Description |
 |----------|-------------|
-| `GET /api/stats` | Real-time counts: peers, seeders, leechers, torrents, completed, rps, version, uptime |
+| `GET /api/stats` | Real-time counts: peers, seeders, leechers, torrents, completed, tracker_rps, version, uptime |
 | `GET /api/trends` | Historical trend data (7-day retention, 10-min sampling) |
 | `GET /api/clients` | Top 15 client types with time-series history |
 | `GET /api/clients/list` | All connected client types sorted by peer count (current snapshot) |

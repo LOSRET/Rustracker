@@ -55,9 +55,9 @@ function lastUpdateText() {
         class="flex items-center justify-end gap-1.5 text-muted text-[11px] uppercase mb-0.5 max-[900px]:justify-start"
       >
         <i class="w-[7px] h-[7px] bg-good rounded-full shrink-0 animate-rps-pulse"></i>
-        RPS
+        Tracker RPS
       </div>
-      <strong class="text-[22px] leading-none text-ink max-[900px]:text-xl">{{ number(stats?.rps ?? 0) }}</strong>
+      <strong class="text-[22px] leading-none text-ink max-[900px]:text-xl">{{ number(stats?.tracker_rps ?? 0) }}</strong>
     </div>
   </section>
 </template>
