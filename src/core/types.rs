@@ -78,12 +78,6 @@ impl AnnounceInput {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PeerContact {
-    pub ip: IpAddr,
-    pub port: u16,
-}
-
 impl InfoHash {
     pub fn new(bytes: [u8; ID_LEN]) -> Self {
         Self(bytes)
@@ -147,35 +141,12 @@ impl Ipv4PeerKey {
             port,
         }
     }
-
-    pub fn compact(self) -> [u8; 6] {
-        let mut out = [0_u8; 6];
-        out[..4].copy_from_slice(&self.ip);
-        out[4..].copy_from_slice(&self.port.to_be_bytes());
-        out
-    }
 }
 
 impl Ipv6PeerKey {
     pub fn new(ip: Ipv6Addr, port: u16) -> Self {
         Self {
             ip: ip.octets(),
-            port,
-        }
-    }
-
-    pub fn compact(self) -> [u8; 18] {
-        let mut out = [0_u8; 18];
-        out[..16].copy_from_slice(&self.ip);
-        out[16..].copy_from_slice(&self.port.to_be_bytes());
-        out
-    }
-}
-
-impl PeerContact {
-    pub fn localhost(_peer_id: PeerId, port: u16) -> Self {
-        Self {
-            ip: IpAddr::V4(Ipv4Addr::LOCALHOST),
             port,
         }
     }
