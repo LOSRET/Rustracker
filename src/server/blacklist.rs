@@ -138,9 +138,13 @@ impl BlacklistStore {
         let _guard = self.write_lock.lock().await;
         let path = self
             .path
-            .as_deref()
+            .clone()
             .ok_or_else(|| anyhow::anyhow!("blacklist file is not configured"))?;
-        let new_set = load_blacklist(path)?;
+        // load_blacklist reads synchronously; keep the blocking read off
+        // the runtime threads.
+        let new_set = tokio::task::spawn_blocking(move || load_blacklist(&path))
+            .await
+            .map_err(|err| anyhow::anyhow!("blacklist reload task failed: {err}"))??;
         let count = new_set.len();
         *self.set.write().await = new_set;
         Ok(count)
@@ -163,11 +167,11 @@ pub(crate) fn spawn_watcher(store: Arc<BlacklistStore>, interval: Duration) {
     tokio::spawn(async move {
         let mut timer = tokio::time::interval(interval);
         timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
-        let mut last_mtime = file_mtime(&path);
+        let mut last_mtime = file_mtime(&path).await;
 
         loop {
             timer.tick().await;
-            let mtime = file_mtime(&path);
+            let mtime = file_mtime(&path).await;
             if mtime == last_mtime {
                 continue;
             }
@@ -286,9 +290,10 @@ fn temp_path(path: &Path) -> PathBuf {
     path.with_file_name(format!(".{name}.{}.{counter}.tmp", std::process::id()))
 }
 
-fn file_mtime(path: &Path) -> SystemTime {
-    std::fs::metadata(path)
-        .and_then(|m| m.modified())
+async fn file_mtime(path: &Path) -> SystemTime {
+    tokio::fs::metadata(path)
+        .await
+        .and_then(|metadata| metadata.modified())
         .unwrap_or(SystemTime::UNIX_EPOCH)
 }
 

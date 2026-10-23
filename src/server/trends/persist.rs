@@ -15,12 +15,12 @@ pub(crate) fn unix_timestamp() -> u64 {
         .unwrap_or_default()
 }
 
-pub(crate) fn save_trend_point(
+pub(crate) async fn save_trend_point(
     path: &Path,
     now: u64,
     snapshot: &TrackerSnapshot,
 ) -> std::io::Result<()> {
-    use std::io::Write;
+    use tokio::io::AsyncWriteExt;
     let bucket = now - (now % TrendStore::SAMPLE_SECS);
     let line = serde_json::json!({
         "timestamp": bucket,
@@ -29,31 +29,33 @@ pub(crate) fn save_trend_point(
         "seeders": snapshot.totals.seeders,
         "leechers": snapshot.totals.leechers,
     });
-    let mut f = std::fs::OpenOptions::new()
+    let mut file = tokio::fs::OpenOptions::new()
         .create(true)
         .append(true)
-        .open(path)?;
-    writeln!(f, "{line}")?;
-    f.flush()
+        .open(path)
+        .await?;
+    file.write_all(format!("{line}\n").as_bytes()).await?;
+    file.flush().await
 }
 
-pub(crate) fn save_client_point(
+pub(crate) async fn save_client_point(
     path: &Path,
     now: u64,
     clients: &[(u8, u64)],
 ) -> std::io::Result<()> {
-    use std::io::Write;
+    use tokio::io::AsyncWriteExt;
     let bucket = now - (now % TrendStore::SAMPLE_SECS);
     let line = serde_json::json!({
         "timestamp": bucket,
         "clients": clients,
     });
-    let mut f = std::fs::OpenOptions::new()
+    let mut file = tokio::fs::OpenOptions::new()
         .create(true)
         .append(true)
-        .open(path)?;
-    writeln!(f, "{line}")?;
-    f.flush()
+        .open(path)
+        .await?;
+    file.write_all(format!("{line}\n").as_bytes()).await?;
+    file.flush().await
 }
 
 pub(crate) fn load_trends_from_file(
