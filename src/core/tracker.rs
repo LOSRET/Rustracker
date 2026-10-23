@@ -117,7 +117,7 @@ impl Tracker {
             }
 
             let stats = swarm.stats();
-            let downloaded = swarm.downloaded;
+            let downloaded = u64::from(swarm.downloaded);
             let peers = swarm.contacts_excluding(
                 endpoint,
                 numwant,
@@ -222,7 +222,7 @@ impl Tracker {
             torrents += 1;
             peers += swarm.len();
             seeders += stats.complete;
-            downloaded += stats.downloaded as u64;
+            downloaded += stats.downloaded;
         }
         self.counters.verify(torrents, peers, seeders, downloaded);
     }

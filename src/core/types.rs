@@ -39,7 +39,7 @@ pub struct PeerState {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct TorrentStats {
     pub complete: usize,
-    pub downloaded: u32,
+    pub downloaded: u64,
     pub incomplete: usize,
 }
 
@@ -51,7 +51,7 @@ pub struct AnnounceOutput {
     pub interval: u64,
     pub complete: usize,
     pub incomplete: usize,
-    pub downloaded: u32,
+    pub downloaded: u64,
     pub peers: (Vec<u8>, Vec<u8>),
 }
 

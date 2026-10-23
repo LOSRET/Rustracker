@@ -483,6 +483,8 @@ pub(crate) struct Swarm {
     pub(crate) ipv4_peers: PackedIpv4Peers,
     pub(crate) ipv6_peers: PackedIpv6Peers,
     pub(crate) complete: u32,
+    // Per-swarm counters stay u32 to keep Swarm compact; every view of
+    // them widens to u64 (see `stats` and the tracker totals).
     pub(crate) downloaded: u32,
 }
 
@@ -589,7 +591,7 @@ impl Swarm {
         let complete = self.complete as usize;
         TorrentStats {
             complete,
-            downloaded: self.downloaded,
+            downloaded: u64::from(self.downloaded),
             incomplete: self.len().saturating_sub(complete),
         }
     }

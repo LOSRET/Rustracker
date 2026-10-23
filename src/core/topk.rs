@@ -102,7 +102,7 @@ pub(crate) fn top_torrents_all(swarms: &BTreeMap<InfoHash, Swarm>, limit: usize)
             (stats.complete + stats.incomplete) as u64,
             stats.complete as u64,
             stats.incomplete as u64,
-            stats.downloaded as u64,
+            stats.downloaded,
         ];
 
         // Fast path: all four heaps are full and this torrent is
@@ -128,7 +128,7 @@ pub(crate) fn top_torrents_all(swarms: &BTreeMap<InfoHash, Swarm>, limit: usize)
                 *info_hash,
                 stats.complete,
                 stats.incomplete,
-                stats.downloaded as u64,
+                stats.downloaded,
             );
         }
     }
