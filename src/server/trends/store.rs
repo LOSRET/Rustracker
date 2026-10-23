@@ -125,6 +125,32 @@ impl TrendStore {
         &self.client_cache
     }
 
+    /// Whether the bucket containing `now` already has a recorded point.
+    /// Handlers check this before paying for a full tracker snapshot.
+    pub(crate) fn has_bucket(&self, now: u64) -> bool {
+        let bucket = now - (now % Self::SAMPLE_SECS);
+        self.points
+            .last()
+            .is_some_and(|point| point.timestamp == bucket)
+    }
+
+    /// Client-distribution counterpart of [`has_bucket`]; the two stores
+    /// record independently, so each needs its own check.
+    pub(crate) fn has_client_bucket(&self, now: u64) -> bool {
+        let bucket = now - (now % Self::SAMPLE_SECS);
+        self.client_points
+            .last()
+            .is_some_and(|(timestamp, _)| *timestamp == bucket)
+    }
+
+    pub(crate) fn history(&self) -> Arc<Vec<TrendPointResponse>> {
+        self.filled_cache.clone()
+    }
+
+    pub(crate) fn client_data(&self) -> ClientTrendData {
+        self.client_cache.clone()
+    }
+
     /// Build a `TrendStore` from points loaded off disk, rebuilding caches.
     pub(crate) fn from_loaded(
         points: Vec<TrendPointResponse>,
@@ -220,5 +246,49 @@ impl TrendStore {
             top_clients: Arc::new(top_clients),
             history: Arc::new(history),
         };
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::tracker::TrackerTotals;
+
+    fn snapshot(peers: usize) -> TrackerSnapshot {
+        TrackerSnapshot {
+            interval: 1800,
+            peer_timeout: 3000,
+            totals: TrackerTotals {
+                torrents: 1,
+                peers,
+                seeders: 0,
+                leechers: peers,
+                downloaded: 0,
+            },
+            clients: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn has_bucket_tracks_each_store_independently() {
+        let mut store = TrendStore::default();
+        let now = TrendStore::SAMPLE_SECS * 10;
+
+        assert!(!store.has_bucket(now));
+        assert!(!store.has_client_bucket(now));
+
+        store.record(now, &snapshot(1));
+        assert!(store.has_bucket(now));
+        assert!(
+            !store.has_client_bucket(now),
+            "recording a trend point must not mark the client bucket"
+        );
+
+        store.record_clients(now, &[(1, 5)]);
+        assert!(store.has_client_bucket(now));
+
+        let next_bucket = now + TrendStore::SAMPLE_SECS;
+        assert!(!store.has_bucket(next_bucket));
+        assert!(!store.has_client_bucket(next_bucket));
     }
 }

@@ -232,6 +232,96 @@ async fn trends_api_returns_history() {
 }
 
 #[tokio::test]
+async fn trends_polls_within_a_bucket_serve_the_frozen_point() {
+    let app = app();
+    let announce_uri = "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-abcdefgh1234&port=6881&left=0&event=started&compact=1";
+
+    app.clone()
+        .oneshot(request_with_connect_info(announce_uri))
+        .await
+        .unwrap();
+
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/trends")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let first: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let last = first["history"].as_array().unwrap().last().unwrap();
+    assert_eq!(last["peers"].as_u64(), Some(1));
+
+    // A new peer arriving in the same 10-minute bucket must not change the
+    // frozen point served to later polls.
+    let second_announce_uri = "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-abcdefgh5678&port=6882&left=0&event=started&compact=1";
+    app.clone()
+        .oneshot(request_with_connect_info(second_announce_uri))
+        .await
+        .unwrap();
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/trends")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let second: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let last = second["history"].as_array().unwrap().last().unwrap();
+    assert_eq!(last["peers"].as_u64(), Some(1));
+}
+
+#[tokio::test]
+async fn clients_get_samples_its_own_bucket_after_a_trends_get() {
+    let app = app();
+    let announce_uri = "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-abcdefgh1234&port=6881&left=0&event=started&compact=1";
+
+    app.clone()
+        .oneshot(request_with_connect_info(announce_uri))
+        .await
+        .unwrap();
+
+    // Freezes the trend bucket only; the client-distribution bucket is a
+    // separate store and must still be sampled by the clients endpoint.
+    app.clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/trends")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/clients")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(parsed["tags"].as_array().unwrap().len(), 1);
+    assert_eq!(parsed["clients"].as_array().unwrap().len(), 1);
+    let history = parsed["history"].as_array().unwrap();
+    let counts = history.last().unwrap()["counts"].as_array().unwrap();
+    assert_eq!(counts.len(), 1);
+    assert_eq!(counts[0].as_u64(), Some(1));
+}
+
+#[tokio::test]
 async fn handles_concurrent_announces_across_shards() {
     let app = sharded_app();
     let mut tasks = Vec::new();

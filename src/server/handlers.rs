@@ -118,16 +118,26 @@ pub(crate) async fn stats(State(state): State<AppState>) -> Json<StatsResponse> 
 }
 
 pub(crate) async fn trends(State(state): State<AppState>) -> Json<TrendsResponse> {
-    let snapshot = state.tracker.snapshot().await;
     let now = trends::unix_timestamp();
-    let history = state.trends.record(now, &snapshot).await;
+    // A full tracker snapshot only pays off when the current 10-minute
+    // bucket has no sample yet; otherwise serve the frozen cache.
+    let history = if state.trends.needs_sample(now).await {
+        let snapshot = state.tracker.snapshot().await;
+        state.trends.record(now, &snapshot).await
+    } else {
+        state.trends.history().await
+    };
     Json(TrendsResponse { history })
 }
 
 pub(crate) async fn clients(State(state): State<AppState>) -> Json<ClientsResponse> {
-    let snapshot = state.tracker.snapshot().await;
     let now = trends::unix_timestamp();
-    let client_data = state.trends.record_clients(now, &snapshot.clients).await;
+    let client_data = if state.trends.needs_client_sample(now).await {
+        let snapshot = state.tracker.snapshot().await;
+        state.trends.record_clients(now, &snapshot.clients).await
+    } else {
+        state.trends.client_data().await
+    };
     Json(ClientsResponse {
         timestamp: now,
         tags: client_data.top_tags,

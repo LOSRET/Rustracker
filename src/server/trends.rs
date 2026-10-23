@@ -77,6 +77,28 @@ impl TrendsState {
             .clone()
     }
 
+    /// Whether the bucket containing `now` still needs a sample. Dashboard
+    /// handlers check this before paying for a full tracker snapshot; the
+    /// write-locking record paths then run at most once per 10-minute bucket.
+    pub(crate) async fn needs_sample(&self, now: u64) -> bool {
+        !self.store.read().await.has_bucket(now)
+    }
+
+    /// Client-distribution counterpart of [`needs_sample`].
+    pub(crate) async fn needs_client_sample(&self, now: u64) -> bool {
+        !self.store.read().await.has_client_bucket(now)
+    }
+
+    /// Cached history for an already-recorded bucket (read lock, no write).
+    pub(crate) async fn history(&self) -> Arc<Vec<TrendPointResponse>> {
+        self.store.read().await.history()
+    }
+
+    /// Cached client data for an already-recorded bucket (read lock, no write).
+    pub(crate) async fn client_data(&self) -> ClientTrendData {
+        self.store.read().await.client_data()
+    }
+
     /// Record a sample point and persist it to disk (sampling task only).
     /// The write lock is released before the disk write (record is
     /// idempotent per bucket), so block I/O never stalls sampling readers.
