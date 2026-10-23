@@ -363,8 +363,6 @@ mod tests {
             peer_id,
             ip: request_ip(peer_id.0[0]),
             port: 6881,
-            uploaded: 0,
-            downloaded: 0,
             left,
             event,
             numwant: 50,

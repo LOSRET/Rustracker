@@ -104,8 +104,6 @@ fn announce(
             peer_id: make_peer_id(peer_seed),
             ip,
             port,
-            uploaded: 0,
-            downloaded: 0,
             left: if peer_seed.is_multiple_of(3) {
                 0
             } else {

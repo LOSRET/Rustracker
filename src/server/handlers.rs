@@ -262,7 +262,6 @@ pub(crate) async fn announce(
     } else {
         None
     };
-    let compact = parsed.compact;
     let ip = peer_ip(header_ip, Some(addr));
     let client_tag = client_id::identify(parsed.peer_id.as_bytes());
     let input = parsed.into_input(ip, client_tag);
@@ -271,7 +270,7 @@ pub(crate) async fn announce(
         .tracker
         .announce(input.info_hash, input, Instant::now())
         .await;
-    bencoded_response(StatusCode::OK, announce_response(output, compact))
+    bencoded_response(StatusCode::OK, announce_response(output))
 }
 
 pub(crate) async fn scrape(

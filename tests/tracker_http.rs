@@ -1969,6 +1969,30 @@ async fn duplicate_completed_does_not_increment() {
 }
 
 #[tokio::test]
+async fn announce_ip_query_parameter_does_not_spoof_peer_address() {
+    let app = app();
+    // The BEP 3 `ip` parameter is deliberately ignored: any client could
+    // spoof it to inject arbitrary addresses into other peers' lists.
+    app.clone()
+        .oneshot(request_with_connect_info(
+            "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-abcdefgh1234&port=6881&left=0&event=started&compact=1&ip=203.0.113.9",
+        ))
+        .await
+        .unwrap();
+
+    let response = app
+        .oneshot(request_with_connect_info(
+            "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-abcdefgh5678&port=6882&left=0&event=started&compact=1",
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    assert!(body.windows(4).any(|w| w == [127, 0, 0, 1]));
+    assert!(!body.windows(4).any(|w| w == [203, 0, 113, 9]));
+}
+
+#[tokio::test]
 async fn scrape_rejects_more_than_200_info_hashes() {
     let app = app();
     let query: String = (0..=200)

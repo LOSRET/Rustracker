@@ -12,14 +12,10 @@ use crate::core::types::{
 pub struct AnnounceQuery {
     pub info_hash: InfoHash,
     pub peer_id: PeerId,
-    pub ip: Option<IpAddr>,
     pub port: u16,
-    pub uploaded: u64,
-    pub downloaded: u64,
     pub left: u64,
     pub event: AnnounceEvent,
     pub numwant: usize,
-    pub compact: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -29,15 +25,16 @@ pub struct ScrapeQuery {
 
 impl AnnounceQuery {
     /// Convert into the engine input. The caller resolves the peer IP
-    /// (query `ip` parameter or remote address) and the client tag.
+    /// (remote address, or the proxy-header IP when a trusted proxy is
+    /// configured) and the client tag. The query's optional `ip`
+    /// parameter is deliberately not honored: any client could spoof it
+    /// to inject arbitrary addresses into peer lists.
     pub fn into_input(self, ip: IpAddr, client_tag: u8) -> AnnounceInput {
         AnnounceInput {
             info_hash: self.info_hash,
             peer_id: self.peer_id,
             ip,
             port: self.port,
-            uploaded: self.uploaded,
-            downloaded: self.downloaded,
             left: self.left,
             event: self.event,
             numwant: self.numwant,
@@ -58,13 +55,9 @@ pub fn parse_announce_query(raw_query: &str) -> Result<AnnounceQuery, ProtocolEr
     let mut info_hash = None;
     let mut peer_id = None;
     let mut port = None;
-    let mut uploaded = None;
-    let mut downloaded = None;
     let mut left = None;
     let mut event = None;
     let mut numwant = None;
-    let mut compact = None;
-    let mut ip = None;
 
     for pair in raw_query.split('&').filter(|s| !s.is_empty()) {
         let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
@@ -72,20 +65,6 @@ pub fn parse_announce_query(raw_query: &str) -> Result<AnnounceQuery, ProtocolEr
             "info_hash" => info_hash = Some(parse_info_hash_value(value)?),
             "peer_id" => peer_id = Some(parse_peer_id_value(value)?),
             "port" => port = Some(value.parse().map_err(|_| ProtocolError::Invalid("port"))?),
-            "uploaded" => {
-                uploaded = Some(
-                    value
-                        .parse()
-                        .map_err(|_| ProtocolError::Invalid("uploaded"))?,
-                )
-            }
-            "downloaded" => {
-                downloaded = Some(
-                    value
-                        .parse()
-                        .map_err(|_| ProtocolError::Invalid("downloaded"))?,
-                )
-            }
             "left" => left = Some(value.parse().map_err(|_| ProtocolError::Invalid("left"))?),
             "event" => {
                 event = Some(match value {
@@ -103,15 +82,6 @@ pub fn parse_announce_query(raw_query: &str) -> Result<AnnounceQuery, ProtocolEr
                         .map_err(|_| ProtocolError::Invalid("numwant"))?,
                 )
             }
-            "compact" => {
-                compact = Some(
-                    value
-                        .parse::<u64>()
-                        .map_err(|_| ProtocolError::Invalid("compact"))?
-                        != 0,
-                )
-            }
-            "ip" => ip = Some(value.parse().map_err(|_| ProtocolError::Invalid("ip"))?),
             _ => {}
         }
     }
@@ -120,13 +90,9 @@ pub fn parse_announce_query(raw_query: &str) -> Result<AnnounceQuery, ProtocolEr
         info_hash: info_hash.ok_or(ProtocolError::Missing("info_hash"))?,
         peer_id: peer_id.ok_or(ProtocolError::Missing("peer_id"))?,
         port: port.ok_or(ProtocolError::Missing("port"))?,
-        uploaded: uploaded.unwrap_or(0),
-        downloaded: downloaded.unwrap_or(0),
         left: left.unwrap_or(0),
         event: event.unwrap_or(AnnounceEvent::Empty),
         numwant: numwant.unwrap_or(100).min(400),
-        compact: compact.unwrap_or(true),
-        ip,
     })
 }
 
@@ -156,13 +122,15 @@ pub fn parse_scrape_query(raw_query: &str) -> Result<ScrapeQuery, ProtocolError>
     Ok(ScrapeQuery { info_hashes })
 }
 
-pub fn peer_ip(query_ip: Option<IpAddr>, remote_addr: Option<SocketAddr>) -> IpAddr {
-    query_ip
+/// Resolve the announcing peer's IP: the trusted-proxy header IP when
+/// present, otherwise the remote address.
+pub fn peer_ip(header_ip: Option<IpAddr>, remote_addr: Option<SocketAddr>) -> IpAddr {
+    header_ip
         .or_else(|| remote_addr.map(|addr| addr.ip()))
         .unwrap_or(IpAddr::from([127, 0, 0, 1]))
 }
 
-pub fn announce_response(output: AnnounceOutput, _compact: bool) -> Vec<u8> {
+pub fn announce_response(output: AnnounceOutput) -> Vec<u8> {
     let (v4_bytes, v6_bytes) = output.peers;
     let mut buf = Vec::with_capacity(160 + v4_bytes.len() + v6_bytes.len());
     buf.push(b'd');
@@ -312,7 +280,7 @@ mod tests {
             downloaded: 0,
             peers: (vec![127, 0, 0, 1, 0x1a, 0xe1], vec![]),
         };
-        let encoded = announce_response(output, true);
+        let encoded = announce_response(output);
         assert!(encoded.windows(6).any(|w| w == [127, 0, 0, 1, 0x1a, 0xe1]));
     }
 
@@ -327,7 +295,7 @@ mod tests {
             downloaded: 0,
             peers: (vec![], v6.clone()),
         };
-        let encoded = announce_response(output, true);
+        let encoded = announce_response(output);
         assert!(encoded.windows(18).any(|w| w == v6.as_slice()));
     }
 }

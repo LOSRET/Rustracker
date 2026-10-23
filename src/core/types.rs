@@ -62,8 +62,6 @@ pub struct AnnounceInput {
     pub peer_id: PeerId,
     pub ip: IpAddr,
     pub port: u16,
-    pub uploaded: u64,
-    pub downloaded: u64,
     pub left: u64,
     pub event: AnnounceEvent,
     pub numwant: usize,

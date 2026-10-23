@@ -172,8 +172,6 @@ fn run_bench(label: &str, torrents: usize, total_peers: usize, max_peers: usize)
                 peer_id: PeerId::new(pid),
                 ip,
                 port,
-                uploaded: 0,
-                downloaded: 0,
                 left: if j % 3 == 0 { 0 } else { 1_000_000_000 },
                 event: AnnounceEvent::Started,
                 numwant: 50,
@@ -182,7 +180,7 @@ fn run_bench(label: &str, torrents: usize, total_peers: usize, max_peers: usize)
 
             let output = tracker.announce(input, now);
             // Encode bencode response (simulates real request path)
-            let _resp = announce_response(output, true);
+            let _resp = announce_response(output);
             drop(_resp);
         }
         peers_done += count;
