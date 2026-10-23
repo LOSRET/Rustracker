@@ -22,6 +22,7 @@ mod pool;
 mod rps;
 mod trends;
 
+use admin::BlacklistAdmin;
 use audit::AuditLog;
 use blacklist::BlacklistStore;
 use pool::TrackerPool;
@@ -34,7 +35,9 @@ pub struct AppState {
     pub(crate) tracker: Arc<TrackerPool>,
     pub(crate) trends: TrendsState,
     pub(crate) blacklist: Arc<BlacklistStore>,
-    pub(crate) audit: Arc<AuditLog>,
+    /// Blacklist mutation service shared by the HTTP admin endpoints and MCP;
+    /// built once so both surfaces cannot drift apart. Owns the audit log.
+    pub(crate) admin: Arc<BlacklistAdmin>,
     pub(crate) admin_token: Option<String>,
     pub(crate) trust_proxy_headers: bool,
     pub(crate) mcp_enabled: bool,
@@ -46,11 +49,13 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(tracker: Tracker, trends_file: Option<PathBuf>) -> Self {
+        let blacklist = Arc::new(BlacklistStore::new(None));
+        let audit = Arc::new(AuditLog::new(None));
         Self {
             tracker: Arc::new(TrackerPool::single(tracker)),
             trends: TrendsState::new(trends_file),
-            blacklist: Arc::new(BlacklistStore::new(None)),
-            audit: Arc::new(AuditLog::new(None)),
+            admin: Arc::new(BlacklistAdmin::new(blacklist.clone(), audit.clone())),
+            blacklist,
             admin_token: None,
             trust_proxy_headers: false,
             mcp_enabled: true,
@@ -75,11 +80,12 @@ impl AppState {
         trust_proxy_headers: bool,
     ) -> Self {
         let audit = Arc::new(AuditLog::new(blacklist_path.as_deref()));
+        let blacklist = Arc::new(BlacklistStore::new(blacklist_path));
         let state = Self {
             tracker: Arc::new(TrackerPool::new(interval, peer_timeout, shards)),
             trends: TrendsState::new(trends_file),
-            blacklist: Arc::new(BlacklistStore::new(blacklist_path)),
-            audit,
+            admin: Arc::new(BlacklistAdmin::new(blacklist.clone(), audit.clone())),
+            blacklist,
             admin_token,
             trust_proxy_headers,
             mcp_enabled: true,

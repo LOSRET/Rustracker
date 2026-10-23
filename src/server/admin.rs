@@ -248,8 +248,7 @@ pub(crate) async fn add_blacklist(
     };
 
     let context = http_audit_context(&state, &headers, connect_info);
-    let admin = BlacklistAdmin::new(state.blacklist.clone(), state.audit.clone());
-    match admin.add(info_hash, &context).await {
+    match state.admin.add(info_hash, &context).await {
         Ok(added) => (
             StatusCode::OK,
             Json(AddBlacklistResponse {
@@ -299,8 +298,7 @@ pub(crate) async fn remove_blacklist(
     };
 
     let context = http_audit_context(&state, &headers, connect_info);
-    let admin = BlacklistAdmin::new(state.blacklist.clone(), state.audit.clone());
-    match admin.remove(info_hash, &context).await {
+    match state.admin.remove(info_hash, &context).await {
         Ok(removed) => (
             StatusCode::OK,
             Json(RemoveBlacklistResponse {

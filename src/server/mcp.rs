@@ -19,7 +19,7 @@ use rmcp::{schemars, tool, tool_handler, tool_router, Json, RoleServer, ServerHa
 use serde::{Deserialize, Serialize};
 
 use super::admin::BlacklistAdmin;
-use super::audit::{AuditContext, AuditLog};
+use super::audit::AuditContext;
 use super::blacklist::{BlacklistStore, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT};
 use super::handlers::cloudflare_connecting_ip;
 use super::AppState;
@@ -31,7 +31,7 @@ use crate::core::types::InfoHash;
 #[derive(Clone)]
 struct McpState {
     blacklist: Arc<BlacklistStore>,
-    audit: Arc<AuditLog>,
+    admin: Arc<BlacklistAdmin>,
     trust_proxy_headers: bool,
 }
 
@@ -89,7 +89,7 @@ impl BlacklistMcp {
         Self {
             state: McpState {
                 blacklist: state.blacklist.clone(),
-                audit: state.audit.clone(),
+                admin: state.admin.clone(),
                 trust_proxy_headers: state.trust_proxy_headers,
             },
             tool_router: Self::tool_router(),
@@ -130,8 +130,7 @@ impl BlacklistMcp {
         self.ensure_blacklist_configured()?;
         let info_hash = parse_info_hash(&args.info_hash)?;
         let audit_context = audit_context(&self.state, &context);
-        let admin = self.admin();
-        match admin.add(info_hash, &audit_context).await {
+        match self.state.admin.add(info_hash, &audit_context).await {
             Ok(added) => Ok(Json(AddOutput {
                 added,
                 info_hash: info_hash.to_string(),
@@ -181,8 +180,7 @@ impl BlacklistMcp {
         self.ensure_blacklist_configured()?;
         let info_hash = parse_info_hash(&args.info_hash)?;
         let audit_context = audit_context(&self.state, &context);
-        let admin = self.admin();
-        match admin.remove(info_hash, &audit_context).await {
+        match self.state.admin.remove(info_hash, &audit_context).await {
             Ok(removed) => Ok(Json(RemoveOutput {
                 removed,
                 info_hash: info_hash.to_string(),
@@ -192,10 +190,6 @@ impl BlacklistMcp {
                 Err(format!("failed to remove blacklist entry: {error}"))
             }
         }
-    }
-
-    fn admin(&self) -> BlacklistAdmin {
-        BlacklistAdmin::new(self.state.blacklist.clone(), self.state.audit.clone())
     }
 
     /// Mutations need a blacklist file to write to. The HTTP admin surface
@@ -271,9 +265,13 @@ mod tests {
     const HASH: &str = "abcdef0123456789abcdef0123456789abcdef01";
 
     fn test_state(trust_proxy_headers: bool) -> McpState {
+        let blacklist = Arc::new(BlacklistStore::new(None));
         McpState {
-            blacklist: Arc::new(BlacklistStore::new(None)),
-            audit: Arc::new(AuditLog::new(None)),
+            admin: Arc::new(BlacklistAdmin::new(
+                blacklist.clone(),
+                Arc::new(super::super::audit::AuditLog::new(None)),
+            )),
+            blacklist,
             trust_proxy_headers,
         }
     }
