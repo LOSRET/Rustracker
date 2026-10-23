@@ -58,7 +58,7 @@ pub(crate) fn save_client_point(
 
 pub(crate) fn load_trends_from_file(
     path: &Path,
-    top_clients_path: Option<&PathBuf>,
+    clients_path: Option<&PathBuf>,
 ) -> anyhow::Result<TrendStore> {
     let content = match std::fs::read_to_string(path) {
         Ok(c) => c,
@@ -82,9 +82,20 @@ pub(crate) fn load_trends_from_file(
         .collect();
 
     let mut client_points: Vec<(u64, Vec<(u8, u32)>)> = Vec::new();
-    if let Some(cp) = top_clients_path {
-        if let Ok(cc) = std::fs::read_to_string(cp) {
-            client_points = cc
+    if let Some(clients_path) = clients_path {
+        // Upgraded deployments keep their history in the legacy fixed-name
+        // `top_clients.jsonl` next to the trends file; read it until the
+        // per-file sidecar exists. Writes always target the sidecar, so
+        // the legacy file is never touched again.
+        let content = std::fs::read_to_string(clients_path).ok().or_else(|| {
+            let legacy = clients_path
+                .parent()
+                .unwrap_or(Path::new("."))
+                .join("top_clients.jsonl");
+            std::fs::read_to_string(legacy).ok()
+        });
+        if let Some(content) = content {
+            client_points = content
                 .lines()
                 .filter_map(|line| {
                     let v: serde_json::Value = match serde_json::from_str(line) {

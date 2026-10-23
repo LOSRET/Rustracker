@@ -280,7 +280,7 @@ cargo run --release -- --trends-file /var/lib/rustracker/trends.jsonl
 - Data is sampled every 10 minutes and retained for 7 days
 - Two JSONL files are created:
   - `<path>` (e.g. `trends.jsonl`) — torrents/peers/seeders/leechers per timestamp
-  - `top_clients.jsonl` in the same directory — client distribution per timestamp
+  - `<stem>.clients.jsonl` next to it (e.g. `trends.clients.jsonl`) — client distribution per timestamp. A legacy `top_clients.jsonl` is still read on upgrade, but no longer written.
 - On restart, existing data is loaded from disk automatically
 - The Linux installer enables this by default at `/var/lib/rustracker/trends.jsonl`
 

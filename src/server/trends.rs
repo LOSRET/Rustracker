@@ -4,7 +4,7 @@
 //! sampled points, and `persist` the JSONL load/save. [`TrendsState`]
 //! ties them together and owns the background sampling task.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -32,19 +32,20 @@ pub(crate) const TREND_SAMPLE_INTERVAL: Duration = Duration::from_secs(10 * 60);
 pub(crate) struct TrendsState {
     store: Arc<RwLock<TrendStore>>,
     file: Option<PathBuf>,
-    top_clients_file: Option<PathBuf>,
+    clients_file: Option<PathBuf>,
 }
 
 impl TrendsState {
     pub(crate) fn new(trends_file: Option<PathBuf>) -> Self {
-        let top_clients_file = trends_file.as_ref().map(|p| {
-            p.parent()
-                .unwrap_or(Path::new("."))
-                .join("top_clients.jsonl")
-        });
+        // Sidecar named after the configured file (same convention as the
+        // blacklist audit log), so two instances sharing a directory with
+        // different trends files do not overwrite each other's history.
+        let clients_file = trends_file
+            .as_ref()
+            .map(|path| path.with_extension("clients.jsonl"));
         let store = match trends_file
             .as_ref()
-            .map(|p| load_trends_from_file(p, top_clients_file.as_ref()))
+            .map(|p| load_trends_from_file(p, clients_file.as_ref()))
             .transpose()
         {
             Ok(Some(store)) => store,
@@ -57,7 +58,7 @@ impl TrendsState {
         Self {
             store: Arc::new(RwLock::new(store)),
             file: trends_file,
-            top_clients_file,
+            clients_file,
         }
     }
 
@@ -112,7 +113,7 @@ impl TrendsState {
     /// Record a client distribution point and persist it (sampling task only).
     pub(crate) async fn record_clients_and_persist(&self, now: u64, clients: &[(u8, u64)]) {
         self.store.write().await.record_clients(now, clients);
-        if let Some(ref path) = self.top_clients_file {
+        if let Some(ref path) = self.clients_file {
             let _ = save_client_point(path, now, clients);
         }
     }

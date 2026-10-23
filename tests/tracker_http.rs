@@ -1642,6 +1642,70 @@ async fn corrupted_jsonl_first_line_still_loads() {
 }
 
 #[tokio::test]
+async fn legacy_top_clients_file_is_loaded_on_upgrade() {
+    use std::io::Write;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let dir = std::env::temp_dir().join(format!(
+        "rustracker-test-jsonl-upgrade-{}-{}",
+        std::process::id(),
+        temp_path_seq()
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let bucket = now - now % 600;
+
+    let trends_file = dir.join("trends.jsonl");
+    let mut f = std::fs::File::create(&trends_file).unwrap();
+    writeln!(
+        f,
+        r#"{{"timestamp":{bucket},"torrents":5,"peers":10,"seeders":3,"leechers":7}}"#
+    )
+    .unwrap();
+    drop(f);
+
+    // Pre-upgrade layout: the client history lives in the fixed-name
+    // `top_clients.jsonl`, and no per-file sidecar exists yet.
+    let mut cf = std::fs::File::create(dir.join("top_clients.jsonl")).unwrap();
+    writeln!(cf, r#"{{"timestamp":{bucket},"clients":[[19,5]]}}"#).unwrap();
+    drop(cf);
+
+    let state = AppState::sharded_with_blacklist_file(
+        Duration::from_secs(1800),
+        Duration::from_secs(3000),
+        16,
+        None,
+        Some(trends_file),
+        None,
+        false,
+    );
+    let app = router(state);
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/clients")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(parsed["tags"].as_array().unwrap(), &[serde_json::json!(19)]);
+    let history = parsed["history"].as_array().unwrap();
+    let counts = history.last().unwrap()["counts"].as_array().unwrap();
+    assert_eq!(counts, &[serde_json::json!(5)]);
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[tokio::test]
 async fn corrupted_client_trend_subarray_does_not_panic() {
     use std::io::Write;
 
@@ -1653,7 +1717,7 @@ async fn corrupted_client_trend_subarray_does_not_panic() {
     std::fs::create_dir_all(&dir).unwrap();
 
     let trends_file = dir.join("trends.jsonl");
-    let top_clients_file = dir.join("top_clients.jsonl");
+    let clients_file = dir.join("trends.clients.jsonl");
     let mut f = std::fs::File::create(&trends_file).unwrap();
     // A valid trend point so load_trends_from_file does not short-circuit.
     writeln!(
@@ -1663,7 +1727,7 @@ async fn corrupted_client_trend_subarray_does_not_panic() {
     .unwrap();
     drop(f);
 
-    let mut cf = std::fs::File::create(&top_clients_file).unwrap();
+    let mut cf = std::fs::File::create(&clients_file).unwrap();
     // Line contains a subarray with only ONE element — this used to panic at
     // `arr[1]` index access. Must be skipped instead.
     writeln!(

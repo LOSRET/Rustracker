@@ -280,7 +280,7 @@ cargo run --release -- --trends-file /var/lib/rustracker/trends.jsonl
 - 数据每 10 分钟采样一次，保留 7 天
 - 会创建两个 JSONL 文件：
   - `<路径>`（如 `trends.jsonl`）——每个时间戳的种子数/peer 数/做种数/下载数
-  - 同目录下的 `top_clients.jsonl`——每个时间戳的客户端分布
+  - 同目录下以趋势文件名派生的 `<stem>.clients.jsonl`（如 `trends.clients.jsonl`）——每个时间戳的客户端分布。升级后仍会读取旧版 `top_clients.jsonl`，但不再写入。
 - 重启时自动从磁盘加载历史数据
 - Linux 安装脚本默认在 `/var/lib/rustracker/trends.jsonl` 启用此功能
 

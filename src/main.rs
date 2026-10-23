@@ -53,7 +53,8 @@ struct Args {
     blacklist: Option<PathBuf>,
 
     /// Path to persist trend data (JSONL). Trends are saved every 10 minutes and
-    /// retained for 7 days. A companion `top_clients.jsonl` is created alongside it.
+    /// retained for 7 days. A companion `<stem>.clients.jsonl` is created alongside
+    /// it (a legacy `top_clients.jsonl` is still read, but no longer written).
     #[arg(long, env = "RUSTRACKER_TRENDS_FILE")]
     trends_file: Option<PathBuf>,
 
