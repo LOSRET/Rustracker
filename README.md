@@ -207,7 +207,7 @@ curl "http://127.0.0.1:8080/api/blacklist?limit=100&offset=0" \
   -H "Authorization: Bearer $RUSTRACKER_ADMIN_TOKEN"
 ```
 
-The response is `{"ok":true,"total":1,"offset":0,"limit":100,"entries":["0123..."],"error":null}`.
+The response is `{"total":1,"offset":0,"limit":100,"entries":["0123..."],"error":null}`.
 
 Remove an entry:
 

@@ -207,7 +207,7 @@ curl "http://127.0.0.1:8080/api/blacklist?limit=100&offset=0" \
   -H "Authorization: Bearer $RUSTRACKER_ADMIN_TOKEN"
 ```
 
-响应形如 `{"ok":true,"total":1,"offset":0,"limit":100,"entries":["0123..."],"error":null}`。
+响应形如 `{"total":1,"offset":0,"limit":100,"entries":["0123..."],"error":null}`。
 
 删除条目：
 

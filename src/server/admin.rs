@@ -97,7 +97,6 @@ pub(crate) struct AddBlacklistRequest {
 
 #[derive(Debug, Serialize)]
 pub(crate) struct AddBlacklistResponse {
-    pub ok: bool,
     pub added: bool,
     pub info_hash: Option<String>,
     pub error: Option<String>,
@@ -117,7 +116,6 @@ pub(crate) struct RemoveBlacklistQuery {
 
 #[derive(Debug, Serialize)]
 pub(crate) struct BlacklistStatusResponse {
-    pub ok: bool,
     pub blacklisted: bool,
     pub info_hash: Option<String>,
     pub error: Option<String>,
@@ -125,7 +123,6 @@ pub(crate) struct BlacklistStatusResponse {
 
 #[derive(Debug, Serialize)]
 pub(crate) struct ListBlacklistResponse {
-    pub ok: bool,
     pub total: usize,
     pub offset: usize,
     pub limit: usize,
@@ -135,7 +132,6 @@ pub(crate) struct ListBlacklistResponse {
 
 #[derive(Debug, Serialize)]
 pub(crate) struct RemoveBlacklistResponse {
-    pub ok: bool,
     pub removed: bool,
     pub info_hash: Option<String>,
     pub error: Option<String>,
@@ -188,7 +184,6 @@ pub(crate) async fn blacklist_get(
         return (
             StatusCode::OK,
             Json(BlacklistStatusResponse {
-                ok: true,
                 blacklisted,
                 info_hash: Some(info_hash.to_string()),
                 error: None,
@@ -207,7 +202,6 @@ pub(crate) async fn blacklist_get(
     (
         StatusCode::OK,
         Json(ListBlacklistResponse {
-            ok: true,
             total,
             offset,
             limit,
@@ -252,7 +246,6 @@ pub(crate) async fn add_blacklist(
         Ok(added) => (
             StatusCode::OK,
             Json(AddBlacklistResponse {
-                ok: true,
                 added,
                 info_hash: Some(info_hash.to_string()),
                 error: None,
@@ -302,7 +295,6 @@ pub(crate) async fn remove_blacklist(
         Ok(removed) => (
             StatusCode::OK,
             Json(RemoveBlacklistResponse {
-                ok: true,
                 removed,
                 info_hash: Some(info_hash.to_string()),
                 error: None,
@@ -380,7 +372,6 @@ fn status_error(status: StatusCode, error: &'static str) -> Response {
     (
         status,
         Json(BlacklistStatusResponse {
-            ok: false,
             blacklisted: false,
             info_hash: None,
             error: Some(error.to_string()),
@@ -398,7 +389,6 @@ fn list_error(
     (
         status,
         Json(ListBlacklistResponse {
-            ok: false,
             total: 0,
             offset: offset.unwrap_or(0),
             limit: limit.unwrap_or(DEFAULT_LIST_LIMIT).min(MAX_LIST_LIMIT),
@@ -413,7 +403,6 @@ fn add_error(status: StatusCode, error: &'static str) -> (StatusCode, Json<AddBl
     (
         status,
         Json(AddBlacklistResponse {
-            ok: false,
             added: false,
             info_hash: None,
             error: Some(error.to_string()),
@@ -428,7 +417,6 @@ fn remove_error(
     (
         status,
         Json(RemoveBlacklistResponse {
-            ok: false,
             removed: false,
             info_hash: None,
             error: Some(error.to_string()),

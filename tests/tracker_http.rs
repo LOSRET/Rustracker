@@ -965,7 +965,6 @@ async fn blacklist_list_is_sorted_and_paginated() {
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
     let parsed = json_body(response).await;
-    assert_eq!(parsed["ok"], true);
     assert_eq!(parsed["total"], 3);
     assert_eq!(parsed["offset"], 0);
     assert_eq!(parsed["limit"], 2);
@@ -1014,7 +1013,6 @@ async fn blacklist_list_requires_token() {
 
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     let parsed = json_body(response).await;
-    assert_eq!(parsed["ok"], false);
     assert_eq!(parsed["error"], "unauthorized");
     cleanup(&path);
 }
@@ -1049,7 +1047,6 @@ async fn remove_blacklist_deletes_entry_and_unblocks_announce() {
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
     let parsed = json_body(response).await;
-    assert_eq!(parsed["ok"], true);
     assert_eq!(parsed["removed"], true);
 
     let file = std::fs::read_to_string(&path).unwrap();
