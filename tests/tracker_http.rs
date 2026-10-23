@@ -1553,7 +1553,7 @@ async fn duplicate_peer_started_does_not_double_count() {
 }
 
 #[tokio::test]
-async fn compact_zero_returns_dict_peers() {
+async fn compact_zero_still_returns_compact_peers() {
     let app = app();
     // Add a peer first
     app.clone()
@@ -1579,8 +1579,7 @@ async fn compact_zero_returns_dict_peers() {
             String::from_utf8_lossy(&body)
         );
     }
-    // Always returns compact peer data regardless of the compact flag.
-    // The compact parameter is accepted but the response format is always compact.
+    // The compact parameter is ignored; the response format is always compact.
     assert!(body.windows(b"5:peers".len()).any(|w| w == b"5:peers"));
 }
 
