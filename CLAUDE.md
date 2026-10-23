@@ -245,7 +245,7 @@ All flags support env var fallback. CLI takes precedence over env vars. `--inter
 ## Key API Endpoints
 
 - `GET /announce` — BEP 3 announce endpoint (peer registration)
-- `GET /scrape` — BEP 3 scrape endpoint (torrent statistics)
+- `GET /scrape` — BEP 3 scrape endpoint (torrent statistics; accepts up to 200 `info_hash` parameters, more returns a bencoded 400 failure)
 - `GET /healthz` — Health check (returns `200 OK` with body `ok`)
 - `GET /api/stats` — JSON statistics (peers, seeders, leechers, torrents, completed, rps, version, uptime_secs)
 - `GET /api/trends` — Historical trend data (7-day retention, 10-min sampling)

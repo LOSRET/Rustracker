@@ -1969,6 +1969,31 @@ async fn duplicate_completed_does_not_increment() {
 }
 
 #[tokio::test]
+async fn scrape_rejects_more_than_200_info_hashes() {
+    let app = app();
+    let query: String = (0..=200)
+        .map(|index| format!("info_hash={index:020}"))
+        .collect::<Vec<_>>()
+        .join("&");
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri(format!("/scrape?{query}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    assert!(body
+        .windows(b"failure reason".len())
+        .any(|w| w == b"failure reason"));
+}
+
+#[tokio::test]
 async fn scrape_multiple_info_hashes() {
     let app = app();
     // Add peers to two different torrents

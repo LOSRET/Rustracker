@@ -130,7 +130,7 @@ Compact peer format: each IPv4 peer is 6 bytes (4-byte IP + 2-byte port, big-end
 GET /scrape?info_hash=<20-byte>[&info_hash=...]
 ```
 
-Multiple `info_hash` parameters are supported. Response (bencoded):
+Multiple `info_hash` parameters are supported (up to 200; requests with more return a bencoded `400` failure). Response (bencoded):
 
 ```
 d5:filesd20:<info_hash>d8:completei5e10:downloadedi10e10:incompletei3eeee

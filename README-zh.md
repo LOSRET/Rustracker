@@ -130,7 +130,7 @@ d8:completei5e10:downloadedi0e10:incompletei3e8:intervali1800e5:peers60:...(紧�
 GET /scrape?info_hash=<20字节>[&info_hash=...]
 ```
 
-支持多个 `info_hash` 参数。响应（Bencode 编码）：
+支持多个 `info_hash` 参数（上限 200 个，超出返回 bencode 编码的 `400` 错误）。响应（Bencode 编码）：
 
 ```
 d5:filesd20:<info_hash>d8:completei5e10:downloadedi10e10:incompletei3eeee

@@ -130,19 +130,24 @@ pub fn parse_announce_query(raw_query: &str) -> Result<AnnounceQuery, ProtocolEr
     })
 }
 
+/// Maximum number of `info_hash` parameters accepted in one scrape
+/// request. Without a cap, a single large URI could force an unbounded
+/// amount of per-hash work (parse, shard locks, response build) on this
+/// unauthenticated endpoint.
+pub const MAX_SCRAPE_HASHES: usize = 200;
+
 pub fn parse_scrape_query(raw_query: &str) -> Result<ScrapeQuery, ProtocolError> {
-    let info_hashes: Vec<_> = raw_query
-        .split('&')
-        .filter(|s| !s.is_empty())
-        .filter_map(|pair| {
-            let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
-            if key == "info_hash" {
-                Some(parse_info_hash_value(value))
-            } else {
-                None
-            }
-        })
-        .collect::<Result<Vec<_>, _>>()?;
+    let mut info_hashes = Vec::new();
+    for pair in raw_query.split('&').filter(|s| !s.is_empty()) {
+        let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
+        if key != "info_hash" {
+            continue;
+        }
+        if info_hashes.len() == MAX_SCRAPE_HASHES {
+            return Err(ProtocolError::Invalid("too many info_hash values"));
+        }
+        info_hashes.push(parse_info_hash_value(value)?);
+    }
 
     if info_hashes.is_empty() {
         return Err(ProtocolError::Missing("info_hash"));
@@ -272,6 +277,30 @@ mod tests {
                 .unwrap();
 
         assert_eq!(parsed.info_hashes.len(), 2);
+    }
+
+    #[test]
+    fn scrape_accepts_up_to_the_hash_limit() {
+        let query: String = (0..super::MAX_SCRAPE_HASHES)
+            .map(|index| format!("info_hash={index:020}"))
+            .collect::<Vec<_>>()
+            .join("&");
+        let parsed = parse_scrape_query(&query).unwrap();
+
+        assert_eq!(parsed.info_hashes.len(), super::MAX_SCRAPE_HASHES);
+    }
+
+    #[test]
+    fn scrape_rejects_more_than_the_hash_limit() {
+        let query: String = (0..=super::MAX_SCRAPE_HASHES)
+            .map(|index| format!("info_hash={index:020}"))
+            .collect::<Vec<_>>()
+            .join("&");
+
+        assert_eq!(
+            parse_scrape_query(&query),
+            Err(super::ProtocolError::Invalid("too many info_hash values"))
+        );
     }
 
     #[test]
