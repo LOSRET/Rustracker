@@ -224,16 +224,17 @@ curl -X DELETE "http://127.0.0.1:8080/api/blacklist?info_hash=0123456789abcdef01
 
 ### MCP 接口
 
-配置 `RUSTRACKER_ADMIN_TOKEN` 后，tracker 还会在 `/mcp` 暴露一个 MCP 服务，使用 Streamable HTTP 传输（无状态、JSON 响应），复用 admin Bearer token，提供四个工具：
+配置 `RUSTRACKER_ADMIN_TOKEN` 后，tracker 还会在 `/mcp` 暴露一个 MCP 服务，使用 Streamable HTTP 传输（无状态、JSON 响应），复用 admin Bearer token，提供五个工具：
 
 | 工具 | 说明 |
 |------|------|
+| `scrape` | 查询最多 200 个 info_hash 的做种/下载/完成数（只读；黑名单中的 hash 不返回） |
 | `blacklist_check` | 查询 info_hash 是否在黑名单（只读） |
 | `blacklist_add` | 添加 info_hash（幂等） |
 | `blacklist_list` | 分页列出 info_hash（`offset`/`limit`） |
 | `blacklist_remove` | 删除 info_hash（幂等） |
 
-端点会在 MCP 初始化时返回服务端 `instructions`，客户端无需额外提示就能知道这四个工具的用途，以及 `info_hash` 是 40 位十六进制字符串。
+端点会在 MCP 初始化时返回服务端 `instructions`，客户端无需额外提示就能知道这些工具的用途，以及 `info_hash` 是 40 位十六进制字符串。
 
 调用成功时返回工具的 `structuredContent`（`blacklisted`、`added`、`removed`、`entries` 等），没有 `ok` 字段：失败按 MCP 的方式上报 —— `isError: true` 加一段说明原因的文本（`info_hash` 格式非法，或 tracker 未配置 `--blacklist` 时提示 `blacklist file is not configured`）。
 

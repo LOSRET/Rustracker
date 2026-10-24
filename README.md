@@ -224,16 +224,17 @@ The blacklist file is designed for a single tracker process. If multiple instanc
 
 ### MCP endpoint
 
-When `RUSTRACKER_ADMIN_TOKEN` is set, the tracker also exposes an MCP server at `/mcp` using the Streamable HTTP transport (stateless, JSON responses). It reuses the admin Bearer token and provides four tools:
+When `RUSTRACKER_ADMIN_TOKEN` is set, the tracker also exposes an MCP server at `/mcp` using the Streamable HTTP transport (stateless, JSON responses). It reuses the admin Bearer token and provides five tools:
 
 | Tool | Description |
 |------|-------------|
+| `scrape` | Fetch swarm statistics (seeders, leechers, completed) for up to 200 info_hashes (read-only; blacklisted hashes are omitted) |
 | `blacklist_check` | Check whether an info_hash is blacklisted (read-only) |
 | `blacklist_add` | Add an info_hash (idempotent) |
 | `blacklist_list` | List info_hashes with `offset`/`limit` |
 | `blacklist_remove` | Remove an info_hash (idempotent) |
 
-The endpoint returns server `instructions` during MCP initialization, so a client knows what the four tools do and that `info_hash` is a 40-character hex string without extra prompting.
+The endpoint returns server `instructions` during MCP initialization, so a client knows what the tools do and that `info_hash` is a 40-character hex string without extra prompting.
 
 Successful calls return the tool's `structuredContent` (`blacklisted`, `added`, `removed`, `entries`, …). There is no `ok` field: a failed call is reported the MCP way — `isError: true` plus a text message explaining the failure (malformed `info_hash`, or `blacklist file is not configured` when the tracker was started without `--blacklist`).
 

@@ -1187,6 +1187,7 @@ async fn mcp_manages_blacklist_tools() {
         "blacklist_check",
         "blacklist_list",
         "blacklist_remove",
+        "scrape",
     ] {
         assert!(names.contains(&expected), "missing {expected}: {names:?}");
     }
@@ -1261,6 +1262,109 @@ async fn mcp_manages_blacklist_tools() {
     let last: serde_json::Value = serde_json::from_str(content.lines().last().unwrap()).unwrap();
     assert_eq!(last["source"], "mcp");
     assert_eq!(last["action"], "remove");
+    cleanup(&path);
+}
+
+#[tokio::test]
+async fn mcp_scrape_reports_swarm_stats_and_omits_blacklisted() {
+    let (app, path) = blacklist_app_with_token(Some("secret-token"));
+
+    // One seeder (left=0) and one leecher for the same torrent. Distinct
+    // ports: the swarm keys peers by IP:port, so a shared port would
+    // overwrite the first peer with the second.
+    for (peer_id, port, left) in [
+        ("-RT0001-abcdefgh1234", "6881", "0"),
+        ("-RT0001-abcdefgh5678", "6882", "1234"),
+    ] {
+        let response = app
+            .clone()
+            .oneshot(request_with_connect_info(&format!(
+                "/announce?info_hash=bbbbbbbbbbbbbbbbbbbb&peer_id={peer_id}&port={port}&left={left}&event=started&compact=1"
+            )))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    // The fixture blacklist contains 6161...61, so it must be omitted;
+    // 6464...64 is unknown and reports zeros.
+    let response = app
+        .oneshot(mcp_request(
+            Some("secret-token"),
+            mcp_tool_call(
+                2,
+                "scrape",
+                serde_json::json!({"info_hashes": [
+                    "6262626262626262626262626262626262626262",
+                    "6161616161616161616161616161616161616161",
+                    "6464646464646464646464646464646464646464"
+                ]}),
+            ),
+        ))
+        .await
+        .unwrap();
+    let scraped = json_body(response).await;
+    assert_ne!(scraped["result"]["isError"], true);
+    let entries = scraped["result"]["structuredContent"]["entries"]
+        .as_array()
+        .unwrap();
+    assert_eq!(entries.len(), 2);
+    assert_eq!(
+        entries[0]["info_hash"],
+        "6262626262626262626262626262626262626262"
+    );
+    assert_eq!(entries[0]["complete"], 1);
+    assert_eq!(entries[0]["incomplete"], 1);
+    assert_eq!(entries[0]["downloaded"], 0);
+    assert_eq!(
+        entries[1]["info_hash"],
+        "6464646464646464646464646464646464646464"
+    );
+    assert_eq!(entries[1]["complete"], 0);
+    assert_eq!(entries[1]["incomplete"], 0);
+
+    cleanup(&path);
+}
+
+#[tokio::test]
+async fn mcp_scrape_rejects_bad_input() {
+    let (app, path) = blacklist_app_with_token(Some("secret-token"));
+
+    let response = app
+        .clone()
+        .oneshot(mcp_request(
+            Some("secret-token"),
+            mcp_tool_call(2, "scrape", serde_json::json!({"info_hashes": []})),
+        ))
+        .await
+        .unwrap();
+    let parsed = json_body(response).await;
+    assert_eq!(parsed["result"]["isError"], true);
+    let text = parsed["result"]["content"][0]["text"].as_str().unwrap();
+    assert!(
+        text.contains("must not be empty"),
+        "unexpected error: {text}"
+    );
+
+    let response = app
+        .oneshot(mcp_request(
+            Some("secret-token"),
+            mcp_tool_call(
+                3,
+                "scrape",
+                serde_json::json!({"info_hashes": [
+                    "6262626262626262626262626262626262626262",
+                    "not-a-hash"
+                ]}),
+            ),
+        ))
+        .await
+        .unwrap();
+    let parsed = json_body(response).await;
+    assert_eq!(parsed["result"]["isError"], true);
+    let text = parsed["result"]["content"][0]["text"].as_str().unwrap();
+    assert!(text.contains("info_hashes[1]"), "unexpected error: {text}");
+
     cleanup(&path);
 }
 
