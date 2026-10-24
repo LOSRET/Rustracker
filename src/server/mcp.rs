@@ -1,9 +1,10 @@
-//! MCP management endpoint for the torrent blacklist.
+//! MCP endpoint for the torrent tracker: blacklist management and scrape.
 //!
 //! Mounted at `/mcp` using the Streamable HTTP transport in stateless mode.
-//! The endpoint reuses the admin bearer token and exposes four tools that
-//! share the same `BlacklistAdmin` service as the HTTP API, so validation,
-//! persistence, and auditing cannot drift between the two surfaces.
+//! The endpoint reuses the admin bearer token. The blacklist tools share the
+//! same `BlacklistAdmin` service as the HTTP API, so validation, persistence,
+//! and auditing cannot drift between the two surfaces; the scrape tool
+//! mirrors the HTTP `/scrape` endpoint, blacklist filtering included.
 
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -22,21 +23,24 @@ use super::admin::BlacklistAdmin;
 use super::audit::AuditContext;
 use super::blacklist::{BlacklistStore, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT};
 use super::handlers::cloudflare_connecting_ip;
+use super::pool::TrackerPool;
 use super::AppState;
 use crate::core::types::InfoHash;
+use crate::protocol::MAX_SCRAPE_HASHES;
 
 /// The slice of [`AppState`] the MCP tools actually need. Holding the whole
-/// app state would drag the tracker pool and the trend store into every
-/// tool handler for no reason.
+/// app state would drag the trend store into every tool handler for no
+/// reason.
 #[derive(Clone)]
 struct McpState {
+    tracker: Arc<TrackerPool>,
     blacklist: Arc<BlacklistStore>,
     admin: Arc<BlacklistAdmin>,
     trust_proxy_headers: bool,
 }
 
 #[derive(Clone)]
-pub(crate) struct BlacklistMcp {
+pub(crate) struct TrackerMcp {
     state: McpState,
     tool_router: ToolRouter<Self>,
 }
@@ -55,6 +59,13 @@ pub(crate) struct ListArgs {
     /// Maximum entries to return. Defaults to 100, capped at 1000.
     #[serde(default)]
     pub limit: Option<usize>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub(crate) struct ScrapeArgs {
+    /// BitTorrent info_hashes as 40-character hexadecimal strings.
+    /// At most 200; duplicates collapse.
+    pub info_hashes: Vec<String>,
 }
 
 #[derive(Debug, Serialize, schemars::JsonSchema)]
@@ -78,16 +89,33 @@ pub(crate) struct ListOutput {
 }
 
 #[derive(Debug, Serialize, schemars::JsonSchema)]
+pub(crate) struct ScrapeEntry {
+    pub info_hash: String,
+    /// Seeders (peers that have the complete torrent).
+    pub complete: u64,
+    /// Leechers (peers still downloading).
+    pub incomplete: u64,
+    /// Times the torrent has been reported fully downloaded.
+    pub downloaded: u64,
+}
+
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub(crate) struct ScrapeOutput {
+    pub entries: Vec<ScrapeEntry>,
+}
+
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 pub(crate) struct RemoveOutput {
     pub removed: bool,
     pub info_hash: String,
 }
 
 #[tool_router]
-impl BlacklistMcp {
+impl TrackerMcp {
     pub(crate) fn new(state: &AppState) -> Self {
         Self {
             state: McpState {
+                tracker: state.tracker.clone(),
                 blacklist: state.blacklist.clone(),
                 admin: state.admin.clone(),
                 trust_proxy_headers: state.trust_proxy_headers,
@@ -192,6 +220,32 @@ impl BlacklistMcp {
         }
     }
 
+    #[tool(
+        name = "scrape",
+        description = "Fetch swarm statistics (seeders, leechers, completed downloads) for up to 200 info_hashes. Mirrors the HTTP /scrape endpoint: blacklisted info_hashes are omitted and unknown info_hashes report zeros.",
+        annotations(read_only_hint = true, open_world_hint = false)
+    )]
+    async fn scrape(
+        &self,
+        Parameters(args): Parameters<ScrapeArgs>,
+    ) -> Result<Json<ScrapeOutput>, String> {
+        let info_hashes = parse_info_hashes(&args.info_hashes)?;
+        let allowed = self.state.blacklist.filter_allowed(&info_hashes).await;
+        let stats = self.state.tracker.scrape(&allowed).await;
+        let mut entries: Vec<_> = stats
+            .into_iter()
+            .map(|(info_hash, stats)| ScrapeEntry {
+                info_hash: info_hash.to_string(),
+                complete: stats.complete as u64,
+                incomplete: stats.incomplete as u64,
+                downloaded: stats.downloaded,
+            })
+            .collect();
+        // Same deterministic order as the bencoded scrape response.
+        entries.sort_by(|a, b| a.info_hash.cmp(&b.info_hash));
+        Ok(Json(ScrapeOutput { entries }))
+    }
+
     /// Mutations need a blacklist file to write to. The HTTP admin surface
     /// answers `503` in that case; MCP reports the same condition as a tool
     /// error so a misconfiguration is not mistaken for a failed write.
@@ -206,13 +260,13 @@ impl BlacklistMcp {
 #[tool_handler(
     router = self.tool_router,
     name = "rustracker",
-    instructions = "Manage the rustracker BitTorrent tracker blacklist. Use blacklist_check/list for read-only inspection, blacklist_add to block a torrent, and blacklist_remove to unblock it. All info_hash values are 40-character hexadecimal strings."
+    instructions = "Operate the rustracker BitTorrent tracker. Use scrape to read swarm statistics (seeders/leechers/completed) for info_hashes; use blacklist_check/list for read-only blacklist inspection, blacklist_add to block a torrent, and blacklist_remove to unblock it. All info_hash values are 40-character hexadecimal strings."
 )]
-impl ServerHandler for BlacklistMcp {}
+impl ServerHandler for TrackerMcp {}
 
-pub(crate) fn service(state: AppState) -> StreamableHttpService<BlacklistMcp, NeverSessionManager> {
+pub(crate) fn service(state: AppState) -> StreamableHttpService<TrackerMcp, NeverSessionManager> {
     StreamableHttpService::new(
-        move || Ok(BlacklistMcp::new(&state)),
+        move || Ok(TrackerMcp::new(&state)),
         NeverSessionManager::default().into(),
         StreamableHttpServerConfig::default()
             // Stateless: no Mcp-Session-Id and no session affinity required.
@@ -230,6 +284,24 @@ pub(crate) fn service(state: AppState) -> StreamableHttpService<BlacklistMcp, Ne
 fn parse_info_hash(raw: &str) -> Result<InfoHash, String> {
     InfoHash::from_hex(raw.trim())
         .ok_or_else(|| "info_hash must be a 40-char hex string".to_string())
+}
+
+fn parse_info_hashes(raw: &[String]) -> Result<Vec<InfoHash>, String> {
+    if raw.is_empty() {
+        return Err("info_hashes must not be empty".to_string());
+    }
+    if raw.len() > MAX_SCRAPE_HASHES {
+        return Err(format!(
+            "too many info_hash values: {} (max {MAX_SCRAPE_HASHES})",
+            raw.len()
+        ));
+    }
+    raw.iter()
+        .enumerate()
+        .map(|(index, value)| {
+            parse_info_hash(value).map_err(|error| format!("info_hashes[{index}]: {error}"))
+        })
+        .collect()
 }
 
 fn audit_context(state: &McpState, context: &RequestContext<RoleServer>) -> AuditContext {
@@ -261,12 +333,17 @@ mod tests {
     use axum::http::Request;
 
     use crate::core::tracker::Tracker;
+    use crate::protocol::MAX_SCRAPE_HASHES;
 
     const HASH: &str = "abcdef0123456789abcdef0123456789abcdef01";
 
     fn test_state(trust_proxy_headers: bool) -> McpState {
         let blacklist = Arc::new(BlacklistStore::new(None));
         McpState {
+            tracker: Arc::new(TrackerPool::single(Tracker::new(
+                Duration::from_secs(1800),
+                Duration::from_secs(3000),
+            ))),
             admin: Arc::new(BlacklistAdmin::new(
                 blacklist.clone(),
                 Arc::new(super::super::audit::AuditLog::new(None)),
@@ -284,7 +361,7 @@ mod tests {
         );
         app_state.trust_proxy_headers = true;
 
-        let mcp = BlacklistMcp::new(&app_state);
+        let mcp = TrackerMcp::new(&app_state);
 
         assert!(mcp.state.trust_proxy_headers);
     }
@@ -329,6 +406,31 @@ mod tests {
                 "expected {raw:?} to be rejected"
             );
         }
+    }
+
+    #[test]
+    fn parse_info_hashes_rejects_empty_and_over_limit_input() {
+        assert!(parse_info_hashes(&[]).is_err());
+
+        let too_many: Vec<String> = (0..=MAX_SCRAPE_HASHES).map(|_| HASH.to_string()).collect();
+        let error = parse_info_hashes(&too_many).expect_err("over the limit");
+        assert!(error.contains("too many"), "unexpected error: {error}");
+
+        let at_limit: Vec<String> = (0..MAX_SCRAPE_HASHES).map(|_| HASH.to_string()).collect();
+        assert_eq!(
+            parse_info_hashes(&at_limit).expect("at the limit").len(),
+            MAX_SCRAPE_HASHES
+        );
+    }
+
+    #[test]
+    fn parse_info_hashes_reports_the_offending_index() {
+        let raw = vec![HASH.to_string(), "not-a-hash".to_string()];
+        let error = parse_info_hashes(&raw).expect_err("malformed entry");
+        assert!(
+            error.contains("info_hashes[1]"),
+            "unexpected error: {error}"
+        );
     }
 
     #[test]
