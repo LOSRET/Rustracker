@@ -1,34 +1,22 @@
 <script setup lang="ts">
-import { computed, h, onActivated, ref } from "vue"
+import { computed, h, onActivated } from "vue"
 import type { TableColumn } from "@nuxt/ui"
-import UTooltip from "@nuxt/ui/runtime/components/Tooltip.vue"
-import { useClipboard } from "@vueuse/core"
 import type { SortKey, Top100Entry } from "../types/api"
 import { useTop100 } from "../composables/useTop100"
 import { useI18n } from "../composables/useI18n"
+import CopyButton from "../components/CopyButton.vue"
+import PageHeader from "../components/PageHeader.vue"
+import SegmentedControl from "../components/SegmentedControl.vue"
+import TablePanel from "../components/TablePanel.vue"
 
-const { t, number, d } = useI18n()
+const { t, number } = useI18n()
 const { data, loading, error, sort, lastUpdated, load } = useTop100()
-const { copied, copy } = useClipboard({ copiedDuring: 1500, legacy: true })
-const copiedHash = ref<string | null>(null)
 
 onActivated(load)
-
-function copyHash(hash: string) {
-  copiedHash.value = hash
-  copy(hash)
-}
 
 const rows = computed(() => {
   if (!data.value) return []
   return data.value[sort.value]
-})
-
-const statusText = computed(() => {
-  if (loading.value) return t("top100_loading")
-  if (error.value) return t("top100_error")
-  if (lastUpdated.value) return `${t("last_update")} ${d(lastUpdated.value, "time")}`
-  return ""
 })
 
 const sortOptions: SortKey[] = ["peers", "seeders", "leechers", "downloaded"]
@@ -54,29 +42,14 @@ const columns = computed<TableColumn<Top100Entry>[]>(() => [
     meta: { class: { td: "font-mono text-xs break-all" } },
     cell: ({ row }) => {
       const hash = String(row.getValue("info_hash"))
-      const isCopied = copied.value && copiedHash.value === hash
-
       return h(
-        UTooltip,
+        CopyButton,
         {
-          text: t("copied"),
-          open: isCopied,
-          content: { side: "top", sideOffset: 8 },
+          value: hash,
+          copyLabel: t("copy_hash"),
+          class: "inline-block max-w-full bg-code-bg px-1.5 py-0.5 text-left font-mono text-xs break-all rounded-sm",
         },
-        () =>
-          h(
-            "button",
-            {
-              type: "button",
-              class: [
-                "inline-block max-w-full border-0 bg-code-bg px-1.5 py-0.5 text-left font-mono text-xs break-all rounded-sm cursor-pointer transition-colors focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-1",
-                isCopied ? "text-good" : "text-ink hover:text-accent",
-              ],
-              "aria-label": `${hash} (${isCopied ? t("copied") : t("copy_hash")})`,
-              onClick: () => copyHash(hash),
-            },
-            hash,
-          ),
+        () => hash,
       )
     },
   },
@@ -105,76 +78,20 @@ const columns = computed<TableColumn<Top100Entry>[]>(() => [
     cell: ({ row }) => number(row.getValue("downloaded") as number),
   },
 ])
-
-const tableData = computed(() => (loading.value || error.value ? [] : rows.value))
 </script>
 
 <template>
-  <section class="flex justify-between items-start gap-5 mb-6 max-[900px]:flex-col max-[900px]:items-stretch">
-    <div>
-      <h1 class="m-0 mb-1.5 text-[28px] leading-tight max-[560px]:text-[24px] font-bold">{{ t("top100_title") }}</h1>
-      <p class="m-0 text-muted text-sm leading-relaxed">{{ t("top100_subtitle") }}</p>
-    </div>
-  </section>
-
-  <section class="bg-panel border border-line p-4 mb-5">
-    <div class="flex items-center justify-between gap-4 mb-3 max-[900px]:flex-col max-[900px]:items-stretch">
-      <URadioGroup
-        v-model="sort"
-        :items="sortItems"
-        variant="table"
-        orientation="horizontal"
-        indicator="hidden"
-        color="neutral"
-        :ui="{
-          fieldset: () => 'flex shrink-0 gap-0 -space-x-px',
-          item: () =>
-            'border text-muted px-4 text-[13px] cursor-pointer min-h-8 transition-colors flex items-center justify-center bg-panel border-line hover:bg-hover-soft has-data-[state=checked]:bg-accent has-data-[state=checked]:border-accent has-data-[state=checked]:text-white has-data-[state=checked]:z-[1] first-of-type:rounded-s last-of-type:rounded-e',
-          container: () => 'contents',
-          wrapper: () => 'contents',
-          label: () => 'text-inherit font-normal',
-        }"
-      />
-      <div class="flex items-center gap-3 max-[900px]:justify-between">
-        <span class="text-muted text-xs whitespace-nowrap">{{ statusText }}</span>
-        <UButton
-          :disabled="loading"
-          variant="none"
-          :class="[
-            'border border-line bg-panel text-ink px-4 text-[13px] cursor-pointer min-h-8 rounded hover:bg-hover-soft',
-            loading ? 'opacity-50 cursor-not-allowed' : '',
-          ]"
-          @click="load"
-        >
-          {{ t("refresh") }}
-        </UButton>
-      </div>
-    </div>
-
-    <div class="overflow-x-auto">
-      <UTable
-        :data="tableData"
-        :columns="columns"
-        :loading="loading"
-        :ui="{
-          root: 'overflow-visible',
-          base: 'min-w-full',
-          tbody: 'divide-y-0',
-          tr: 'hover:bg-row-hover',
-          th: 'p-2.5 bg-soft text-muted text-xs uppercase border-b-2 border-line whitespace-nowrap',
-          td: 'p-2 px-3 border-b border-td-border text-[13px] text-ink whitespace-normal',
-          empty: 'p-8 text-center text-[13px]',
-          loading: 'p-8 text-center text-[13px]',
-        }"
-      >
-        <template #loading>
-          <span class="text-muted">{{ t("top100_loading") }}</span>
-        </template>
-        <template #empty>
-          <span v-if="error" class="text-bad">{{ t("top100_error") }}</span>
-          <span v-else class="text-muted">{{ t("top100_empty") }}</span>
-        </template>
-      </UTable>
-    </div>
-  </section>
+  <PageHeader :title="t('top100_title')" :subtitle="t('top100_subtitle')" />
+  <TablePanel
+    :data="rows"
+    :columns="columns"
+    :loading="loading"
+    :error="error"
+    :last-updated="lastUpdated"
+    @refresh="load"
+  >
+    <template #controls>
+      <SegmentedControl v-model="sort" :items="sortItems" />
+    </template>
+  </TablePanel>
 </template>

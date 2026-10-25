@@ -60,7 +60,7 @@ function brandColor(name: string): string {
 const option = computed(() => {
   const historyAll = data?.history ?? []
   if (!historyAll.length) {
-    return emptyChartOption(error ? t("top100_error") : t("top100_empty"))
+    return emptyChartOption(error ? t("table_error") : t("table_empty"))
   }
 
   const names = data?.clients ?? []

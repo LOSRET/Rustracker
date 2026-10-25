@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { StatsResponse } from "../types/api"
-import { useClipboard } from "@vueuse/core"
 import { useI18n } from "../composables/useI18n"
+import CopyButton from "../components/CopyButton.vue"
+import PageHeader from "../components/PageHeader.vue"
 
 const { stats, error, lastUpdated } = defineProps<{
   stats: StatsResponse | null
@@ -10,13 +11,8 @@ const { stats, error, lastUpdated } = defineProps<{
 }>()
 
 const { t, number, d } = useI18n()
-const { copied, copy } = useClipboard({ copiedDuring: 1500, legacy: true })
 
 const trackerUrl = `${window.location.origin}/announce`
-
-function copyAddr() {
-  copy(trackerUrl)
-}
 
 function lastUpdateText() {
   const ts = lastUpdated
@@ -26,40 +22,30 @@ function lastUpdateText() {
 </script>
 
 <template>
-  <section class="flex justify-between items-start gap-5 mb-6 max-[900px]:flex-col max-[900px]:items-stretch">
-    <div>
-      <h1 class="m-0 mb-1.5 text-[28px] leading-tight font-bold max-[560px]:text-[24px]">{{ t("title") }}</h1>
-      <p class="m-0 text-muted text-sm leading-relaxed">{{ t("subtitle") }}</p>
-      <p :class="['text-xs mt-1.5', error ? 'text-bad' : 'text-muted']">
-        {{ error ? t("error") : lastUpdateText() }}
-      </p>
-      <div class="flex items-center flex-wrap gap-1 mb-5">
-        <span class="text-muted text-sm font-normal whitespace-nowrap">{{ t("tracker_addr_label") }}</span>
-        <UTooltip :text="t('copied')" :open="copied" :content="{ side: 'top', sideOffset: 8 }">
-          <button
-            type="button"
-            :class="[
-              'tracker-addr text-left text-base font-bold break-all cursor-pointer border-b border-dashed border-line transition-colors focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-1',
-              copied ? 'text-good' : 'text-ink hover:text-accent',
-            ]"
-            :aria-label="`${trackerUrl} (${copied ? t('copied') : t('copy_tracker')})`"
-            @click="copyAddr"
-          >
-            {{ trackerUrl }}
-          </button>
-        </UTooltip>
-      </div>
+  <PageHeader :title="t('title')" :subtitle="t('subtitle')">
+    <p :class="['text-xs mt-1.5', error ? 'text-bad' : 'text-muted']">
+      {{ error ? t("error") : lastUpdateText() }}
+    </p>
+    <div class="flex items-center flex-wrap gap-1 mb-5">
+      <span class="text-muted text-sm font-normal whitespace-nowrap">{{ t("tracker_addr_label") }}</span>
+      <CopyButton
+        :value="trackerUrl"
+        :copy-label="t('copy_tracker')"
+        class="tracker-addr text-left text-base font-bold break-all border-b border-dashed border-line"
+      />
     </div>
-    <div class="text-right shrink-0 bg-soft px-3.5 py-2 rounded max-[900px]:text-left">
-      <div
-        class="flex items-center justify-end gap-1.5 text-muted text-[11px] uppercase mb-0.5 max-[900px]:justify-start"
-      >
-        <i class="w-[7px] h-[7px] bg-good rounded-full shrink-0 animate-rps-pulse"></i>
-        Tracker RPS
+    <template #actions>
+      <div class="text-right shrink-0 bg-soft px-3.5 py-2 rounded max-[900px]:text-left">
+        <div
+          class="flex items-center justify-end gap-1.5 text-muted text-[11px] uppercase mb-0.5 max-[900px]:justify-start"
+        >
+          <i class="w-[7px] h-[7px] bg-good rounded-full shrink-0 animate-rps-pulse"></i>
+          Tracker RPS
+        </div>
+        <strong class="text-[22px] leading-none text-ink max-[900px]:text-xl">{{
+          number(stats?.tracker_rps ?? 0)
+        }}</strong>
       </div>
-      <strong class="text-[22px] leading-none text-ink max-[900px]:text-xl">{{
-        number(stats?.tracker_rps ?? 0)
-      }}</strong>
-    </div>
-  </section>
+    </template>
+  </PageHeader>
 </template>

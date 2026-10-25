@@ -4,6 +4,7 @@ import VChart from "vue-echarts"
 import { usePreferredDark } from "@vueuse/core"
 import type { TrendsResponse, RangeKey } from "../types/api"
 import { useI18n } from "../composables/useI18n"
+import SegmentedControl from "./SegmentedControl.vue"
 import { baseChart, emptyChartOption, filterRange, lineSeries } from "../utils/chart"
 
 const props = defineProps<{
@@ -18,7 +19,7 @@ const isDark = usePreferredDark()
 const option = computed(() => {
   const history = filterRange(props.data?.history ?? [], range.value)
   if (!history.length) {
-    return emptyChartOption(props.error ? t("top100_error") : t("top100_empty"))
+    return emptyChartOption(props.error ? t("table_error") : t("table_empty"))
   }
   const dark = isDark.value
   const labels = history.map((item) => d(item.timestamp * 1000, "chart"))
@@ -60,22 +61,7 @@ const rangeItems = computed(() =>
         <h2 class="m-0 text-base leading-relaxed font-bold">{{ t("chart_title") }}</h2>
         <span class="text-muted text-xs">{{ t("chart_note") }}</span>
       </div>
-      <URadioGroup
-        v-model="range"
-        :items="rangeItems"
-        variant="table"
-        orientation="horizontal"
-        indicator="hidden"
-        color="neutral"
-        :ui="{
-          fieldset: () => 'flex shrink-0 gap-0 -space-x-px',
-          item: () =>
-            'border text-muted px-3 text-xs cursor-pointer min-h-7 transition-colors flex items-center justify-center bg-panel border-line hover:bg-hover-soft has-data-[state=checked]:bg-accent has-data-[state=checked]:border-accent has-data-[state=checked]:text-white has-data-[state=checked]:z-[1] first-of-type:rounded-s last-of-type:rounded-e',
-          container: () => 'contents',
-          wrapper: () => 'contents',
-          label: () => 'text-inherit font-normal',
-        }"
-      />
+      <SegmentedControl v-model="range" :items="rangeItems" size="sm" />
     </div>
     <div class="w-full h-[440px] max-[900px]:h-[330px] max-[560px]:h-[275px]">
       <v-chart :option="option" :init-options="{ renderer: 'svg' }" autoresize />
