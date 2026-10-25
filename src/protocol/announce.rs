@@ -266,6 +266,19 @@ mod tests {
     }
 
     #[test]
+    fn numwant_defaults_to_100_and_caps_at_400() {
+        let base = "info_hash=%00%01%02%03%04%05%06%07%08%09%0A%0B%0C%0D%0E%0F%10%11%12%13&peer_id=-RT0001-abcdefgh1234&port=6881";
+
+        assert_eq!(parse_announce_query(base).unwrap().numwant, 100);
+        assert_eq!(
+            parse_announce_query(&format!("{base}&numwant=999999"))
+                .unwrap()
+                .numwant,
+            400
+        );
+    }
+
+    #[test]
     fn parses_multiple_scrape_hashes() {
         let parsed =
             parse_scrape_query("info_hash=aaaaaaaaaaaaaaaaaaaa&info_hash=bbbbbbbbbbbbbbbbbbbb")

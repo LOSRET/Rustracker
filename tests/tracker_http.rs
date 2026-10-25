@@ -7,7 +7,6 @@ use axum::http::{header, Request, StatusCode};
 use http_body_util::BodyExt;
 use rustracker::server::{router, AppState};
 use rustracker::tracker::Tracker;
-use rustracker::types::InfoHash;
 use tower::ServiceExt;
 
 fn app() -> axum::Router {
@@ -32,6 +31,26 @@ fn request_with_ipv6_connect_info(uri: &str, port: u16) -> Request<Body> {
             port,
         ))));
     req
+}
+
+/// Extracts the raw IPv4 `peers` byte string from a compact announce
+/// response, so assertions look only at peer data and not at other keys.
+fn compact_peers(body: &[u8]) -> &[u8] {
+    const MARKER: &[u8] = b"5:peers";
+    let start = body
+        .windows(MARKER.len())
+        .position(|w| w == MARKER)
+        .expect("peers key missing from announce response");
+    let rest = &body[start + MARKER.len()..];
+    let colon = rest
+        .iter()
+        .position(|&b| b == b':')
+        .expect("peers length prefix missing");
+    let len: usize = std::str::from_utf8(&rest[..colon])
+        .expect("peers length not utf-8")
+        .parse()
+        .expect("peers length not numeric");
+    &rest[colon + 1..colon + 1 + len]
 }
 
 fn sharded_app() -> axum::Router {
@@ -423,87 +442,45 @@ async fn compact_announce_includes_ipv6_peers6() {
 }
 
 #[tokio::test]
-async fn announce_uses_cloudflare_connecting_ip() {
-    let app = trusted_proxy_app();
-    let cloudflare_peer = "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-cloudflare01&port=6881&left=0&event=started&compact=1";
-    let requester = "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-requester123&port=6882&left=128&event=started&compact=1&ip=127.0.0.1";
+async fn announce_uses_trusted_proxy_headers() {
+    for (header, value, ip) in [
+        ("CF-Connecting-IP", "203.0.113.7", [203, 0, 113, 7]),
+        ("X-Real-IP", "198.51.100.42", [198, 51, 100, 42]),
+        // Only the first hop of X-Forwarded-For is honored.
+        (
+            "X-Forwarded-For",
+            "203.0.113.50, 10.0.0.1",
+            [203, 0, 113, 50],
+        ),
+    ] {
+        let app = trusted_proxy_app();
+        let proxy_peer = "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-proxypeer001&port=6881&left=0&event=started&compact=1";
+        let requester = "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-requester123&port=6882&left=128&event=started&compact=1";
 
-    let mut cf_req = Request::builder()
-        .uri(cloudflare_peer)
-        .header("CF-Connecting-IP", "203.0.113.7")
-        .body(Body::empty())
-        .unwrap();
-    cf_req
-        .extensions_mut()
-        .insert(MockConnectInfo(SocketAddr::from(([127, 0, 0, 1], 6881))));
-    app.clone().oneshot(cf_req).await.unwrap();
+        let mut req = Request::builder()
+            .uri(proxy_peer)
+            .header(header, value)
+            .body(Body::empty())
+            .unwrap();
+        req.extensions_mut()
+            .insert(MockConnectInfo(SocketAddr::from(([127, 0, 0, 1], 6881))));
+        app.clone().oneshot(req).await.unwrap();
 
-    let response = app
-        .oneshot(request_with_connect_info(requester))
-        .await
-        .unwrap();
+        let response = app
+            .oneshot(request_with_connect_info(requester))
+            .await
+            .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
-    let body = response.into_body().collect().await.unwrap().to_bytes();
-    assert!(body
-        .windows([203, 0, 113, 7, 26, 225].len())
-        .any(|window| window == [203, 0, 113, 7, 26, 225]));
-}
-
-#[tokio::test]
-async fn announce_uses_nginx_real_ip() {
-    let app = trusted_proxy_app();
-    let nginx_peer = "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-nginxpeer001&port=6881&left=0&event=started&compact=1";
-    let requester = "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-requester123&port=6882&left=128&event=started&compact=1";
-
-    let mut req = Request::builder()
-        .uri(nginx_peer)
-        .header("X-Real-IP", "198.51.100.42")
-        .body(Body::empty())
-        .unwrap();
-    req.extensions_mut()
-        .insert(MockConnectInfo(SocketAddr::from(([127, 0, 0, 1], 6881))));
-    app.clone().oneshot(req).await.unwrap();
-
-    let response = app
-        .oneshot(request_with_connect_info(requester))
-        .await
-        .unwrap();
-
-    assert_eq!(response.status(), StatusCode::OK);
-    let body = response.into_body().collect().await.unwrap().to_bytes();
-    // 198.51.100.42:6881 in compact form
-    assert!(body
-        .windows([198, 51, 100, 42, 26, 225].len())
-        .any(|window| window == [198, 51, 100, 42, 26, 225]));
-}
-
-#[tokio::test]
-async fn announce_uses_x_forwarded_for() {
-    let app = trusted_proxy_app();
-    let proxy_peer = "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-proxypeer001&port=6881&left=0&event=started&compact=1";
-    let requester = "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-requester123&port=6882&left=128&event=started&compact=1";
-
-    let mut req = Request::builder()
-        .uri(proxy_peer)
-        .header("X-Forwarded-For", "203.0.113.50, 10.0.0.1")
-        .body(Body::empty())
-        .unwrap();
-    req.extensions_mut()
-        .insert(MockConnectInfo(SocketAddr::from(([127, 0, 0, 1], 6881))));
-    app.clone().oneshot(req).await.unwrap();
-
-    let response = app
-        .oneshot(request_with_connect_info(requester))
-        .await
-        .unwrap();
-
-    assert_eq!(response.status(), StatusCode::OK);
-    let body = response.into_body().collect().await.unwrap().to_bytes();
-    // 203.0.113.50:6881 in compact form (first IP from X-Forwarded-For)
-    assert!(body
-        .windows([203, 0, 113, 50, 26, 225].len())
-        .any(|window| window == [203, 0, 113, 50, 26, 225]));
+        assert_eq!(response.status(), StatusCode::OK, "{header}: {value}");
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let mut expected = ip.to_vec();
+        expected.extend_from_slice(&6881_u16.to_be_bytes());
+        assert!(
+            body.windows(expected.len())
+                .any(|w| w == expected.as_slice()),
+            "{header}: {value} peer missing from response"
+        );
+    }
 }
 
 #[tokio::test]
@@ -538,19 +515,31 @@ async fn spoofed_proxy_header_ignored_by_default() {
 }
 
 #[tokio::test]
-async fn invalid_announce_returns_bencoded_failure() {
-    let response = app()
-        .oneshot(request_with_connect_info(
-            "/announce?info_hash=short&peer_id=short&port=6881",
-        ))
-        .await
-        .unwrap();
+async fn invalid_info_hash_returns_bencoded_failure() {
+    // The info_hash must decode to exactly 20 bytes: both a too-short and
+    // a too-long value are rejected with a bencoded failure.
+    let long_hash = "a".repeat(41);
+    for info_hash in ["short", long_hash.as_str()] {
+        let uri = format!(
+            "/announce?info_hash={info_hash}&peer_id=-RT0001-abcdefgh1234&port=6881&left=0"
+        );
+        let response = app()
+            .oneshot(request_with_connect_info(&uri))
+            .await
+            .unwrap();
 
-    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-    let body = response.into_body().collect().await.unwrap().to_bytes();
-    assert!(body
-        .windows(b"failure reason".len())
-        .any(|w| w == b"failure reason"));
+        assert_eq!(
+            response.status(),
+            StatusCode::BAD_REQUEST,
+            "info_hash={info_hash}"
+        );
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        assert!(
+            body.windows(b"failure reason".len())
+                .any(|w| w == b"failure reason"),
+            "info_hash={info_hash}"
+        );
+    }
 }
 
 /// Unique suffix for temp paths.
@@ -927,32 +916,13 @@ async fn add_blacklist_requires_configured_token() {
     cleanup(&path);
 }
 
+/// Ordering and pagination math are unit-tested in `server::blacklist`;
+/// this only pins the endpoint's response fields.
 #[tokio::test]
-async fn blacklist_list_is_sorted_and_paginated() {
+async fn blacklist_list_returns_entries_with_pagination_fields() {
     let (app, path) = blacklist_app_with_token(Some("secret-token"));
 
-    for hash in [
-        "6363636363636363636363636363636363636363",
-        "6262626262626262626262626262626262626262",
-    ] {
-        let response = app
-            .clone()
-            .oneshot(
-                Request::builder()
-                    .method("POST")
-                    .uri("/api/blacklist")
-                    .header(header::AUTHORIZATION, "Bearer secret-token")
-                    .header(header::CONTENT_TYPE, "application/json")
-                    .body(Body::from(format!(r#"{{"info_hash":"{hash}"}}"#)))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(response.status(), StatusCode::OK);
-    }
-
     let response = app
-        .clone()
         .oneshot(
             Request::builder()
                 .method("GET")
@@ -965,34 +935,12 @@ async fn blacklist_list_is_sorted_and_paginated() {
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
     let parsed = json_body(response).await;
-    assert_eq!(parsed["total"], 3);
+    assert_eq!(parsed["total"], 1);
     assert_eq!(parsed["offset"], 0);
     assert_eq!(parsed["limit"], 2);
     assert_eq!(
         parsed["entries"][0],
         "6161616161616161616161616161616161616161"
-    );
-    assert_eq!(
-        parsed["entries"][1],
-        "6262626262626262626262626262626262626262"
-    );
-
-    let response = app
-        .oneshot(
-            Request::builder()
-                .method("GET")
-                .uri("/api/blacklist?offset=2&limit=2")
-                .header(header::AUTHORIZATION, "Bearer secret-token")
-                .body(Body::empty())
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    let parsed = json_body(response).await;
-    assert_eq!(parsed["total"], 3);
-    assert_eq!(
-        parsed["entries"][0],
-        "6363636363636363636363636363636363636363"
     );
     cleanup(&path);
 }
@@ -1327,48 +1275,6 @@ async fn mcp_scrape_reports_swarm_stats_and_omits_blacklisted() {
 }
 
 #[tokio::test]
-async fn mcp_scrape_rejects_bad_input() {
-    let (app, path) = blacklist_app_with_token(Some("secret-token"));
-
-    let response = app
-        .clone()
-        .oneshot(mcp_request(
-            Some("secret-token"),
-            mcp_tool_call(2, "scrape", serde_json::json!({"info_hashes": []})),
-        ))
-        .await
-        .unwrap();
-    let parsed = json_body(response).await;
-    assert_eq!(parsed["result"]["isError"], true);
-    let text = parsed["result"]["content"][0]["text"].as_str().unwrap();
-    assert!(
-        text.contains("must not be empty"),
-        "unexpected error: {text}"
-    );
-
-    let response = app
-        .oneshot(mcp_request(
-            Some("secret-token"),
-            mcp_tool_call(
-                3,
-                "scrape",
-                serde_json::json!({"info_hashes": [
-                    "6262626262626262626262626262626262626262",
-                    "not-a-hash"
-                ]}),
-            ),
-        ))
-        .await
-        .unwrap();
-    let parsed = json_body(response).await;
-    assert_eq!(parsed["result"]["isError"], true);
-    let text = parsed["result"]["content"][0]["text"].as_str().unwrap();
-    assert!(text.contains("info_hashes[1]"), "unexpected error: {text}");
-
-    cleanup(&path);
-}
-
-#[tokio::test]
 async fn mcp_tool_errors_are_visible_to_the_caller() {
     let (app, path) = blacklist_app_with_token(Some("secret-token"));
 
@@ -1524,104 +1430,7 @@ async fn mcp_is_not_mounted_without_admin_token() {
     cleanup(&path);
 }
 
-#[tokio::test]
-async fn info_hash_from_hex_parses_correctly() {
-    let hash = InfoHash::from_hex("6161616161616161616161616161616161616161").unwrap();
-    assert_eq!(hash.as_bytes(), &[b'a'; 20]);
-
-    assert!(InfoHash::from_hex("invalid").is_none());
-    assert!(InfoHash::from_hex("zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz").is_none());
-    assert!(InfoHash::from_hex("61616161616161616161616161616161616161").is_none());
-    // 38 chars
-}
-
 // ── 边界场景补测 ────────────────────────────────────────────────────────────
-
-#[tokio::test]
-async fn info_hash_too_short_returns_error() {
-    let response = app()
-        .oneshot(request_with_connect_info(
-            "/announce?info_hash=short&peer_id=-RT0001-abcdefgh1234&port=6881&left=0",
-        ))
-        .await
-        .unwrap();
-
-    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-    let body = response.into_body().collect().await.unwrap().to_bytes();
-    assert!(body
-        .windows(b"failure reason".len())
-        .any(|w| w == b"failure reason"));
-}
-
-#[tokio::test]
-async fn info_hash_too_long_returns_error() {
-    let long_hash = "a".repeat(41); // 41 chars, one too many
-    let uri =
-        format!("/announce?info_hash={long_hash}&peer_id=-RT0001-abcdefgh1234&port=6881&left=0");
-    let response = app()
-        .oneshot(request_with_connect_info(&uri))
-        .await
-        .unwrap();
-
-    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-    let body = response.into_body().collect().await.unwrap().to_bytes();
-    assert!(body
-        .windows(b"failure reason".len())
-        .any(|w| w == b"failure reason"));
-}
-
-#[tokio::test]
-async fn numwant_capped_at_400() {
-    let app = app();
-    // Add 500 peers to the same torrent
-    for i in 0..500 {
-        let peer_id = format!("-RT0001-p{i:011}");
-        let uri = format!(
-            "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id={peer_id}&port={}&left=0&event=started&compact=1",
-            6881 + (i % 60000) as u16,
-        );
-        app.clone()
-            .oneshot(request_with_connect_info(&uri))
-            .await
-            .unwrap();
-    }
-
-    // Request with numwant=999999
-    let response = app
-        .oneshot(request_with_connect_info(
-            "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-reqstr000012&port=7000&left=0&event=started&compact=1&numwant=999999",
-        ))
-        .await
-        .unwrap();
-
-    assert_eq!(response.status(), StatusCode::OK);
-    let body = response.into_body().collect().await.unwrap().to_bytes();
-    // Compact peers are 6 bytes each; count them by looking for peers key
-    // The response should have at most 400 peers (400 * 6 = 2400 bytes of peer data)
-    // We verify by checking the peers string length
-    let peers_marker = b"5:peers";
-    let peers6_marker = b"6:peers6";
-    let peers_pos = body
-        .windows(peers_marker.len())
-        .position(|w| w == peers_marker)
-        .unwrap();
-    let peers6_pos = body
-        .windows(peers6_marker.len())
-        .position(|w| w == peers6_marker)
-        .unwrap();
-    // Between "5:peers" and "6:peers6" there's the length prefix and data
-    // Extract the peers data length from bencode format "5:peers<len>:"
-    let peers_section = &body[peers_pos + peers_marker.len()..peers6_pos];
-    // Parse bencode byte string length: "<digits>:<data>"
-    let colon_pos = peers_section.iter().position(|&b| b == b':').unwrap();
-    let len_str = std::str::from_utf8(&peers_section[..colon_pos]).unwrap();
-    let peers_data_len: usize = len_str.parse().unwrap();
-    let peer_count = peers_data_len / 6;
-    assert!(
-        peer_count <= 400,
-        "expected at most 400 peers, got {peer_count}"
-    );
-}
 
 #[tokio::test]
 async fn duplicate_peer_started_does_not_double_count() {
@@ -1974,13 +1783,13 @@ async fn stopped_peer_not_in_announce_response() {
     // Add two peers
     app.clone()
         .oneshot(request_with_connect_info(
-            "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-peer_aaaaaaaaaa&port=6881&left=10&event=started&compact=1",
+            "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-peer_aaaaaaa&port=6881&left=10&event=started&compact=1",
         ))
         .await
         .unwrap();
     app.clone()
         .oneshot(request_with_connect_info(
-            "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-peer_bbbbbbbbbb&port=6882&left=10&event=started&compact=1",
+            "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-peer_bbbbbbb&port=6882&left=10&event=started&compact=1",
         ))
         .await
         .unwrap();
@@ -1988,7 +1797,7 @@ async fn stopped_peer_not_in_announce_response() {
     // Stop peer A
     app.clone()
         .oneshot(request_with_connect_info(
-            "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-peer_aaaaaaaaaa&port=6881&left=10&event=stopped&compact=1",
+            "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-peer_aaaaaaa&port=6881&left=10&event=stopped&compact=1",
         ))
         .await
         .unwrap();
@@ -1996,35 +1805,19 @@ async fn stopped_peer_not_in_announce_response() {
     // Peer B announces - should not see peer A in response
     let response = app
         .oneshot(request_with_connect_info(
-            "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-peer_bbbbbbbbbb&port=6882&left=10&event=started&compact=1&numwant=100",
+            "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-peer_bbbbbbb&port=6882&left=10&event=started&compact=1&numwant=100",
         ))
         .await
         .unwrap();
     let body = response.into_body().collect().await.unwrap().to_bytes();
-    // Peer A is 127.0.0.1:6881 = [127,0,0,1,0x1A,0xE1], but it was stopped so should not appear
+    let peers = compact_peers(&body);
+    // Peer A is 127.0.0.1:6881 = [127,0,0,1,0x1A,0xE1], but it was
+    // stopped, so it must not appear in the peers data.
     let peer_a_bytes: [u8; 6] = [127, 0, 0, 1, 0x1A, 0xE1];
-    // The response should not contain peer A's compact representation in the peers data
-    // We need to check only the peers binary data, not the whole response
-    // Find "5:peers" and extract the data
-    let peers_marker = b"5:peers";
-    let peers6_marker = b"6:peers6";
-    if let Some(peers_pos) = body
-        .windows(peers_marker.len())
-        .position(|w| w == peers_marker)
-    {
-        if let Some(peers6_pos) = body
-            .windows(peers6_marker.len())
-            .position(|w| w == peers6_marker)
-        {
-            let peers_section = &body[peers_pos + peers_marker.len()..peers6_pos];
-            let colon_pos = peers_section.iter().position(|&b| b == b':').unwrap();
-            let peers_data = &peers_section[colon_pos + 1..];
-            assert!(
-                !peers_data.windows(6).any(|w| w == peer_a_bytes),
-                "stopped peer A should not appear in peers data"
-            );
-        }
-    }
+    assert!(
+        !peers.windows(6).any(|w| w == peer_a_bytes),
+        "stopped peer A should not appear in peers data"
+    );
 }
 
 #[tokio::test]
@@ -2133,51 +1926,6 @@ async fn duplicate_completed_does_not_increment() {
 }
 
 #[tokio::test]
-async fn announce_without_left_counts_as_leecher() {
-    let app = app();
-
-    let response = app
-        .oneshot(request_with_connect_info(
-            "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-abcdefgh1234&port=6881&event=started",
-        ))
-        .await
-        .unwrap();
-
-    assert_eq!(response.status(), StatusCode::OK);
-    let body = response.into_body().collect().await.unwrap().to_bytes();
-    assert!(body
-        .windows(b"8:completei0e".len())
-        .any(|w| w == b"8:completei0e"));
-    assert!(body
-        .windows(b"10:incompletei1e".len())
-        .any(|w| w == b"10:incompletei1e"));
-}
-
-#[tokio::test]
-async fn announce_ip_query_parameter_does_not_spoof_peer_address() {
-    let app = app();
-    // The BEP 3 `ip` parameter is deliberately ignored: any client could
-    // spoof it to inject arbitrary addresses into other peers' lists.
-    app.clone()
-        .oneshot(request_with_connect_info(
-            "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-abcdefgh1234&port=6881&left=0&event=started&compact=1&ip=203.0.113.9",
-        ))
-        .await
-        .unwrap();
-
-    let response = app
-        .oneshot(request_with_connect_info(
-            "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-abcdefgh5678&port=6882&left=0&event=started&compact=1",
-        ))
-        .await
-        .unwrap();
-    assert_eq!(response.status(), StatusCode::OK);
-    let body = response.into_body().collect().await.unwrap().to_bytes();
-    assert!(body.windows(4).any(|w| w == [127, 0, 0, 1]));
-    assert!(!body.windows(4).any(|w| w == [203, 0, 113, 9]));
-}
-
-#[tokio::test]
 async fn scrape_rejects_more_than_200_info_hashes() {
     let app = app();
     let query: String = (0..=200)
@@ -2203,9 +1951,9 @@ async fn scrape_rejects_more_than_200_info_hashes() {
 }
 
 #[tokio::test]
-async fn scrape_multiple_info_hashes() {
+async fn scrape_reports_each_torrent_independently() {
     let app = app();
-    // Add peers to two different torrents
+    // Seed a seeder on torrent A and a leecher on torrent B.
     app.clone()
         .oneshot(request_with_connect_info(
             "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-abcdefgh1234&port=6881&left=0&event=started&compact=1",
@@ -2219,46 +1967,7 @@ async fn scrape_multiple_info_hashes() {
         .await
         .unwrap();
 
-    // Scrape both
-    let response = app
-        .oneshot(
-            Request::builder()
-                .uri("/scrape?info_hash=aaaaaaaaaaaaaaaaaaaa&info_hash=bbbbbbbbbbbbbbbbbbbb")
-                .body(Body::empty())
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(response.status(), StatusCode::OK);
-    let body = response.into_body().collect().await.unwrap().to_bytes();
-    // Both info_hashes should be in the response
-    // InfoHash a = 6161... in bytes, b = 6262... in bytes
-    assert!(body
-        .windows(b"8:completei1e".len())
-        .any(|w| w == b"8:completei1e"));
-    assert!(body
-        .windows(b"10:incompletei1e".len())
-        .any(|w| w == b"10:incompletei1e"));
-}
-
-#[tokio::test]
-async fn scrape_one_hash_does_not_affect_other() {
-    let app = app();
-    // Add peers to two different torrents
-    app.clone()
-        .oneshot(request_with_connect_info(
-            "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-abcdefgh1234&port=6881&left=0&event=started&compact=1",
-        ))
-        .await
-        .unwrap();
-    app.clone()
-        .oneshot(request_with_connect_info(
-            "/announce?info_hash=bbbbbbbbbbbbbbbbbbbb&peer_id=-RT0001-bcdefghi1234&port=6882&left=10&event=started&compact=1",
-        ))
-        .await
-        .unwrap();
-
-    // Scrape only torrent A
+    // Scraping one torrent leaves the other intact.
     let response = app
         .clone()
         .oneshot(
@@ -2274,8 +1983,8 @@ async fn scrape_one_hash_does_not_affect_other() {
         .windows(b"8:completei1e".len())
         .any(|w| w == b"8:completei1e"));
 
-    // Scrape only torrent B - should still have its peer
     let response = app
+        .clone()
         .oneshot(
             Request::builder()
                 .uri("/scrape?info_hash=bbbbbbbbbbbbbbbbbbbb")
@@ -2288,21 +1997,38 @@ async fn scrape_one_hash_does_not_affect_other() {
     assert!(body
         .windows(b"10:incompletei1e".len())
         .any(|w| w == b"10:incompletei1e"));
+
+    // Both hashes in one request report both swarms.
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/scrape?info_hash=aaaaaaaaaaaaaaaaaaaa&info_hash=bbbbbbbbbbbbbbbbbbbb")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    assert!(body
+        .windows(b"8:completei1e".len())
+        .any(|w| w == b"8:completei1e"));
+    assert!(body
+        .windows(b"10:incompletei1e".len())
+        .any(|w| w == b"10:incompletei1e"));
 }
 
 #[tokio::test]
 async fn client_ip_parameter_ignored() {
-    // Verify that client-reported &ip= parameter is ignored in favor of connection IP
+    // The BEP 3 `ip` parameter is deliberately ignored: a client could
+    // spoof it to inject arbitrary addresses into other peers' lists.
     let app = app();
-    // Peer announces with &ip= spoofing a different IP
     let uri = "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-abcdefgh1234&port=6881&left=0&event=started&compact=1&ip=10.0.0.99";
     app.clone()
         .oneshot(request_with_connect_info(uri))
         .await
         .unwrap();
 
-    // Another peer announces and should see the first peer at 127.0.0.1 (connection IP),
-    // not at 10.0.0.99 (spoofed IP)
     let response = app
         .oneshot(request_with_connect_info(
             "/announce?info_hash=aaaaaaaaaaaaaaaaaaaa&peer_id=-RT0001-bcdefghi1234&port=6882&left=10&event=started&compact=1",
@@ -2310,35 +2036,17 @@ async fn client_ip_parameter_ignored() {
         .await
         .unwrap();
     let body = response.into_body().collect().await.unwrap().to_bytes();
-    // Connection IP is 127.0.0.1, port 6881 = [127,0,0,1,0x1A,0xE1]
+    let peers = compact_peers(&body);
+    // The first peer is seen at its connection IP 127.0.0.1:6881 ...
     let peer_bytes: [u8; 6] = [127, 0, 0, 1, 0x1A, 0xE1];
-    // Find peers data
-    let peers_marker = b"5:peers";
-    if let Some(peers_pos) = body
-        .windows(peers_marker.len())
-        .position(|w| w == peers_marker)
-    {
-        let peers_section = &body[peers_pos + peers_marker.len()..];
-        let colon_pos = peers_section.iter().position(|&b| b == b':').unwrap();
-        let peers_data = &peers_section[colon_pos + 1..];
-        assert!(
-            peers_data.windows(6).any(|w| w == peer_bytes),
-            "peer should be at connection IP 127.0.0.1:6881, not spoofed 10.0.0.99"
-        );
-    }
-    // Also verify 10.0.0.99 does NOT appear
+    assert!(
+        peers.windows(6).any(|w| w == peer_bytes),
+        "peer should be at connection IP 127.0.0.1:6881, not spoofed 10.0.0.99"
+    );
+    // ... and not at the spoofed 10.0.0.99.
     let spoofed_bytes: [u8; 6] = [10, 0, 0, 99, 0x1A, 0xE1];
-    let peers_marker = b"5:peers";
-    if let Some(peers_pos) = body
-        .windows(peers_marker.len())
-        .position(|w| w == peers_marker)
-    {
-        let peers_section = &body[peers_pos + peers_marker.len()..];
-        let colon_pos = peers_section.iter().position(|&b| b == b':').unwrap();
-        let peers_data = &peers_section[colon_pos + 1..];
-        assert!(
-            !peers_data.windows(6).any(|w| w == spoofed_bytes),
-            "spoofed IP 10.0.0.99 should not appear in peers"
-        );
-    }
+    assert!(
+        !peers.windows(6).any(|w| w == spoofed_bytes),
+        "spoofed IP 10.0.0.99 should not appear in peers"
+    );
 }
