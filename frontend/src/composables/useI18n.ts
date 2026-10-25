@@ -2,7 +2,7 @@ import { computed } from "vue"
 import { useI18n as useVueI18n } from "vue-i18n"
 import { useHead, useSeoMeta } from "@unhead/vue"
 import type { LangKey } from "../types/api"
-import { LANG_LOCALE, OG_LOCALE } from "../i18n"
+import { LANG_LOCALE, OG_LOCALE, persistLang } from "../i18n"
 
 export function useI18n() {
   const { t, locale, n, d } = useVueI18n({ useScope: "global" })
@@ -13,6 +13,7 @@ export function useI18n() {
 
   function setLang(l: LangKey) {
     locale.value = l
+    persistLang(l)
   }
 
   return { t, lang: locale, n, number, d, setLang }

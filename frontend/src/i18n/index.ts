@@ -424,7 +424,29 @@ export const numberFormats: Record<LangKey, typeof nfFormats> = {
   uk: nfFormats,
 }
 
+const LANG_STORAGE_KEY = "rt-lang"
+const LANG_KEYS = ["zh", "en", "ja", "ru", "de", "uk"] as const
+
+function storedLang(): LangKey | null {
+  try {
+    const value = localStorage.getItem(LANG_STORAGE_KEY)
+    return value !== null && LANG_KEYS.includes(value as LangKey) ? (value as LangKey) : null
+  } catch {
+    return null
+  }
+}
+
+export function persistLang(lang: LangKey) {
+  try {
+    localStorage.setItem(LANG_STORAGE_KEY, lang)
+  } catch {
+    // Private-browsing mode can block storage; memory-only locale is fine.
+  }
+}
+
 export function detectLang(): LangKey {
+  const stored = storedLang()
+  if (stored) return stored
   const nav = navigator.language || ""
   if (nav.startsWith("zh")) return "zh"
   if (nav.startsWith("ja")) return "ja"
