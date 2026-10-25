@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from "vue"
+import { computed, onActivated } from "vue"
 import type { TableColumn } from "@nuxt/ui"
 import type { ClientListEntry } from "../types/api"
 import { useClientsList } from "../composables/useClientsList"
@@ -8,7 +8,7 @@ import { useI18n } from "../composables/useI18n"
 const { t, number, d, n } = useI18n()
 const { data, loading, error, lastUpdated, load } = useClientsList()
 
-onMounted(load)
+onActivated(load)
 
 const totalPeers = computed(() => (data.value ? data.value.clients.reduce((s, c) => s + c.peers, 0) : 0))
 

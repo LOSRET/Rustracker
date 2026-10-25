@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h, onMounted, ref } from "vue"
+import { computed, h, onActivated, ref } from "vue"
 import type { TableColumn } from "@nuxt/ui"
 import UTooltip from "@nuxt/ui/runtime/components/Tooltip.vue"
 import { useClipboard } from "@vueuse/core"
@@ -12,7 +12,7 @@ const { data, loading, error, sort, lastUpdated, load } = useTop100()
 const { copied, copy } = useClipboard({ copiedDuring: 1500, legacy: true })
 const copiedHash = ref<string | null>(null)
 
-onMounted(load)
+onActivated(load)
 
 function copyHash(hash: string) {
   copiedHash.value = hash
