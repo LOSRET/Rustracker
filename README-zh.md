@@ -27,7 +27,7 @@
 
 **运维特性**
 - 64 分片并发 Tracker 池，高吞吐低争用
-- 102 种 BitTorrent 客户端识别（qBittorrent、Transmission、µTorrent、Aria2、迅雷等）
+- 103 种 BitTorrent 客户端识别（qBittorrent、Transmission、µTorrent、Aria2、迅雷等）
 - 种子黑名单热重载——编辑文件即可生效，无需重启
 - 可选的趋势数据持久化到 JSONL（7 天保留，10 分钟采样）
 - Ctrl+C / SIGTERM 优雅关闭
@@ -320,7 +320,7 @@ cargo run --release -- --trends-file /var/lib/rustracker/trends.jsonl
 rustracker/
 ├── src/
 │   ├── core/          # 追踪引擎（无 I/O）：types、tracker、swarm、topk、counters
-│   ├── protocol/      # BT 协议：bencode、announce、client_id（102 种客户端）
+│   ├── protocol/      # BT 协议：bencode、announce、client_id（103 种客户端）
 │   └── server/        # HTTP 层：handlers、admin、mcp、pool（64 分片）、blacklist、audit、trends
 ├── frontend/          # Vue 3 + Vite + Tailwind 面板 SPA（编译时内嵌）
 ├── examples/          # 负载测试与性能基准
@@ -333,7 +333,7 @@ rustracker/
 
 ## 客户端识别
 
-Tracker 可从 peer ID 前缀识别 **102 种 BitTorrent 客户端**，包括：
+Tracker 可从 peer ID 前缀识别 **103 种 BitTorrent 客户端**，包括：
 
 | 类别 | 客户端 |
 |------|--------|
@@ -342,7 +342,7 @@ Tracker 可从 peer ID 前缀识别 **102 种 BitTorrent 客户端**，包括：
 | Web 端 | WebTorrent、Brave |
 | 经典 | FlashGet、GetRight、LimeWire、Shareaza |
 | 国产 | 迅雷（Thunder）、QQ旋风、百度网盘 |
-| 其他 | Tixati、Halite、BitComet、BitSpirit、MLDonkey |
+| 其他 | Tixati、Halite、BitComet、BitSpirit、MLDonkey、Ani |
 
 客户端标签通过 `/api/clients` 端点暴露，并展示在面板的客户端分布图表中。
 

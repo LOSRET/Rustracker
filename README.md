@@ -27,7 +27,7 @@ A lightweight, high-performance HTTP BitTorrent tracker with a real-time dashboa
 
 **Operations**
 - 64-shard concurrent tracker pool for high throughput
-- 102 BitTorrent client identification (qBittorrent, Transmission, µTorrent, Aria2, 迅雷, etc.)
+- 103 BitTorrent client identification (qBittorrent, Transmission, µTorrent, Aria2, 迅雷, etc.)
 - Hot-reload torrent blacklist — edit the file, no restart needed
 - Optional trend data persistence to JSONL (7-day retention, 10-min sampling)
 - Graceful shutdown on Ctrl+C / SIGTERM
@@ -320,7 +320,7 @@ cargo run --release -- --trends-file /var/lib/rustracker/trends.jsonl
 rustracker/
 ├── src/
 │   ├── core/          # Tracker engine (no I/O): types, tracker, swarm, topk, counters
-│   ├── protocol/      # BT protocol: bencode, announce, client_id (102 clients)
+│   ├── protocol/      # BT protocol: bencode, announce, client_id (103 clients)
 │   └── server/        # HTTP layer: handlers, admin, mcp, pool (64 shards), blacklist, audit, trends
 ├── frontend/          # Vue 3 + Vite + Tailwind dashboard SPA (embedded at compile time)
 ├── examples/          # Load testing and benchmarking tools
@@ -333,7 +333,7 @@ Three-layer design: `core` (pure engine) → `protocol` (BT encoding) → `serve
 
 ## Client Identification
 
-The tracker recognizes **102 BitTorrent clients** from peer ID prefixes, including:
+The tracker recognizes **103 BitTorrent clients** from peer ID prefixes, including:
 
 | Category | Clients |
 |----------|---------|
@@ -342,7 +342,7 @@ The tracker recognizes **102 BitTorrent clients** from peer ID prefixes, includi
 | Web-based | WebTorrent, Brave |
 | Legacy | FlashGet, GetRight, LimeWire, Shareaza |
 | Chinese | 迅雷 (Thunder), QQ旋风, 百度网盘 |
-| Other | Tixati, Halite, BitComet, BitSpirit, MLDonkey |
+| Other | Tixati, Halite, BitComet, BitSpirit, MLDonkey, Ani |
 
 Client tags are exposed in the `/api/clients` endpoint and the dashboard's client distribution chart.
 

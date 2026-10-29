@@ -104,6 +104,7 @@ pub const MLDONKEY: u8 = 98;
 pub const BM: u8 = 99;
 pub const ALLPEERS: u8 = 100;
 pub const QVOD: u8 = 101;
+pub const ANI: u8 = 102;
 
 /// Name for a client tag value. Returns "Unknown" for tag 0.
 pub fn client_name(tag: u8) -> &'static str {
@@ -209,6 +210,7 @@ pub fn client_name(tag: u8) -> &'static str {
         BM => "BitMagnet",
         ALLPEERS => "AllPeers",
         QVOD => "QVOD",
+        ANI => "Ani",
         _ => "Unknown",
     }
 }
@@ -231,6 +233,8 @@ const fn build_azureus_table() -> [[u8; 256]; 256] {
     t[b'A' as usize][b'X' as usize] = BITPUMP;
     // ADM
     t[b'A' as usize][b'D' as usize] = ADM;
+    // Ani (Anitorrent)
+    t[b'A' as usize][b'L' as usize] = ANI;
     // AzTorrent
     t[b'A' as usize][b'T' as usize] = AZTORRENT;
     // Vuze
@@ -465,4 +469,26 @@ pub fn identify(peer_id: &[u8; 20]) -> u8 {
     }
 
     UNKNOWN
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{identify, ANI, LIBTORRENT, QBITTORRENT, UNKNOWN};
+
+    #[test]
+    fn identifies_ani_anitorrent() {
+        assert_eq!(identify(b"-AL6400-abcdefgh1234"), ANI);
+        assert_eq!(identify(b"-AL3000-abcdefgh1234"), ANI);
+    }
+
+    #[test]
+    fn keeps_existing_prefixes() {
+        assert_eq!(identify(b"-LT2000-abcdefgh1234"), LIBTORRENT);
+        assert_eq!(identify(b"-qB4600-abcdefgh1234"), QBITTORRENT);
+    }
+
+    #[test]
+    fn unknown_prefix_stays_unknown() {
+        assert_eq!(identify(b"-ZZ0000-abcdefgh1234"), UNKNOWN);
+    }
 }

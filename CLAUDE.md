@@ -69,7 +69,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## Project Overview
 
-Rustracker is a lightweight, high-performance HTTP BitTorrent tracker written in Rust. It implements BEP 3 compliant `announce` and `scrape` endpoints, serves a real-time web dashboard on the same port, and identifies 102 BitTorrent clients from peer ID prefixes.
+Rustracker is a lightweight, high-performance HTTP BitTorrent tracker written in Rust. It implements BEP 3 compliant `announce` and `scrape` endpoints, serves a real-time web dashboard on the same port, and identifies 103 BitTorrent clients from peer ID prefixes.
 
 **Requirements:** Rust 1.85+ (edition 2021)
 
