@@ -13,7 +13,7 @@ personal-contact = []
 [dependencies]
 anyhow = "1.0"
 axum = { version = "0.8", features = ["tokio", "http1"] }
-axum-server = "0.8"
+axum-server = "0.9"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 clap = { version = "4.5", features = ["derive", "env"] }
 hyper-util = { version = "0.1", features = ["tokio"] }
